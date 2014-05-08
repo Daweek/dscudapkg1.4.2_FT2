@@ -1,0 +1,51 @@
+/usr/local/cuda-5.0/bin/nvcc -O0 -g -I. -I/usr/local/cuda-5.0/include -I/share02/m_oikawa/NVIDIA_GPU_Computing_SDK/C/common/inc -c -o libdscuda.o libdscuda.cu
+libdscuda.cu:1182:2: warning: #warning fill this part in dscudaFuncGetAttributesWrapper().
+libdscuda.cu:1478:2: warning: #warning fill this part in dscudaBindTextureWrapper().
+libdscuda.cu:1525:2: warning: #warning fill this part in dscudaBindTexture2DWrapper().
+libdscuda.cu:1577:2: warning: #warning fill this part in dscudaBindTextureToArrayWrapper().
+libdscuda.cu(708): warning: variable "nsvr" was set but never used
+
+libdscuda.cu(850): warning: variable "tmp" was declared but never referenced
+
+libdscuda.cu(59): warning: variable "Nbroken" was declared but never referenced
+
+libdscuda.cu(60): warning: variable "svrBroken" was declared but never referenced
+
+libdscuda.cu(66): warning: variable "Cmid" was declared but never referenced
+
+libdscuda.cu(150): warning: function "RCmappedMemRegister" was declared but never referenced
+
+libdscuda.cu(184): warning: function "RCmappedMemUnregister" was declared but never referenced
+
+libdscuda.cu(213): warning: function "RCstreamArrayRegister" was declared but never referenced
+
+libdscuda.cu(265): warning: function "RCstreamArrayUnregister" was declared but never referenced
+
+libdscuda.cu(295): warning: function "RCcuarrayArrayRegister" was declared but never referenced
+
+libdscuda.cu(329): warning: function "RCcuarrayArrayUnregister" was declared but never referenced
+
+libdscuda.cu(357): warning: function "RCeventArrayRegister" was declared but never referenced
+
+libdscuda.cu(391): warning: function "RCeventArrayUnregister" was declared but never referenced
+
+libdscuda.cu(451): warning: function "RCuvaRegister" was declared but never referenced
+
+libdscuda.cu(497): warning: function "RCuvaUnregister" was declared but never referenced
+
+libdscuda.cu(614): warning: function "printModuleList" was declared but never referenced
+
+libdscuda.cu(848): warning: function "replaceBrokenServer" was declared but never referenced
+
+libdscuda.cu(992): warning: function "invalidateModuleCache" was declared but never referenced
+
+libdscuda.cu(1081): warning: variable "LoadModuleMutex" was declared but never referenced
+
+libdscuda.cu:1182:2: warning: #warning fill this part in dscudaFuncGetAttributesWrapper().
+libdscuda.cu:1478:2: warning: #warning fill this part in dscudaBindTextureWrapper().
+libdscuda.cu:1525:2: warning: #warning fill this part in dscudaBindTexture2DWrapper().
+libdscuda.cu:1577:2: warning: #warning fill this part in dscudaBindTextureToArrayWrapper().
+libdscuda.cu(708): warning: variable "nsvr" was set but never used
+
+libdscuda.cu(850): warning: variable "tmp" was declared but never referenced
+
