@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <ctype.h>
 #include "dscuda.h"
 #include "libdscuda.h"
 #include "dscudaverb.h"
@@ -47,32 +48,42 @@ static RCuva          *RCuvaListTail          = NULL;
 
 int       Vdevid[RC_NPTHREADMAX] = { 0 };           // the virtual device currently in use.
 
-static int        Nvdev;                   /* # of virtual devices available. */
+static int Nvdev;                   /* # of virtual devices available. */
 Vdev_t     Vdev[RC_NVDEVMAX];       /* a list of virtual devices. */
 
-static int        Ncand;                   /* # of server candidates. */
-static RCServer_t svrCand[RC_NVDEVMAX];    /* a list of candidates of server. */
+static int Ncand;                   /* # of server candidates. */
+RCServer_t svrCand[RC_NVDEVMAX];    /* a list of candidates of server. */
 
-static int        Nspare;
-static RCServer_t svrSpare[RC_NVDEVMAX];
+static int Nspare;
+RCServer_t svrSpare[RC_NVDEVMAX];
 
-static int        Nbroken;
-static RCServer_t svrBroken[RC_NVDEVMAX];
+static int Nbroken;
+RCServer_t svrBroken[RC_NVDEVMAX];
+
+static int Nignore;
+RCServer_t svrIgnore[RC_NVDEVMAX];
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
-static ClientModule  Modulelist[RC_NKMODULEMAX] = {0}; /* is Singleton.*/
+ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 struct ClientState_t St; // is Singleton
 
-void dscudaRecordHistOn(void)  { St.setRecordHist(); }
-void dscudaRecordHistOff(void) { St.unsetRecordHist(); }
+void dscudaRecordHistOn(void) {
+    St.setRecordHist();
+}
+void dscudaRecordHistOff(void) {
+    St.unsetRecordHist();
+}
 
-void dscudaAutoVerbOn(void)    { St.setAutoVerb(); }
-void dscudaAutoVerbOff(void)   { St.unsetAutoVerb(); }
-
+void dscudaAutoVerbOn(void) {
+    St.setAutoVerb();
+}
+void dscudaAutoVerbOff(void) {
+    St.unsetAutoVerb();
+}
 int
 requestDaemonForDevice(char *ipaddr, int devid, int useibv)
 {
@@ -128,13 +139,11 @@ requestDaemonForDevice(char *ipaddr, int devid, int useibv)
  * Obtain a small integer unique for each thread.
  * The integer is used as an index to 'Vdevid[]'.
  */
-int
-vdevidIndex(void)
-{
+int vdevidIndex(void) {
     int i;
     pthread_t ptid = pthread_self();
 
-    for (i = 0; i < VdevidIndexMax; i++) {
+    for (i=0; i<VdevidIndexMax; i++) {
         if (VdevidIndex2ptid[i] == ptid) {
             return i;
         }
@@ -154,9 +163,7 @@ vdevidIndex(void)
     return i;
 }
 
-void
-RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
-{
+void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
     RCmappedMem *mem = (RCmappedMem *)malloc(sizeof(RCmappedMem));
     if (!mem) {
         perror("RCmappedMemRegister");
@@ -176,8 +183,7 @@ RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
 }
 
 RCmappedMem *
-RCmappedMemQuery(void *pHost)
-{
+RCmappedMemQuery(void *pHost) {
     RCmappedMem *mem = RCmappedMemListTop;
     while (mem) {
         if (mem->pHost == pHost) {
@@ -189,8 +195,7 @@ RCmappedMemQuery(void *pHost)
 }
 
 void
-RCmappedMemUnregister(void *pHost)
-{
+RCmappedMemUnregister(void *pHost) {
     RCmappedMem *mem = RCmappedMemQuery(pHost);
     if (!mem) return;
 
@@ -523,8 +528,6 @@ RCuvaUnregister(void *adr)
     free(uva);
 }
 
-
-
 static char*
 readServerConf(char *fname)
 {
@@ -574,14 +577,13 @@ resetServerUniqID(void)
     }
 }
 
-static void
-printVirtualDeviceList(void)
-{
+void
+printVirtualDeviceList(void) {
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
     int         i,j;
     printf("#(info.) *** Virtual Device Info.(Nvdev=%d)\n", Nvdev);
-    for (i=0, pVdev=Vdev; i<Nvdev; i++, pVdev++) {
+    for( i=0, pVdev=Vdev; i<Nvdev; i++, pVdev++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many virtual devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -592,12 +594,22 @@ printVirtualDeviceList(void)
 		WARN(0, "(;_;) Too many redundant devices. %s().\nexit.", __func__);
 		exit(1);
 	    }
-	    printf("#(info.)    + Raid[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", j,
-		   pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
+	    printf("#(info.)    + Raid[%d]: id=%d, cid=%d, IP=%s(%s), uniq=%d.\n", j,
+		   pSvr->id, pSvr->cid, pSvr->ip, pSvr->hostname, pSvr->uniq);
 	}
     }
+    printf("#(info.) *** Ignored Server Info.(Ningore=%d)\n",Nignore);
+    for( i=0, pSvr=svrIgnore; i<Nignore; i++, pSvr++ ){
+	if (i >= RC_NVDEVMAX) {
+	    WARN(0, "(;_;) Too many ignored devices. %s().\nexit.", __func__);
+	    exit(1);
+	}
+	printf("#(info.)    - Ignore[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
+	       pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
+    }
+    /*            */
     printf("#(info.) *** Candidate Server Info.(Ncand=%d)\n",Ncand);
-    for (i=0, pSvr=svrCand; i<Ncand; i++, pSvr++) {
+    for( i=0, pSvr=svrCand; i<Ncand; i++, pSvr++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many candidate devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -607,7 +619,7 @@ printVirtualDeviceList(void)
     }
     /*                 */
     printf("#(info.) *** Spare Server Info.(Nspare=%d)\n",Nspare);
-    for (i=0, pSvr=svrSpare; i<Nspare; i++, pSvr++) {
+    for( i=0, pSvr=svrSpare; i<Nspare; i++, pSvr++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many spare devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -618,25 +630,31 @@ printVirtualDeviceList(void)
     fflush(stdout);
 }
 
-static void
-printModuleList(ClientModule *module_list)
-{
-    ClientModule *mp=module_list;
-    printf("#%s(): RC_NKMODULEMAX= %d\n", __func__, RC_NKMODULEMAX);
+void printModuleList(void) {
+    const int len = 256;
+    char printbuf[len];
+    int valid_cnt = 0;
+    printf("# %s(): ====================================================\n", __func__);
+    printf("# %s(): RC_NKMODULEMAX= %d\n", __func__, RC_NKMODULEMAX);
     
-    for (int i=0; i < RC_NKMODULEMAX; i++) {
-	if (mp->valid != 0) {
-	    printf("#%s(): Modulelist[%d]:\n", __func__, i);
-	    printf("#%s():    + vdevid= %d\n", __func__, mp->vdevid);
+    for (int i=0; i<RC_NKMODULEMAX; i++) {
+	if( CltModulelist[i].isValid() ){
+	    printf("# %s(): CltModulelist[%d]:\n", __func__, i);
+	    printf("# %s():    + vdevid= %d\n", __func__, CltModulelist[i].vdevid);
 	    for (int j=0; j<4; j++) {
-		printf("#%s():    + id[%d]= %d\n", __func__, j, mp->id[j]);
+		printf("# %s():    + id[%d]= %d\n", __func__, j, CltModulelist[i].id[j]);
 	    }
-	    printf("#%s():    + name= %s\n", __func__, mp->name);
+	    printf("# %s():    + name= %s\n", __func__, CltModulelist[i].name);
 	    //printf("    + send_time= \n", sent_time., sent_time.);
-	    //printf("    + ptx_image= %s\n", mp->ptx_image);
+	    strncpy(printbuf, CltModulelist[i].ptx_image, len - 1 );
+	    printbuf[254]='\0';
+	    printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
+	    valid_cnt++;
 	}
-	mp++;
     }
+    printf("# %s(): %d valid modules registered.\n", __func__, valid_cnt);
+    printf("# %s(): ====================================================\n", __func__);
+    fflush(stdout);
 }
 
 static int
@@ -709,8 +727,7 @@ dscudaSearchServer(char *ips, int size)
 }
 
 static void
-initCandServerList(const char *env)
-{
+initCandServerList(const char *env) {
     char *ip;
     char buf[1024*RC_NVDEVMAX];
     int nsvr;
@@ -746,12 +763,43 @@ initCandServerList(const char *env)
 }
 
 static void
+initIgnoreServerList(void)
+{
+    char *env = getenv("DSCUDA_SERVER_IGNORE");
+    char *ip, *hostname, ips[RC_NVDEVMAX][256];
+    char buf[1024*RC_NVDEVMAX];
+    
+    if (env) {
+	if (sizeof(buf) < strlen(env)) {
+	    WARN(0, "%s():evironment variable DSCUDA_SERVER_IGNORE too long.\n", __func__);
+	    exit(1);
+	}
+	strncpy(buf, env, sizeof(buf));
+	Nignore = 0;
+	ip = strtok(buf, " "); // a list of IPs which consist a single vdev.
+	while (ip) {
+	    strcpy(svrIgnore[Nignore].ip, ip);
+	    Nignore++; /* counts Nignore */
+	    if (RC_NVDEVMAX < Nignore) {
+		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		     RC_NVDEVMAX);
+		exit(1);
+	    }
+	    ip = strtok(NULL, " ");
+	}
+    }
+    else {
+	Nignore = 0;
+    }
+}
+
+static void
 initVirtualServerList(const char *env)
 {
-    char *ip, ips[RC_NVDEVMAX][256];
+    char *ip, *hostname, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
     RCServer_t *sp;
-    Vdev_t *vdev;
+    Vdev_t *pvdev;
     
     if (env) {
 	if (sizeof(buf) < strlen(env)) {
@@ -774,18 +822,18 @@ initVirtualServerList(const char *env)
 	for (int i=0; i<Nvdev; i++) {
 	    int nred=0;
 	    int uniq=0; // begin with 0.
-	    vdev = Vdev + i;  /* vdev = &Vdev[i]  */
+	    pvdev = Vdev + i;  /* vdev = &Vdev[i]  */
 	    ip = strtok(ips[i], ","); // an IP (optionally with devid preceded by a colon) of
 	    // a single element of the vdev.
 	    while (ip != NULL) {
-		strcpy(vdev->server[nred].ip, ip);
+		strcpy(pvdev->server[nred].ip, ip);
 		nred++;
 		ip = strtok(NULL, ",");
 	    }
-	    vdev->nredundancy = nred;
+	    pvdev->nredundancy = nred;
 	    
-	    sp = vdev->server;
-	    for (int ired=0; ired<nred; ired++, sp++) {
+	    sp = pvdev->server;
+	    for (int ired=0; ired<nred; ired++) {
 		strncpy(buf, sp->ip, sizeof(buf));
 		ip = strtok(buf, ":");
 		strcpy(sp->ip, ip);
@@ -794,6 +842,43 @@ initVirtualServerList(const char *env)
 		sp->cid = ip ? atoi(ip) : 0;
 		sp->uniq = uniq;
 		uniq++;
+		sp++;
+	    }
+	}
+	/* convert hostname to ip address. */
+	int det_abc;
+	char letter;
+	char *ip_ref;
+	struct hostent *hostent0;
+	for (int i=0; i<Nvdev; i++) {
+	    for (int j=0; j < Vdev[i].nredundancy; j++) {
+		ip = Vdev[i].server[j].ip;
+		hostname = Vdev[i].server[j].hostname;
+		det_abc=1;
+		for (int k=0; k < strlen(ip); k++) {
+		    letter = ip[k];
+		    if (isdigit((unsigned char)letter || letter=='.')) {
+			det_abc = 0;
+			printf("%c", letter);
+		    }
+		    else {
+			det_abc = 1;
+			break;
+		    }
+		    printf("\n");
+		}
+		if (det_abc==1) {
+		    strcpy(hostname, ip);
+		    hostent0 = gethostbyname(hostname);
+		    if (hostent0==NULL) {
+			fprintf(stderr, "gethostbyname() returned NULL.\n");
+			exit(1);
+		    }
+		    else {
+			ip_ref = inet_ntoa(*(struct in_addr*)hostent0->h_addr_list[0]);
+			strcpy(ip, ip_ref);
+		    }
+		}
 	    }
 	}
     }
@@ -818,12 +903,17 @@ updateSpareServerList() //TODO: need more good algorithm.
 	for (int j=0; j<Nvdev; j++) {
 	    pSvr = pVdev->server;
 	    for (int k=0; k < pVdev->nredundancy; k++) {
-		if (strcmp(svrCand[i].ip, pSvr->ip)==0) { /* same IP */
+		if (strcmp(svrCand[i].ip, pSvr->ip)==0) { /* check same IP */
 		    found=1;
 		}
 		pSvr++;
 	    }
 	    pVdev++;
+	}
+	for (int j=0; j<Nignore; j++) {
+	    if (strcmp(svrCand[i].ip, svrIgnore[j].ip)==0) { /* check same IP */
+		found=1;
+	    }
 	}
 	if (found==0) { /* not found */
 	    svrSpare[spare_count].id   = svrCand[i].id;
@@ -838,8 +928,8 @@ updateSpareServerList() //TODO: need more good algorithm.
 static void
 copyServer(RCServer_t *dst, RCServer_t *src)
 {
-    //dst->id   = src->id; /* not exchanged */
-    //dst->cid  = src->cid;
+    //dst->id   = src->id;   // id must be the same.
+    //dst->cid  = src->cid;  // cid too.
     dst->uniq = src->uniq;
     strcpy(dst->ip, src->ip);
 }
@@ -852,16 +942,17 @@ swapServer(RCServer_t *s0, RCServer_t *s1)
     copyServer(s1, &buf);
 }
 
-static void
-replaceBrokenServer(RCServer_t *broken, RCServer_t *spare)
-{
+void
+replaceBrokenServer(RCServer_t *broken, RCServer_t *spare) {
     RCServer_t tmp;
 
     if (Nspare < 1) {  //redundant check?
-	WARN(0, "(+_+) No more spare server exist.\n");
+	WARN(0, "(+_+) Not found any spare server.\n");
 	exit(1);
     }
-    swapServer(broken, spare);
+    else {
+	swapServer(broken, spare);
+    }
 }
 
 static void printVersion(void)
@@ -888,8 +979,8 @@ static void updateWarnLevel(void)
     WARN(1, "#(info.) DSCUDA_WARNLEVEL= %d\n", dscudaWarnLevel());
 }
 
-static void updateDscudaPath(void)
-{
+static void
+updateDscudaPath(void) {
     char *env = getenv("DSCUDA_PATH");
     if (env) {
 	strncpy(Dscudapath, env, sizeof(Dscudapath)); //"Dscudapath" has global scape.
@@ -902,13 +993,12 @@ static void updateDscudaPath(void)
 }
 
 static void
-initEnv(void)
+initEnv(void) {
 /*
  * set "int Ndev",  "Vdev_t     Vdev[RC_NVDEVMAX]",
  *     "int Ncand", "RCServer_t svrCand[RC_NVDEVMAX]
  *     "autoVerb", "UseDaemon"
  */
-{
     static int firstcall=1;
     char *sconfname, *env;
 
@@ -926,9 +1016,11 @@ initEnv(void)
         env = getenv("DSCUDA_SERVER");
     }
 
-    resetServerUniqID();      /* set all unique ID to invalid(-1)*/ 
+    resetServerUniqID();      /* set all unique ID to invalid(-1)*/
+    initIgnoreServerList();
     initCandServerList(env);  /* search servers in which dscudad is running. */
     initVirtualServerList(env);  /* Update the list of virtual devices information. */
+
     updateSpareServerList();
     
     printVirtualDeviceList(); /* Print result to screen. */
@@ -942,16 +1034,15 @@ initEnv(void)
 
     // DSCUDA_AUTOVERB
     env = getenv("DSCUDA_AUTOVERB");
-    WARN(2, "#(info.) Automatic data recovery: ");
+
     if (env) {
         St.setAutoVerb();
         dscudaVerbInit();
-        WARN(2, "on");
+	WARN(2, "#(info.) Automatic data recovery: on.\n");
     }
     else {
-        WARN(2, "off");
+	WARN(2, "#(info.) Automatic data recovery: off.\n");
     }
-    WARN(2, "\n");
 
     // DSCUDA_USEDAEMON
     env = getenv("DSCUDA_USEDAEMON");
@@ -963,13 +1054,24 @@ initEnv(void)
         WARN(3, "#(info.) Do not use daemon. connect to the server directly.\n");
         St.unsetUseDaemon();
     }
+
+    // MIGRATE_DEVICE
+    env = getenv("DSCUDA_MIGRATION");
+    if (env && atoi(env)) {
+        WARN(3, "#(info.) Device Migrataion is enabled.\n");
+        St.setMigrateDevice();
+    }
+    else {
+        WARN(3, "#(info.) Device Migration is disabled.\n");
+        St.unsetMigrateDevice();
+    }
+
 }
 
 static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void
-initClient(void)
-{
+initClient(void) {
     static int firstcall = 1;
 
     pthread_mutex_lock(&InitClientMutex);
@@ -996,18 +1098,15 @@ initClient(void)
     pthread_mutex_unlock(&InitClientMutex);
 }
 
-void
-invalidateModuleCache(void)
-{
-#if RC_CACHE_MODULE
-    int i;
-    ClientModule *mp;
-
-    for (i=0, mp=Modulelist; i<RC_NKMODULEMAX; i++, mp++) {
-        if (!mp->valid) continue;
-        mp->valid = 0; // invalidate the cache.
+void invalidateModuleCache(void) {
+    for (int i=0; i<RC_NKMODULEMAX; i++) {
+        if( CltModulelist[i].isValid() ){
+	    CltModulelist[i].invalidate();
+	}
+	else { 
+	    continue;
+	}
     }
-#endif // RC_CACHE_MODULE
 }
 
 /*
@@ -1041,8 +1140,7 @@ void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg)
  *               } // _Z6vecMulPfS_fS_iPi
  */
 void
-dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata)
-{
+dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata) {
     WARN(10, "<---Entering %s()\n", __func__);
     static char mangler[256] = {0, };
     char cmd[4096];
@@ -1093,8 +1191,7 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  * the module is cached and sent only once for a certain period.
  */
 int*
-dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated.
-{
+dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
     //WARN(10, "<---Entering %s()\n", __func__);
     int i, j, mid;
     ClientModule *mp;
@@ -1103,19 +1200,23 @@ dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated
 	WARN(5, "dscudaLoadModule(%p) modulename:%s  ...\n", name, name);
 #if RC_CACHE_MODULE
 	// look for modulename in the module list.
-	for (i=0, mp=Modulelist; i < RC_NKMODULEMAX; i++, mp++) {
-	    if (mp->valid == 0) continue;
+	mp = CltModulelist;
+	for (i=0; i < RC_NKMODULEMAX; i++) {
+	    if (mp->isInvalid()) continue;
 	    if (mp->vdevid != Vdevid[vdevidIndex()]) continue;
 	    if (!strcmp(name, mp->name)) {
-		if (time(NULL) - mp->sent_time < RC_CLIENT_CACHE_LIFETIME) {
+		if ( mp->isAlive() ) {
 		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
 			 mp->id[i], time(NULL) - mp->sent_time, mp->name);
 		    return mp->id; // module found. i.e, it's already loaded.
 		}
-		WARN(5, "found a cached one with id:%d, but it is too old (age:%d). resend it.\n",
-		     mp->id[i], time(NULL) - mp->sent_time);
-		mp->valid = 0; // invalidate the cache.
+		else {
+		    WARN(5, "found a cached one with id:%d, but it is too old (age:%d). resend it.\n",
+			 mp->id[i], time(NULL) - mp->sent_time);
+		    mp->invalidate(); // invalidate the cache.
+		}
 	    }
+	    mp++;
 	}
 #endif // RC_CACHE_MODULE
     }
@@ -1127,15 +1228,16 @@ dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated
     char *strdata_found = NULL;
     char *name_found=NULL;
     if (name==NULL && strdata==NULL) {
-	for (i=0, mp=Modulelist; i < RC_NKMODULEMAX; i++, mp++) {
+	for (i=0, mp=CltModulelist; i<RC_NKMODULEMAX; i++) {
 	    WARN(10, "i=%d\n", i);
-	    if (mp->valid==0) continue;
+	    if (mp->isInvalid()) continue;
 	    if (mp->vdevid != Vdevid[vdevidIndex()]) continue;
 	    if (!strcmp(name, mp->name)) {     /* matched */
 		strdata_found = mp->ptx_image;
 		name_found = mp->name;
 		break;
 	    }
+	    mp++;
 	}
     }
     else {
@@ -1157,21 +1259,25 @@ dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated
         // register a new module into the list,
         // and then, return a module id assigned by the server.
         if (i==0) {
-            for (j=0, mp=Modulelist; j<RC_NKMODULEMAX; j++, mp++) {
-                if (!mp->valid) break;
-                if (j == RC_NKMODULEMAX) { WARN(0, "module send buffer is full.\n"); exit(1); }
+            for (j=0; j<RC_NKMODULEMAX; j++) { /* Search vacant sheet. */
+                if( CltModulelist[j].isInvalid() ) break;
+                if( j == RC_NKMODULEMAX ) {
+		    WARN(0, "module send buffer is full.\n");
+		    exit(1);
+		}
             }
-            mp->valid     = 1;
-            mp->sent_time = time(NULL);
-            strncpy(mp->name, name, sizeof(mp->name));
-	    mp->ptx_image = strdata_found; // moikawa add
-            WARN(5, "done. newly registered. id:%d\n", mid);
+            CltModulelist[j].validate();
+            CltModulelist[j].sent_time = time(NULL);
+            CltModulelist[j].setPtxPath(name_found);
+	    CltModulelist[j].setPtxImage(strdata_found);
+            WARN(5, "New client module item was registered. id:%d\n", mid);
         }
-        mp->id[i] = mid;
+        CltModulelist[j].id[i] = mid;
     }
-    mp->vdevid = Vdevid[vi];
+    CltModulelist[j].vdevid = Vdevid[vi];
+    printModuleList();
     //WARN(10, "--->Exiting  %s()\n", __func__);
-    return mp->id;
+    return CltModulelist[j].id; //mp->id;
 }
 
 cudaError_t
@@ -1600,8 +1706,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
 
 
 cudaError_t
-cudaGetDevice(int *device)
-{
+cudaGetDevice(int *device) {
     cudaError_t err = cudaSuccess;
 
     initClient();
@@ -1613,16 +1718,15 @@ cudaGetDevice(int *device)
 }
 
 cudaError_t
-cudaSetDevice(int device)
-{
+cudaSetDevice(int device) {
     cudaError_t err = cudaSuccess;
-    int vi = vdevidIndex();
+    int         vi  = vdevidIndex();
 
     initClient();
     WARN(3, "%s(%d), verb=%d, history=%d...", __func__, device,
 	 St.isAutoVerb(), St.isRecordHist());
 
-    if (0 <= device && device < Nvdev) {
+    if (device >= 0 && device < Nvdev) {
         Vdevid[vi] = device;
     }
     else {
@@ -1639,8 +1743,7 @@ cudaSetDevice(int device)
 }
 
 cudaError_t
-cudaChooseDevice(int *device, const struct cudaDeviceProp *prop)
-{
+cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     cudaError_t err = cudaSuccess;
 
     initClient();

@@ -25,16 +25,12 @@
 
 #define DEBUG 1
 
-int
-dscudaRemoteCallType(void)
-{
+int dscudaRemoteCallType(void) {
     return RC_REMOTECALL_TYPE_RPC;
 }
 
 void
-setupConnection(int idev, RCServer_t *sp)
-{
-
+setupConnection(int idev, RCServer_t *sp) {
     int id   = sp->id;
     int cid  = sp->cid;
     int pgid = DSCUDA_PROG;
@@ -323,8 +319,7 @@ cudaGetErrorString(cudaError_t error)
  */
 
 cudaError_t
-cudaSetDeviceFlags(unsigned int flags)
-{
+cudaSetDeviceFlags(unsigned int flags) {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
@@ -467,10 +462,8 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
 /*
  * Memory Management
  */
-
 cudaError_t
-cudaMalloc(void **devAdrPtr, size_t size)
-{
+cudaMalloc(void **devAdrPtr, size_t size) {
     cudaError_t err = cudaSuccess;
     dscudaMallocResult *rp;
     int vid = vdevidIndex();
@@ -540,8 +533,7 @@ cudaFree(void *mem)
 }
 
 static cudaError_t
-cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
-{
+cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     WARN(10, "#<--- Entering %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
 	 __func__, St.isAutoVerb(), St.isRecordHist(), St.isHistoCalling());
     dscudaResult *rp;
@@ -578,19 +570,18 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 }
 
 static cudaError_t
-cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
-{
+cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     WARN(10, "#<--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
     int matched_count=0;
     int unmatched_count=0;
+    int recall_result;
     
     dscudaMemcpyD2HResult *rp;
     RCServer_t *sp;
-    //    RCServer_t *failed_1st;
+    RCServer_t *failed_1st;
     //    int fail_flag[RC_NVDEVMAX]={0};
     cudaError_t err = cudaSuccess;
 
-    //<--- oikawa moved to here from inside of for loop just after.
     cudaMemcpyArgs args;
     if (St.isAutoVerb()) { /* Register called history */
 	args.dst   = dst;
@@ -606,7 +597,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
     //--->
     /* Get the data from remote GPU(s), then verify */
     sp = vdev->server;
-    for (int i=0; i < vdev->nredundancy; i++, sp++) {
+    for (int i=0; i < vdev->nredundancy; i++) {
         rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]); /* Recieve data from server node */
         checkResult(rp, sp);
         err = (cudaError_t)rp->err;
@@ -620,7 +611,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 	    if (bcmp(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len) != 0) {  /* Unmatched case  */
 		unmatched_count++;
 		//fail_flag[i]=1;
-		//		failed_1st = sp; // temporary
+		failed_1st = sp; // temporary
 		WARN(2, "   #(;_;) UNMATCHED redundant device %d/%d with device 0. %s()\n", i, vdev->nredundancy - 1, __func__);
 	    }
 	    else { /* Matched case */
@@ -631,12 +622,14 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 	    }
 	}
 	xdr_free((xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp);
+	sp++;
     } // for (int i=0; ...
 
+    
     if (vdev->nredundancy > 1) {
     //if (St.isAutoVerb() && vdev->nredundancy > 1) {
 	if (unmatched_count==0 && matched_count==(vdev->nredundancy-1)) {
-	    WARN(1, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
+	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 vdev->nredundancy-1, matched_count, unmatched_count);
 	    /*
 	     * Update backuped memory region.
@@ -647,45 +640,32 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 	}
 	else { /* redundant failed */
 	    if (unmatched_count>0 && matched_count<(vdev->nredundancy-1)) {
-		WARN(1, "   #(+_+)   Some Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
-		     matched_count, unmatched_count);
+		WARN(1, "### #   #\n");
+		WARN(1, "###  # #\n");
+		WARN(1, "###   #  (+_+) Unmatched result from some redundant devices. OK/NG= %d/%d.\n", matched_count, unmatched_count);
+		WARN(1, "###  # #\n");
+		WARN(1, "### #   #\n");
 	    }
 	    else {
 		WARN(1, "   #(;_;)   All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
 		     vdev->nredundancy-1, matched_count, unmatched_count);
 	    }
 	    
-	    St.unsetAutoVerb(); //disable autoVerb to block recursive call. this must be removed in the future.
-	    St.unsetRecordHist();
+	    St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
+	    St.unsetRecordHist();  // <--- Must not record Historical call list.
 
-	    dscudaVerbRealloc();
+	    dscudaVerbMemDup();
 	    St.setHistoCalling();
-	    dscudaVerbRecallHist();  /* ----- Do redundant calculation(recursive) ----- */
+	    recall_result = dscudaVerbRecallHist();
 	    St.unsetHistoCalling();
-// #if 0 // <--- Migration Part.
-// 	    /*
-// 	     * Migration Part.
-// 	     */
-// 	    static int step = 0;                    /* counts # of called. */
-// 	    //step++;                                 /* disabled parmanently?  */
-// 	    //sp = vdev->server;
-// 	    WARN(2, "   # Failed 1st= %s\n", failed_1st->ip);
-// 	    if (step == 0) {
-// 		//invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
-// 		//step++;
-		
-// 		replaceBrokenServer(failed_1st, &svrSpare[0]);
-// 		printModuleList(Modulelist);
-// 		printVirtualDeviceList();
-// 		WARN(2, "#(info.) Reconnecting to %s replacing %s\n", /*sp*/failed_1st->ip, svrSpare[0].ip);
-// 		setupConnection(Vdevid[vdevidIndex()], failed_1st);
-// 		dscudaVerbRealloc();
-// 		//dscudaLoadModule(NULL, NULL); // not good ;_;, or no need.
-// 		dscudaVerbRecallHist();  /* ----- Do redundant calculation(recursive) ----- */
-// 	    }
-// #endif // ---> Migration Part.
-	    dscudaRecordHistOn();
-	    St.setAutoVerb(); //restore autoVerb enabled.
+
+	    if (recall_result != 0) {
+		printModuleList();
+		printVirtualDeviceList();
+		dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
+	    }
+	    St.setRecordHist();  // ---> restore recordHist enable.
+	    St.setAutoVerb();    // ===> restore autoVerb enabled. 
 	} // redundant failed.
     }
 
@@ -765,22 +745,16 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
 }
 
 cudaError_t
-cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
-{
-    cudaError_t err = cudaSuccess;
-    int vdevid;
-    Vdev_t *vdev;
-    CLIENT **clnt;
+cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    Vdev_t     *vdev   = Vdev + vdevid;
+    CLIENT    **clnt   = Clnt[vdevid];
     RCuva *suva, *duva;
     int dev0;
     void *lsrc, *ldst;
+    cudaError_t err    = cudaSuccess;
 
     initClient();
-
-    vdevid = Vdevid[vdevidIndex()];
-    vdev = Vdev + vdevid;
-    clnt = Clnt[vdevid];
-
     lsrc = dscudaAdrOfUva((void *)src);
     ldst = dscudaAdrOfUva(dst);
     switch (kind) {
@@ -877,8 +851,7 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device)
 }
 
 int
-dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *modulebuf, int vdevid, int raidid)
-{
+dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *modulebuf, int vdevid, int raidid) {
     //WARN(10, "<---Entering %s()\n", __func__);
     //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
     
@@ -1460,8 +1433,7 @@ cudaFreeHost(void *ptr)
 
 // flags is not used for now in CUDA3.2. It should always be zero.
 cudaError_t
-cudaHostGetDevicePointer(void **pDevice, void*pHost, unsigned int flags)
-{
+cudaHostGetDevicePointer(void **pDevice, void*pHost, unsigned int flags) {
 #if RC_SUPPORT_PAGELOCK
     cudaError_t err = cudaSuccess;
     dscudaHostGetDevicePointerResult *rp;

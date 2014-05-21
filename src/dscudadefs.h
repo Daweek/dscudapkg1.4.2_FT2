@@ -30,5 +30,6 @@
 
 #define RC_WARNLEVEL_DEFAULT (5)
 #define RC_DSCUDA_VER "1.4.2.branch"
-#define RC_REDUNDANT_GIVEUP_COUNT (5)
+#define RC_REDUNDANT_GIVEUP_COUNT (3) //
+#define RC_MIGRATION (1)  // set 1 to migrate after failing redundant calc, 0 not.
 #endif //  _DSCUDADEFS_H

@@ -9,6 +9,8 @@
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "dscuda.h"
 #include "dscudarpc.h"
 #include "libdscuda.h"
@@ -40,8 +42,7 @@ typedef enum {
 } DSCVMethod;
 
 int
-verbGetLengthOfMemList(void)
-{
+verbGetLengthOfMemList(void) {
     verbAllocatedMem *pMem = verbAllocatedMemListTop;
     int length = 0;
     while (pMem != NULL) {
@@ -52,8 +53,7 @@ verbGetLengthOfMemList(void)
 }
 
 verbAllocatedMem *
-verbAllocatedMemQuery(void *dst)
-{
+verbAllocatedMemQuery(void *dst) {
     verbAllocatedMem *mem = verbAllocatedMemListTop;
 
     while (mem != NULL) { /* Search */
@@ -67,8 +67,7 @@ verbAllocatedMemQuery(void *dst)
 }
 
 void *
-verbAllocatedMemUpdateQuery(void *dst)
-{
+verbAllocatedMemUpdateQuery(void *dst) {
     verbAllocatedMem *mem = verbAllocatedMemListTop;
     //WARN(2, "<--- %s(%p):\n", __func__, dst);
     char *d_targ  = (char *)dst;
@@ -121,8 +120,7 @@ printRegionalCheckSum(void) {
  * Register cudaMalloc()
  */
 void
-verbAllocatedMemRegister(void *dst, int size)
-{
+verbAllocatedMemRegister(void *dst, int size) {
     static int i=0;
     // WARN(10, "<--- %s(dst=%p, size=%d) [%d]\n", __func__, dst, size, i);
     verbAllocatedMem *mem = (verbAllocatedMem *)malloc(sizeof(verbAllocatedMem));
@@ -148,8 +146,7 @@ verbAllocatedMemRegister(void *dst, int size)
 }
 
 void
-verbAllocatedMemUnregister(void *dst)
-{
+verbAllocatedMemUnregister(void *dst) {
     // WARN(10, "<--- %s(dst=%p)\n", __func__, dst);
     verbAllocatedMem *mem = verbAllocatedMemQuery(dst);
     verbAllocatedMem *p_list = verbAllocatedMemListTop;
@@ -188,10 +185,9 @@ verbAllocatedMemUnregister(void *dst)
 }
 
 void
-verbAllocatedMemUpdate(void *dst, void *src, int size)
+verbAllocatedMemUpdate(void *dst, void *src, int size) {
 // dst : GPU device memory region
 // src : HOST memory region
-{
     verbAllocatedMem *mem;
     void             *src_mirrored;
 
@@ -208,14 +204,59 @@ verbAllocatedMemUpdate(void *dst, void *src, int size)
 	memcpy(src_mirrored, src, size); // update historical memory region.
 	WARN(10, "        Also copied to backup region (%p), checksum=%d.\n",
 	     dst, checkSum(src, size));
-	printRegionalCheckSum();
+	//printRegionalCheckSum();
     }
     WARN(10, "    ---> %s(dst=%p, src=%p, size=%d)\n", __func__, dst, src, size); 
 }
+static cudaError_t
+dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
+    int      vid = vdevidIndex();
+    
+    void *adrs;
+    dscudaMallocResult *rp;
+    cudaError_t err = cudaSuccess;
+    
+    WARN(3, "%s(%p, %d, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
+	 __func__, devAdrPtr, size, pSvr->id, pSvr->cid, pSvr->uniq);
+    //initClient();
+    rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][pSvr->id]);
+    checkResult(rp, pSvr);
+    if (rp->err != cudaSuccess) {
+            err = (cudaError_t)rp->err;
+    }
+    adrs = (void*)rp->devAdr;
+    WARN(3, "device : devAdrPtr:%p\n", adrs);	
+    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
+
+    RCuvaRegister(Vdevid[vid], &adrs, size);
+    *devAdrPtr = dscudaUvaOfAdr(adrs, Vdevid[vid]);
+    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, verbGetLengthOfMemList());
+
+    return err;
+}
 
 void
-dscudaVerbRealloc(void)
-{
+dscudaVerbRealloc(RCServer_t *svr) {
+    verbAllocatedMem *mem = verbAllocatedMemListTop;
+    int               verb = St.isAutoVerb();
+    int               copy_count = 0;
+    
+    WARN(1, "###============================================================\n");
+    WARN(1, "### <--- %s() called.\n", __func__);
+    WARN(1, "###------------------------------------------------------------\n");
+
+    while (mem != NULL) {
+	dscudaVerbMalloc(&mem->dst, mem->size, svr);
+	mem = mem->next;
+    }
+    WARN(1, "###------------------------------------------------------------\n");
+    WARN(1, "### ---> %s() done.\n", __func__);
+    WARN(1, "###============================================================\n");
+}
+/* 
+ * Resore the all data of a GPU device with backup data on client node.
+ */
+void dscudaVerbMemDup(void) {
     verbAllocatedMem *mem = verbAllocatedMemListTop;
     int               verb = St.isAutoVerb();
     int               copy_count = 0;
@@ -223,40 +264,23 @@ dscudaVerbRealloc(void)
     float            *fmon;
     int              *imon;
 
-    WARN(1, "###============================================================\n");
-    WARN(1, "### %s() called.\n", __func__);
-    WARN(1, "###============================================================\n");
+    WARN(2, "###============================================================\n");
+    WARN(2, "### <--- %s() called.\n", __func__);
+    WARN(2, "###------------------------------------------------------------\n");
 
+    WARN(1, "###============================================================\n");
+    WARN(1, "### %s() restores GPU device memory regions.\n", __func__);
+    WARN(1, "###------------------------------------------------------------\n");
     while (mem != NULL) {
-	//cudaMalloc(&mem->dst, mem->size); /* To migrate another GPU, you need to do cudaMalloc() before following cudaMemcpy(). */
-	WARN(2, "Restore device memory region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
+	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
 	     copy_count++, mem->dst, mem->src, mem->size, checkSum(mem->src, mem->size));
-	if (mem->size <= 16) {
-	    fmon = (float *)mem->src;
-	    imon = (int   *)mem->src;
-	    for (int i=0; i < (mem->size / sizeof(float)); i++) {
-		WARN(2, "  + float[%d]= %f, int[%d]= %d\n", i, *fmon, i, *imon);
-		fmon++;
-		imon++;
-	    }
-	}
 	cudaMemcpy(mem->dst, mem->src, mem->size, cudaMemcpyHostToDevice);
-	// mon = (unsigned char *)mem->src;
-	// for (int i=0; i<16; i++) {
-	//     printf("%04d: ", i);
-	//     for (int j=0; j<16; j++) {
-	// 	printf("%02x ", *mon);
-	// 	mon++;
-	//     }
-	//     printf("\n"); fflush(stdout);
-	// }
 	mem = mem->next;
     }
-    WARN(1, "###============================================================\n");
-    WARN(1, "### %s() done.\n", __func__);
-    WARN(1, "###============================================================\n");
+    WARN(2, "###------------------------------------------------------------\n");
+    WARN(2, "### ---> %s() done.\n", __func__);
+    WARN(2, "###============================================================\n");
 }
-
 
 //stubs for store/release args, and recall functions.
 static void *(*storeArgsStub[DSCVMethodEnd])(void *);
@@ -400,8 +424,7 @@ storeLoadModule(void *argp) {
 }
 
 static void *
-storeRpcLaunchKernel(void *argp)
-{
+storeRpcLaunchKernel(void *argp) {
     WARN(3, "add hist RpcLaunchKernel\n");
     DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
 
@@ -421,8 +444,7 @@ storeRpcLaunchKernel(void *argp)
 }
 
 static void *
-storeIbvLaunchKernel(void *argp)
-{
+storeIbvLaunchKernel(void *argp) {
     WARN(3, "add hist IbvLaunchKernel\n");
     DSCUDAVERB_STORE_ARGS(IbvLaunchKernel);
 
@@ -529,27 +551,27 @@ releaseIbvLaunchKernel(void *argp) {
 }
 
 //stubs for recall
-static void
-recallSetDevice(void *argp) {
+static
+void recallSetDevice(void *argp) {
     DSCUDAVERB_SET_ARGS(SetDevice);
     WARN(3, "Recall cudaSetDevice()...\n");
     cudaSetDevice(argsrc->device);
 }
 
-static void
-recallMalloc(void *argp) {
+static
+void recallMalloc(void *argp) {
     //nothing to do
 }
 
-static void
-recallMemcpyH2D(void *argp) {
+static
+void recallMemcpyH2D(void *argp) {
     DSCUDAVERB_SET_ARGS(Memcpy);
     WARN(3, "Recall cudaMemcpyH2D()...\n");
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyHostToDevice);
 }
 
-static void
-recallMemcpyD2D(void *argp) {
+static
+void recallMemcpyD2D(void *argp) {
     DSCUDAVERB_SET_ARGS(Memcpy);
     WARN(3, "Recall cudaMemcpyD2D()...\n");
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToDevice);
@@ -596,7 +618,8 @@ recallIbvLaunchKernel(void *argp) {
 static void
 recallRpcLaunchKernel(void *argp) {
     DSCUDAVERB_SET_ARGS(RpcLaunchKernel);
-    WARN(3, "Recall RpcLaunchKernel()...\n");
+    WARN(3, "Recall RpcLaunchKernel((int*)moduleid=%p, (int)kid=%d, (char*)kname=%s, ...)...\n",
+	 argsrc->moduleid, argsrc->kid, argsrc->kname);
     rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
 }
 
@@ -637,8 +660,7 @@ dscudaVerbInit(void) {
 }
 
 void
-dscudaVerbAddHist(int funcID, void *argp)
-{
+dscudaVerbAddHist(int funcID, void *argp) {
     int DSCVMethodId;
 
     if (verbHistNum == verbHistMax) { /* Extend the existing memory region. */
@@ -671,8 +693,7 @@ dscudaVerbAddHist(int funcID, void *argp)
  *
  */
 void
-dscudaVerbClearHist(void)
-{
+dscudaVerbClearHist(void) {
    if (verbHists) {
       for (int i=0; i<verbHistNum; i++) {
          (releaseArgsStub[funcID2DSCVMethod(verbHists[i].funcID)])(verbHists[i].args);
@@ -686,15 +707,11 @@ dscudaVerbClearHist(void)
    return;
 }
 
-void
-dscudaClearHist(void)
-{
+void dscudaClearHist(void) {
     dscudaVerbClearHist();
 }
 
-void
-dscudaPrintHist(void)
-{
+void dscudaPrintHist(void) {
     WARN(1, "%s(): *************************************************\n", __func__);
     if (verbHistNum==0) {
 	WARN(1, "%s(): Recall History[]> (Empty).\n", __func__);
@@ -716,30 +733,78 @@ dscudaPrintHist(void)
     }
     WARN(1, "%s(): *************************************************\n", __func__);
 }
-
-void
-dscudaVerbRecallHist(void)
-{
-   char       func_name[256]; 
-   static int called_depth=0;
-
+/*
+ * Rerun the recorded history of cuda function series.
+ */
+int dscudaVerbRecallHist(void) {
+   static int called_depth = 0;
+   int result;
    WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, verbHistNum, __func__);
    WARN(1, "called_depth= %d.\n", called_depth);
-   if (called_depth >= RC_REDUNDANT_GIVEUP_COUNT) {
-       WARN(1, "#*****************************************************\n");
-       WARN(1, "# (;_;) I give up redundant calculation.             \n"); 
-       WARN(1, "#       I have tried %d times and all failed.        \n", RC_REDUNDANT_GIVEUP_COUNT);
-       WARN(1, "#*****************************************************\n");
+   if (called_depth < 0) {       /* irregal error */
+       WARN(1, "#**********************************************************************\n");
+       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+       WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
+       WARN(1, "#**********************************************************************\n\n");
        exit(1);
-       called_depth=0;
    }
-   else {
+   else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
        dscudaPrintHist();
        called_depth++;       
        for (int i=0; i<verbHistNum; i++) { /* Do recall history */
 	   (recallStub[funcID2DSCVMethod(verbHists[i].funcID)])(verbHists[i].args); /* partially recursive */
        }
        called_depth=0;
+       result = 0;
+   }
+   else { /* try migraion or not. */
+       WARN(1, "#**********************************************************************\n");
+       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+       WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
+       WARN(1, "#**********************************************************************\n\n");
+       called_depth=0;
+       result = 1;
    }
    WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
+   return result;
+}
+/*
+ *
+ */
+void
+dscudaVerbMigrateModule() {
+    // module not found in the module list.
+    // really need to send it to the server.
+    int vi = vdevidIndex();
+    Vdev_t *vdev = Vdev + Vdevid[vi];
+    int i, mid;
+    char *ptx_path, *ptx_data;
+
+    ptx_path = CltModulelist[0].name;      // 0 is only for test
+    ptx_data = CltModulelist[0].ptx_image; // 0 is only for test
+    
+    for (i=0; i<vdev->nredundancy; i++) { /* Reload to all redundant devices. */
+	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), ptx_path, ptx_data, Vdevid[vi], i);
+        WARN(3, "dscudaLoadModuleLocal returns %d\n", mid);
+    }
+    printModuleList();
+}
+/*
+ *
+ */
+void
+dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
+    WARN(1, "#**********************************************************************\n");
+    WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
+    WARN(1, "#**********************************************************************\n\n");
+    WARN(1, "   # Failed 1st= %s\n", from->ip);
+    replaceBrokenServer(from, to);
+    WARN(1, "#(info.) Reconnecting to %s replacing %s\n", from->ip, to->ip);
+    setupConnection(Vdevid[vdevidIndex()], from);
+    dscudaVerbRealloc(from);
+    dscudaVerbMemDup(); /* */
+    printModuleList();
+    invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
+    dscudaVerbMigrateModule(); // not good ;_;, or no need.
+    dscudaVerbRecallHist();  /* ----- Do redundant calculation(recursive) ----- */
 }

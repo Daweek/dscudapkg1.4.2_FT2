@@ -54,7 +54,7 @@ typedef struct {
     int  isValid(void)    { return valid; }
     int  isInvalid(void)  { if (isValid()) { return 0; } else { return 1; } }
 } ServerModule;
-static ServerModule Modulelist[RC_NKMODULEMAX] = {0};
+static ServerModule SvrModulelist[RC_NKMODULEMAX] = {0};
 
 struct ServerState_t{
     int  fault_injection; // fault injection pattarn. "0" means no faults.
@@ -309,7 +309,7 @@ initDscuda(void)
     }
 
     for (unsigned int u=0; u<RC_NKMODULEMAX; u++) { /* Set sequential number. */
-	Modulelist[u].id = u;
+	SvrModulelist[u].id = u;
     }
 
     err = cuInit(flags);
@@ -458,7 +458,7 @@ releaseModules(bool releaseall = false)
 {
     ServerModule *mp;
     int i;
-    for (i=0, mp=Modulelist; i < RC_NKMODULEMAX; i++, mp++) {
+    for (i=0, mp=SvrModulelist; i < RC_NKMODULEMAX; i++, mp++) {
         if (mp->isInvalid()) continue;
         if (releaseall || time(NULL) - mp->loaded_time > RC_SERVER_CACHE_LIFETIME) {
             cuModuleUnload((CUmodule)mp->handle);
@@ -475,11 +475,11 @@ releaseModules(bool releaseall = false)
 }
 
 static void
-printModuleList(ServerModule *module_list)
+printSvrModuleList(ServerModule *module_list)
 {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	if (module_list[i].isValid()) {
-	    WARN(10, "#--- Modulelist[%d]\n", i);
+	    WARN(10, "#--- SvrModulelist[%d]\n", i);
 	    WARN(10, "#---    + ID=%u, ip=%u\n", module_list[i].id, module_list[i].ipaddr);
 	    WARN(10, "#---    + name=%s\n",   module_list[i].name);
 	}
@@ -487,18 +487,17 @@ printModuleList(ServerModule *module_list)
 }
 
 static CUresult
-getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid)
-{
+getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
     WARN(10, "<---Entering %s(kname=%s)\n", __func__, kname);
     CUresult cuerr;
-    ServerModule *mp = Modulelist + moduleid;
+    ServerModule *mp = SvrModulelist + moduleid;
 
     cuerr = cuModuleGetFunction(kfuncp, mp->handle, kname);
     if (cuerr == CUDA_SUCCESS) {
         WARN(3, "(^_^) cuModuleGetFunction() : function '%s' found.\n", kname);
 	WARN(3, "(^_^) moduleid=%d, valid=%d, id=%d, name=%s\n",
 	     moduleid, mp->valid, mp->id, mp->name);
-	printModuleList(Modulelist);
+	printSvrModuleList(SvrModulelist);
     }
     else {
         WARN(0, "(;_;) cuModuleGetFunction() : function:'%s'. %s\n",
@@ -537,7 +536,7 @@ getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
         WARN(0, "getGlobalSymbol() : invalid module id:%d.\n", moduleid);
         fatal_error(1);
     }
-    mp = Modulelist + moduleid;
+    mp = SvrModulelist + moduleid;
     cuerr = cuModuleGetGlobal(dptr, size, mp->handle, symbolname);
     if (cuerr == CUDA_SUCCESS) {
 	WARN(3, "cuModuleGetGlobal(0x%08lx, 0x%08lx, 0x%08lx, %s) done."
@@ -555,8 +554,7 @@ getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
 }
 
 static int
-dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
-{
+dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
     CUresult cuerr;
     ServerModule   *mp;
     int      i;
@@ -566,7 +564,8 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
     // look for mname in the module list, which may found if the client
     // resent multiple requests for the same mname:pid:ipaddr.
     int found = 0;
-    for (i=0, mp=Modulelist; i < RC_NKMODULEMAX; i++, mp++) {
+    mp = SvrModulelist;
+    for (i=0; i < RC_NKMODULEMAX; i++) {
         if (mp->isInvalid()) continue;
         if ((unsigned int)ipaddr == mp->ipaddr && pid == mp->pid &&
             !strcmp(mname, mp->name)) {
@@ -575,6 +574,7 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
         }
 	WARN(4, "ip:%x  %x    pid:%d  %d    name:%s  %s\n",
 	     (unsigned int)ipaddr, mp->ipaddr, pid, mp->pid, mname, mp->name);
+	mp++;
     }
 
     if (found) { // module found. i.e, it's already loaded.
@@ -596,11 +596,11 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
 #endif // RC_CACHE_MODULE
 
     {
-        for (i=0, mp=Modulelist; i < RC_NKMODULEMAX; i++, mp++) { /* look for .valid==0 */
+        for (i=0, mp=SvrModulelist; i < RC_NKMODULEMAX; i++, mp++) { /* look for .valid==0 */
             if (mp->isInvalid()) break;
             if (i >= RC_NKMODULEMAX) { WARN(0, "(+_+) module cache is full.\n"); fatal_error(1); }
         }
-	/* Register new Modulelist[i] */
+	/* Register new SvrModulelist[i] */
         /* mp->id = i; */
         cuerr = cuModuleLoadData(&mp->handle, image); /* load .ptx string */
         if (cuerr != CUDA_SUCCESS) {
@@ -610,7 +610,7 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
         mp->validate(); /* mp->valid  = 1;*/
         mp->ipaddr = ipaddr;
         mp->pid    = pid;
-        strncpy(mp->name, mname, sizeof(Modulelist[0].name));
+        strncpy(mp->name, mname, sizeof(SvrModulelist[0].name));
         for (i=0; i<RC_NKFUNCMAX; i++) { mp->kfunc[i] = NULL; }
         WARN(3, "cuModuleLoadData() : a module loaded. id:%d  name:%s\n", mp->id, mname);
     }
@@ -625,7 +625,8 @@ static void *
 dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
                    RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args)
 {
-    WARN(10, "<--- Entering %s(char *kname=%s)\n", __func__, kname);
+    WARN(10, "<--- Entering %s(int moduleid=%d, int kid=%d, char *kname=%s)\n", __func__,
+	 moduleid, kid, kname);
     static int dummyres = 123;
     int paramsize;
     CUresult cuerr;
@@ -650,7 +651,7 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
     // this is faster, but not used since it would cause a problem
     // when called from a kernel function that uses C++ template.
     // in that case kid might not be unique for each instance of the template.
-    ServerModule *mp = Modulelist + moduleid;
+    ServerModule *mp = SvrModulelist + moduleid;
     CUfunction kfunc = mp->kfunc[kid];
     if (!kfunc) {
         getFunctionByName(&kfunc, kname, moduleid);

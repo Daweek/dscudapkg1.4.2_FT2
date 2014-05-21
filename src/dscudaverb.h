@@ -1,5 +1,6 @@
 #ifndef __DSCUDAVERB_H__
 #define __DSCUDAVERB_H__
+#include "libdscuda.h"
 #define DSCUDAVERB_HISTMAX_GROWSIZE (10)
 /*** ==========================================================================
  *** Backup memory region of devices allocated by cudaMemcpy().
@@ -80,8 +81,11 @@ typedef struct {
 void dscudaVerbInit(void);                /* Initializer    */
 void dscudaVerbAddHist(int, void *);      /* Add            */
 void dscudaVerbClearHist(void);           /* Clear          */
-void dscudaVerbRecallHist(void);          /* Recall         */
+int  dscudaVerbRecallHist(void);          /* Recall         */
 void dscudaVerbRealloc(void);             /* ReLoad backups */
+void dscudaVerbMemDup(void);              /* ReLoad backups */
+
+void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
 
 void dscudaClearHist(void);
 void dscudaPrintHist(void);

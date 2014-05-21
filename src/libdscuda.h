@@ -12,33 +12,72 @@
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
 
-typedef struct {
+typedef struct RCServer {
     int  id;   // index for each redundant server.
     int  cid;  // id of a server given by -c option to dscudasvr.
                // clients specify the server using this num preceded
                // by an IP address & colon, e.g.,
                // export DSCUDA_SERVER="192.168.1.123:2"
-    char ip[512];// ex.) 192.168.0.92
-    int  uniq; // unique number in all RCServer_t including svrCand[]. 
-} RCServer_t;
+    char ip[512];      // ex. "192.168.0.92"
+    char hostname[64]; // ex. "titan01"
+    int  uniq; // unique number in all RCServer_t including svrCand[].
+    RCServer() {
+	id = cid = uniq = 0xffff;
+	strcpy(ip, "empty");
+	strcpy(hostname, "empty");
+    }
+} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 typedef struct {
-    int nredundancy;
+    int        nredundancy;
     RCServer_t server[RC_NREDUNDANCYMAX];
 } Vdev_t;
 
-typedef struct {
-    int    valid;   /* "1" means valid, "0" means invalid, "(else)" not used. */
+typedef struct ClientModule_t {
+    int    valid;   // 1=>alive, 0=>cache out, -1=>init val.
     int    vdevid;  /* the virtual device the module is loaded into. */
-    int    id[RC_NREDUNDANCYMAX]; //  that consists of the virtual one.
+    int    id[RC_NREDUNDANCYMAX]; //  that consists of the virtual one, returned from server.
     char   name[RC_KMODULENAMELEN];
+    char   ptx_image[RC_KMODULEIMAGELEN]; // needed for RecallHist().
     time_t sent_time;
-    char  *ptx_image; //add
-    void validate()   { valid=1; }
-    void invalidate() { valid=0; }
+    //
+    void validate() { valid = 1; }
+    void invalidate() { valid = 0; }
     int  isValid()  {
-	if (valid==0) return 0;
-	else          return 1;
+	if (valid<-1 || valid>1) {
+	    fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
+	    exit(1);
+	}
+	else if (valid==1) { return 1; }
+	else { return 0; }
+    }
+    int  isInvalid()  {
+	if (valid<-1 || valid>1) {
+	    fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
+	    exit(1);
+	}
+	else if (valid==1) { return 0;}
+	else { return 1; }
+    }
+    void setPtxPath(char *ptxpath) {
+	strncpy(name, ptxpath, RC_KMODULENAMELEN);
+    }
+    void setPtxImage(char *ptxstr) {
+	strncpy(ptx_image, ptxstr, RC_KMODULEIMAGELEN);
+    }
+    int isAlive() {
+	if( (time(NULL) - sent_time) < RC_CLIENT_CACHE_LIFETIME ) {
+	    return 1;
+	} else {
+	    return 0;
+	}
+    }
+    ClientModule_t() {
+	valid  = -1;
+	vdevid = -1;
+	for (int i=0; i<RC_NREDUNDANCYMAX; i++) id[i] = -1;
+	strncpy(name, "init", RC_KMODULENAMELEN);
+	strncpy(ptx_image, "init", RC_KMODULEIMAGELEN);
     }
 } ClientModule;
 
@@ -84,6 +123,7 @@ struct ClientState_t {
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int auto_verb;           /* 1:Redundant calculation */
     int record_hist;
+    int migrate_device;
     int use_daemon;
     int historical_calling;
     void setIpAddress(unsigned int val) { ip_addr = val; }
@@ -109,13 +149,18 @@ struct ClientState_t {
     void   setHistoCalling() { historical_calling = 1; }
     void unsetHistoCalling() { historical_calling = 0; }
     int  isHistoCalling()   { return historical_calling; }
+
+    void setMigrateDevice(int val=1) { migrate_device = val; }
+    void unsetMigrateDevice() { migrate_device = 0; }
+    int  getMigrateDevice() { return migrate_device; }
     
     ClientState_t() {
-	ip_addr = 0;
-	use_ibv = 0;
-	auto_verb = 0;
+	ip_addr     = 0;
+	use_ibv     = 0;
+	auto_verb   = 0;
 	record_hist = 0;
-	use_daemon = 0;
+	migrate_device = 0;
+	use_daemon  = 0;
 	historical_calling = 0;
     }
 };
@@ -123,12 +168,15 @@ extern struct ClientState_t St;
 
 extern const char *DEFAULT_SVRIP;
 extern Vdev_t Vdev[RC_NVDEVMAX];
+extern RCServer_t svrCand[RC_NVDEVMAX];
+extern RCServer_t svrSpare[RC_NVDEVMAX];
+extern RCServer_t svrBroken[RC_NVDEVMAX];
 extern int    Vdevid[RC_NPTHREADMAX];
 extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void (*errorHandler)(void *arg);
 extern CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void *errorHandlerArg;
-
+extern ClientModule  CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 extern RCmappedMem    *RCmappedMemListTop;
 extern RCmappedMem    *RCmappedMemListTail;
 
@@ -138,7 +186,8 @@ void dscudaRecordHistOff(void); // add by oikawa
 void dscudaAutoVerbOff(void);
 void dscudaAutoVerbOn(void);
 /* --> Redundant APIs */
-
+void printModuleList(void);
+void printVirtualDeviceList();
 void invalidateModuleCache(void);
 int  requestDaemonForDevice(char *ipaddr, int devid, int useibv);
 int  vdevidIndex(void);
@@ -191,6 +240,9 @@ void RCeventArrayUnregister(cudaEvent_t event0);
 void *dscudaUvaOfAdr(void *adr, int devid);
 void *dscudaAdrOfUva(void *adr);
 int   dscudaDevidOfUva(void *adr);
+void
+replaceBrokenServer(RCServer_t *broken, RCServer_t *spare);
+
 cudaError_t
 dscudaBindTextureWrapper(int *moduleid, char *texname,
 			 size_t *offset,

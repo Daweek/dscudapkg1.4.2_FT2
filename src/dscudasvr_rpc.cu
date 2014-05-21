@@ -1040,7 +1040,7 @@ dscudamemcpytosymbolh2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize co
     WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s) done. module name:%s  symbol:%s\n",
          gsptr, (unsigned long)src.RCbuf_val, count, offset,
          dscudaMemcpyKindName(cudaMemcpyHostToDevice),
-         Modulelist[moduleid].name, symbol);
+         SvrModulelist[moduleid].name, symbol);
     check_cuda_error(err);
     res.err = err;
     return &res;
@@ -1095,7 +1095,7 @@ dscudamemcpyfromsymbold2hid_1_svc(int moduleid, char *symbol, RCsize count, RCsi
     WARN(3, "0x%08llx, 0x%08llx, %d, %d, %s) done. module name:%s  symbol:%s\n",
          (unsigned long)res.buf.RCbuf_val, gsptr, count, offset,
          dscudaMemcpyKindName(cudaMemcpyDeviceToHost),
-         Modulelist[moduleid].name, symbol);
+         SvrModulelist[moduleid].name, symbol);
     check_cuda_error(err);
     res.err = err;
     return &res;
@@ -1141,7 +1141,7 @@ dscudamemcpytosymbolasynch2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsi
     WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done. module name:%s  symbol:%s\n",
          gsptr, (unsigned long)src.RCbuf_val, count, offset,
          dscudaMemcpyKindName(cudaMemcpyHostToDevice), stream,
-         Modulelist[moduleid].name, symbol);
+         SvrModulelist[moduleid].name, symbol);
 
     check_cuda_error(err);
     res.err = err;
@@ -1197,7 +1197,7 @@ dscudamemcpyfromsymbolasyncd2hid_1_svc(int moduleid, char *symbol, RCsize count,
     WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done. module name:%s  symbol:%s\n",
          (unsigned long)res.buf.RCbuf_val, gsptr, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToHost),
-         Modulelist[moduleid].name, symbol);
+         SvrModulelist[moduleid].name, symbol);
     check_cuda_error(err);
     res.err = err;
     return &res;
@@ -1606,7 +1606,7 @@ dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size
     static dscudaBindTextureResult res;
     cudaError_t err;
     CUtexref texref;
-    ServerModule *mp = Modulelist + moduleid;
+    ServerModule *mp = SvrModulelist + moduleid;
 
     if (!dscuContext) createDscuContext();
 
@@ -1643,7 +1643,7 @@ dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize wi
     static dscudaBindTexture2DResult res;
     cudaError_t err;
     CUtexref texref;
-    ServerModule *mp = Modulelist + moduleid;
+    ServerModule *mp = SvrModulelist + moduleid;
     CUDA_ARRAY_DESCRIPTOR desc;
 
     if (!dscuContext) createDscuContext();
@@ -1688,7 +1688,7 @@ dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtex
     static dscudaResult res;
     cudaError_t err;
     CUtexref texref;
-    ServerModule *mp = Modulelist + moduleid;
+    ServerModule *mp = SvrModulelist + moduleid;
 
     if (!dscuContext) createDscuContext();
 
