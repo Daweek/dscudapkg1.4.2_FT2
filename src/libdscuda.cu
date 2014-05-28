@@ -658,9 +658,7 @@ void printModuleList(void) {
 }
 
 static int
-dscudaSearchServer(char *ips, int size)
-{
-    WARN(10, "<--- Entering %s\n", __func__);
+dscudaSearchServer(char *ips, int size) {
     int sock, rcvsock, nsvr, val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
@@ -722,7 +720,6 @@ dscudaSearchServer(char *ips, int size)
 
     close(sock);
     close(rcvsock);
-    WARN(10, "---> Exiting  %s().\n", __func__);
     return nsvr;
 }
 
