@@ -52,8 +52,7 @@ rpcWatchDisconnection(void *arg)
 }
 
 static int
-rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
-{
+rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     CUresult cuerr;
     CUfunction kfunc = *kfuncp;
     int ival;
@@ -61,7 +60,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
     void *pval;
     RCarg noarg;
     RCarg *argp = &noarg;
-    ReplacedVar_t *replaced; // moikawa add
+    FaultConf_t *fault_conf; // moikawa add
 
     noarg.offset = 0;
     noarg.size = 0;
@@ -119,16 +118,16 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
           case dscudaArgTypeV: /*Structure, etc.*/
             pval = argp->val.RCargVal_u.valuev;
 	    /*if environ var found, then update its value with localhost's one.*/
-	    replaced = (ReplacedVar_t *)pval;
-	    if (strncmp(replaced->tag, "DSCUDA_FAULT_INJECTION", 32)==0) {
+	    fault_conf = (FaultConf_t *)pval;
+	    if (strncmp(fault_conf->tag, "DSCUDA_FAULT_INJECTION", 32)==0) {
                 WARN(10, "DSCUDA_FAULT_INJECTION found, ");
-		if (replaced->overwrite_en) {
+		if (fault_conf->overwrite_en) {
 		    WARN(10, "then overwrite %d over %d.\n",
-			 DscudaSvr.getFaultInjection(), replaced->fault_on);
-		    replaced->fault_on = DscudaSvr.getFaultInjection();
+			 DscudaSvr.getFaultInjection(), fault_conf->fault_on);
+		    fault_conf->fault_on = DscudaSvr.getFaultInjection();
 		}
 		else {
-		    WARN(10, "but leave as is %d.\n", replaced->fault_on);
+		    WARN(10, "but leave as is %d.\n", fault_conf->fault_on);
 		}
 	    }
 	    

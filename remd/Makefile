@@ -9,7 +9,7 @@
 ## Status           : Unknown, Use with caution!
 ##----------------------------------------------------------------------------- 
 #CCLIB		= -lpthread -lgomp
-CUDAPATH        ?= /opt/cuda/5.0
+CUDAPATH        ?= /usr/local/cuda-4.2/cuda
 CUDALIB		= -L$(CUDAPATH)/lib64 -lcudart -lGLU -lGL
 DSCUDA_PATH     = /home/m_oikawa/dscudapkg
 DSCUDAFLAGS     = -I$(DSCUDA_PATH)/include
@@ -24,7 +24,7 @@ DSCUDACPP ?= /bin/dscudacpp
 
 CPPFLAGS = 
 NVCCFLAGS = -O2 -g -I${CUDASDKPATH}/CUDALibraries/common/inc -I${HOME} \
-	    -arch=compute_35 -code=compute_35 \
+	    -arch=compute_20 -code=compute_20 \
    -I/usr/apps/free/NVIDIA_GPU_Computing_SDK/4.1/C/common/inc  --use_fast_math --ptxas-options=-v
 
 OUTPUT_FILE = histogram/histogram*.dat index_replica.dat energy_replica.dat input.txt acceptance_ratio.dat
@@ -84,7 +84,7 @@ remd_rpc : $(OBJS_DS)
 	@echo "//"
 	@echo "// Generate remd_ds_rpc"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lrt $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 #	$(CXX) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 
 remd_rpc_rcut : $(OBJS_DS_RCUT)

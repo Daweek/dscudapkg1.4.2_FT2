@@ -6,7 +6,7 @@ NVCC						?= $(CUDAPATH)/bin/nvcc -use_fast_math -O
 
 TARGET = matrixMul
 
-$(TARGET):	matrixMul.cu ../../lib/libdscuda.a
+$(TARGET)_ibv:	matrixMul.cu ../../lib/libdscuda.a
 	$(DSCUDACPP) -o $@ -I. -i $< -ldscuda -libverbs -lrdmacm -lpthread
 
 $(TARGET)_rpc:	matrixMul.cu ../../lib/libdscuda_rpc.a
@@ -20,4 +20,4 @@ $(TARGET)_local: matrixMul.cu
 
 
 clean:
-	rm -rf *.o *.ptx $(TARGET) $(TARGET)_rpc *.linkinfo ./dscudatmp
+	rm -rf *.o *.ptx $(TARGET)_{ibv,rpc,rpconly,local} *.linkinfo ./dscudatmp

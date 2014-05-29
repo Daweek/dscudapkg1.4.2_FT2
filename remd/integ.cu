@@ -110,7 +110,7 @@ integTime_dev(int t0,
 	      Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	      Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
 	      Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar,
-	      ReplacedVar_t FAULT_CONF)
+	      FaultConf_t FAULT_CONF)
 {
     __shared__ Real3_t  shared_mem[SMEM_COUNT];
     __shared__ Real_t   potential_ar[SMEM_COUNT];
@@ -372,7 +372,7 @@ simRemd( Remd_t &remd, Simu_t &simu)
     next_progress = 0.0;
     step_progress = 0.05;
 
-    ReplacedVar_t FAULT_CONF(5); // fault 1 times.
+    FaultConf_t FAULT_CONF(5); // fault 1 times.
     for (int t0=0; t0<simu.step_max; t0++) {
 	printf("###=============================================================\n");
 	printf("### t0 = %d / %d\n", t0, simu.step_max-1);

@@ -8,8 +8,8 @@
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
-#ifndef _DSCUDA_H
-#define _DSCUDA_H
+#ifndef DSCUDA_H
+#define DSCUDA_H
 
 #include <cuda_runtime_api.h>
 #include <cutil.h>
@@ -30,13 +30,14 @@ enum {
     RC_REMOTECALL_TYPE_IBV = 2,
 };
 
-typedef struct ReplacedVar {
+typedef struct FaultConf {
     char tag[32];     /* <= "DSCUDA_FAULT_INJECTION" */
     int  overwrite_en;
     int  fault_on;    /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
     int   h_Nfault;   /* */
     int  *d_Nfault;
-    ReplacedVar(int fault_set=0, const char *s="DSCUDA_FAULT_INJECTION") {
+
+    FaultConf(int fault_set=0, const char *s="DSCUDA_FAULT_INJECTION") {
 	cudaError_t err;
 	overwrite_en=1;
 	fault_on = 0; /* Default */
@@ -64,7 +65,10 @@ typedef struct ReplacedVar {
 #endif
     }
 #if 0
-    ~ReplacedVar() {
+  /*
+   * Destructor
+   */
+    ~FaultConf() {
 	cudaError_t err;
 	cudaSetDevice(0); /* temporary */
 	err = cudaFree(p_Nfault);
@@ -74,8 +78,6 @@ typedef struct ReplacedVar {
 	}
     }
 #endif
-} ReplacedVar_t;
+} FaultConf_t;
    
-// defined in libdscuda.cu
-
-#endif // _DSCUDA_H
+#endif // DSCUDA_H
