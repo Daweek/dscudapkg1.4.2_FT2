@@ -9,6 +9,9 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	(1) virtual device managemant in the dscuda client library.
 	    Vdet_t Vdev[RC_NVDEVMAX] "RC_NVDEVMAX"=64 by default.
 	    int    Nvdev;
+
+	    From the side of the dscuda server(s), the server can't distinguish
+	    grouping of redundant construction.
 	    
 	(2) fault injection mechanism
 	DSCUDA server recognize the parameters by following 4 types in
