@@ -22,3 +22,7 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	- dscudaARgTypeV: (else) struct, double, 'FaultConf_t', ..
 	
 [History]
+
+
+[etc]
+	日本語テスト for gitHub.
