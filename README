@@ -6,5 +6,11 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	under development.
 
 [Memo]
+	DSCUDA server recognize the parameters by following 4 types in
+	function "rpcUnpackKernelParam()", 
+	- dscudaArgTypeP: pointer(any type).
+	- dscudaArgTypeI: int.
+	- dscudaArgTypeF: float.
+	- dscudaARgTypeV: (else) struct, double, 'FaultConf_t', ..
 	
 [History]
