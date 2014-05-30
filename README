@@ -6,6 +6,11 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	under development.
 
 [Memo]
+	(1) virtual device managemant in the dscuda client library.
+	    Vdet_t Vdev[RC_NVDEVMAX] "RC_NVDEVMAX"=64 by default.
+	    int    Nvdev;
+	    
+	(2) fault injection mechanism
 	DSCUDA server recognize the parameters by following 4 types in
 	function "rpcUnpackKernelParam()", 
 	- dscudaArgTypeP: pointer(any type).
