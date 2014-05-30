@@ -20,7 +20,9 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	- dscudaArgTypeI: int.
 	- dscudaArgTypeF: float.
 	- dscudaARgTypeV: (else) struct, double, 'FaultConf_t', ..
-	
+
+	(3) Frequently Wrong Operation
+	    - (+_+)set environment variable "LD_LIBRARY_PATH" on server node.
 [History]
 
 
