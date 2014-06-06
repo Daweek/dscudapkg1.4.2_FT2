@@ -59,11 +59,11 @@ libcudart.so.3:	cudart_dummy.cu
 dscudaverb.o:	dscudaverb.cu
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
-dscudad :	dscudad.c sockutil.c sockutil.h
-	$(CC) -o $@ dscudad.c sockutil.c -lpthread
+dscudad :	dscudad.cu sockutil.c
+	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
 
-dscudad_rpc :	dscudad.c sockutil.c sockutil.h
-	$(CC) -DRPC_ONLY=1 -o $@ dscudad.c sockutil.c -lpthread
+dscudad_rpc :	dscudad.cu sockutil.c
+	$(NVCC) -o $@ $(CUDAINCLUDES) -DRPC_ONLY=1 $^ -lpthread
 
 dummysvr :	dummysvr.c
 
@@ -107,7 +107,7 @@ ibv_rdma.o:	ibv_rdma.cpp
 libdscuda.cu:      dscuda.h libdscuda.h dscudaverb.h
 libdscuda_rpc.cu:  dscuda.h libdscuda.h dscudaverb.h
 libdscuda_ibv.cu:  dscuda.h libdscuda.h dscudaverb.h ibv_rdma.h
-dscudad.c :        dscudadefs.h sockutil.h
+dscudad.cu :       dscudadefs.h sockutil.h dscudarpc.h
 dscudaverb.cu:     dscuda.h libdscuda.h dscudaverb.h dscudarpc.h
 dscudatest.cu:     dscuda.h ibv_rdma.h
 ibv_rdma.cpp:      ibv_rdma.h 

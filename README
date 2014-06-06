@@ -23,8 +23,8 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 
 	(3) Frequently Wrong Operation
 	    - (+_+)set environment variable "LD_LIBRARY_PATH" on server node.
-[History]
 
+[History]
 
 [etc]
 	日本語テスト for gitHub.

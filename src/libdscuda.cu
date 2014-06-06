@@ -658,16 +658,18 @@ void printModuleList(void) {
 }
 
 static int
-dscudaSearchServer(char *ips, int size) {
+dscudaSearchServer(char *ips, int size)
+{
+    const int Len_Byte = 256;
     int sock, rcvsock, nsvr, val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
-    char rcvbuf[256];
+    char rcvbuf[Len_Byte];
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
     struct ifconf ifc;
 
-    WARN(2, "searching DSCUDA servers...\n");
+    WARN(2, "###(info) Searching DSCUDA servers...\n");
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     rcvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock == -1 || rcvsock == -1) {
@@ -690,7 +692,7 @@ dscudaSearchServer(char *ips, int size) {
     addr.sin_port = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = adr | ~mask;
 
-    sendto(sock, "DSCUDA_SEARCHSERVER", 20, 0, (struct sockaddr *)&addr, sizeof(addr));
+    sendto(sock, SEARCH_PING, strlen(SEARCH_PING), 0, (struct sockaddr *)&addr, sizeof(addr));
 
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
@@ -707,15 +709,15 @@ dscudaSearchServer(char *ips, int size) {
     }
 
     sleep(3);
-    memset(rcvbuf, 0, 256);
-    while (0 < recvfrom(rcvsock, rcvbuf, 256 - 1, 0, (struct sockaddr *)&svr, &sin_size)) {
-	if (strcmp(rcvbuf, "DSCUDA_SERVERRESPONSE") == 0) {
+    memset(rcvbuf, 0, Len_Byte);
+    while (0 < recvfrom(rcvsock, rcvbuf, Len_Byte - 1, 0, (struct sockaddr *)&svr, &sin_size)) {
+	if (strcmp( rcvbuf, SEARCH_ACK ) == 0) {
 	    WARN(2, "found server: \"%s\"\n", inet_ntoa(svr.sin_addr));
 	    strcat(ips, inet_ntoa(svr.sin_addr));
 	    strcat(ips, " ");
 	    nsvr++;
 	}
-	memset(rcvbuf, 0, 256);
+	memset(rcvbuf, 0, Len_Byte);
     }
 
     close(sock);

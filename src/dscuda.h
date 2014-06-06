@@ -31,7 +31,10 @@ const char DELIM_REDUN[] = ","; // Redundant device is seperated by comma.
 const char DELIM_CAND[]  = " "; //
 const char DELIM_IGNORE[]= " "; //
 /*   */
-const char IDTAG_0[]="DSCUDA_FAULT_INJECTION"; //
+const char IDTAG_0[]     = "DSCUDA_FAULT_INJECTION" ; //
+/* DS-CUDA search daemons */
+const char SEARCH_PING[] = "DSCUDA_SEARCHSERVER" ;
+const char SEARCH_ACK[]  = "DSCUDA_SERVERRESPONSE" ;
 
 enum {
     RC_REMOTECALL_TYPE_RPC = 1,
