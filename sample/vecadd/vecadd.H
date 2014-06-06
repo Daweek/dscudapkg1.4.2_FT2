@@ -1,14 +1,14 @@
 
 extern "C" __global__ void
-vecAdd(float *a, float *b, float *c, ReplacedVar_t fault_conf)
+vecAdd(float *a, float *b, float *c, FaultConf_t fault_conf)
 {
     //    int i = blockIdx.x * blockDim.x + threadIdx.x;
     int i = blockIdx.x;
     int *fault_cnt = fault_conf.d_Nfault;
     printf("[vecadd] fault_conf is %d/%d  %s.\n",
-	   *fault_cnt, fault_conf.fault_on, fault_conf.tag);
+	   *fault_cnt, fault_conf.fault_en, fault_conf.tag);
 
-    if (!fault_conf.fault_on || *fault_cnt==0) {
+    if (!fault_conf.fault_en || *fault_cnt==0) {
 	c[i] = a[i] + b[i];
 	printf("[normal] %f + %f =? %f\n", a[i], b[i], c[i]);
     }

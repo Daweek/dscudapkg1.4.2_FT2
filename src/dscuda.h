@@ -25,23 +25,32 @@
 #include "dscudaverb.h"
 #include "libdscuda.h"
 
+/*   */
+const char DELIM_VDEV[]  = " "; // Virtual device is seperated by space.
+const char DELIM_REDUN[] = ","; // Redundant device is seperated by comma.
+const char DELIM_CAND[]  = " "; //
+const char DELIM_IGNORE[]= " "; //
+/*   */
+const char IDTAG_0[]="DSCUDA_FAULT_INJECTION"; //
+
 enum {
     RC_REMOTECALL_TYPE_RPC = 1,
     RC_REMOTECALL_TYPE_IBV = 2,
 };
 
-typedef struct FaultConf {
-    char tag[32];     /* <= "DSCUDA_FAULT_INJECTION" */
-    int  overwrite_en;
-    int  fault_on;    /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
-    int   h_Nfault;   /* */
+typedef struct FaultConf
+{
+    char tag[32];      /* <= "DSCUDA_FAULT_INJECTION" */
+    int  overwrite_en; /* Overwrite by DS-CUDA server */
+    int  fault_en;     /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
+    int  fault_count;  /* Number of fault occur */
     int  *d_Nfault;
 
-    FaultConf(int fault_set=0, const char *s="DSCUDA_FAULT_INJECTION") {
+    FaultConf(int fault_set=0, const char *s=IDTAG_0) {
 	cudaError_t err;
 	overwrite_en=1;
-	fault_on = 0; /* Default */
-	h_Nfault = fault_set;
+	fault_en = 0; /* Default */
+	fault_count = fault_set;
 	strcpy(tag, s);
 	/* malloc on device */
 #if defined(__DSCUDA__)
@@ -54,7 +63,7 @@ typedef struct FaultConf {
 	    exit(1);
 	}
 	/* set initial value on device */
-	err = cudaMemcpy(d_Nfault, &h_Nfault, sizeof(h_Nfault), cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_Nfault, &fault_count, sizeof(fault_count), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
 	    fprintf(stderr, "#Error. cudaMalloc() failed in consructor %s().\n", __func__);
 	    exit(1);

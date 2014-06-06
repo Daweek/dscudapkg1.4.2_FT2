@@ -8,10 +8,10 @@ else
 endif
 
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
-CC            = gcc -O0 -g -ffast-math -funroll-loops
-CXX           = g++ -O0 -g -ffast-math -funroll-loops
+CC            = /usr/bin/gcc -O0 -g -ffast-math -funroll-loops
+CXX           = /usr/bin/g++ -O0 -g -ffast-math -funroll-loops
 CUDAPATH     ?= /usr/local/cuda
-NVCC          = $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_30
+NVCC          = $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_20
 CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64

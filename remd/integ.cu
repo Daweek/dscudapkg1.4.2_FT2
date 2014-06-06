@@ -118,7 +118,6 @@ integTime_dev(int t0,
      
     __shared__ int fault_cnt;
     
-
    
     Real_t calc_err;
     if (threadIdx.x==0) {

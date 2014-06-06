@@ -17,7 +17,7 @@ int main(void) {
 
     printf("start vecadd\n"); fflush(stdout);
     //dscudaRecordHistOff();    
-    ReplacedVar_t FAULT_CONF(2);
+    FaultConf_t FAULT_CONF(2);
     FAULT_CONF.overwrite_en = 1;
     printf("The size of FAULT_CONF is %d Byte.\n", sizeof(FAULT_CONF));
 

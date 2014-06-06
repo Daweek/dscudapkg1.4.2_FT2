@@ -84,8 +84,8 @@ void dscudaAutoVerbOn(void) {
 void dscudaAutoVerbOff(void) {
     St.unsetAutoVerb();
 }
-int
-requestDaemonForDevice(char *ipaddr, int devid, int useibv)
+
+int requestDaemonForDevice(char *ipaddr, int devid, int useibv)
 {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
@@ -139,7 +139,8 @@ requestDaemonForDevice(char *ipaddr, int devid, int useibv)
  * Obtain a small integer unique for each thread.
  * The integer is used as an index to 'Vdevid[]'.
  */
-int vdevidIndex(void) {
+int vdevidIndex(void)
+{
     int i;
     pthread_t ptid = pthread_self();
 
@@ -163,7 +164,8 @@ int vdevidIndex(void) {
     return i;
 }
 
-void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
+void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
+{
     RCmappedMem *mem = (RCmappedMem *)malloc(sizeof(RCmappedMem));
     if (!mem) {
         perror("RCmappedMemRegister");
@@ -183,7 +185,8 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
 }
 
 RCmappedMem *
-RCmappedMemQuery(void *pHost) {
+RCmappedMemQuery(void *pHost)
+{
     RCmappedMem *mem = RCmappedMemListTop;
     while (mem) {
         if (mem->pHost == pHost) {
@@ -194,8 +197,8 @@ RCmappedMemQuery(void *pHost) {
     return NULL; // pHost not found in the list.
 }
 
-void
-RCmappedMemUnregister(void *pHost) {
+void RCmappedMemUnregister(void *pHost)
+{
     RCmappedMem *mem = RCmappedMemQuery(pHost);
     if (!mem) return;
 
@@ -222,8 +225,8 @@ RCmappedMemUnregister(void *pHost) {
  * Others, i.e., streams[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-static void
-RCstreamArrayRegister(cudaStream_t *streams)
+static
+void RCstreamArrayRegister(cudaStream_t *streams)
 {
     RCstreamArray *st = (RCstreamArray *)malloc(sizeof(RCstreamArray));
     if (!st) {
@@ -244,8 +247,8 @@ RCstreamArrayRegister(cudaStream_t *streams)
 }
 
 #if 0
-static void
-showsta(void)
+static
+void showsta(void)
 {
     RCstreamArray *st = RCstreamArrayListTop;
     while (st) {
@@ -422,8 +425,7 @@ RCeventArrayUnregister(cudaEvent_t event0)
 }
 
 
-void *
-dscudaUvaOfAdr(void *adr, int devid)
+void *dscudaUvaOfAdr(void *adr, int devid)
 {
     unsigned long adri = (unsigned long)adr;
 #if __LP64__
@@ -432,8 +434,7 @@ dscudaUvaOfAdr(void *adr, int devid)
     return (void *)adri;
 }
 
-int
-dscudaDevidOfUva(void *adr)
+int dscudaDevidOfUva(void *adr)
 {
 #if __LP64__
     unsigned long adri = (unsigned long)adr;
@@ -444,8 +445,7 @@ dscudaDevidOfUva(void *adr)
 #endif
 }
 
-void *
-dscudaAdrOfUva(void *adr)
+void *dscudaAdrOfUva(void *adr)
 {
     unsigned long adri = (unsigned long)adr;
 #if __LP64__
@@ -460,8 +460,7 @@ dscudaAdrOfUva(void *adr)
  * Others, i.e., Server[1..Nredunddancy-1], are hidden to the user,
  * and used by this library to handle redundant calculation mechanism.
  */
-void
-RCuvaRegister(int devid, void *adr[], size_t size)
+void RCuvaRegister(int devid, void *adr[], size_t size)
 {
     int i;
     int nredundancy = dscudaNredundancy();
@@ -578,7 +577,8 @@ resetServerUniqID(void)
 }
 
 void
-printVirtualDeviceList(void) {
+printVirtualDeviceList(void)
+{
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
     int         i,j;
@@ -590,8 +590,8 @@ printVirtualDeviceList(void) {
 	}
 	printf("#(info.) Virtual Device[%d] (Redundancy: %d)\n", i, pVdev->nredundancy);
 	for (j=0, pSvr=pVdev->server; j<pVdev->nredundancy; j++, pSvr++) {
-	    if (i >= RC_NREDUNDANCYMAX) {
-		WARN(0, "(;_;) Too many redundant devices. %s().\nexit.", __func__);
+	    if (j >= RC_NREDUNDANCYMAX) {
+		WARN(0, "(;_;) Too many redundant devices %d. %s().\nexit.\n", __func__);
 		exit(1);
 	    }
 	    printf("#(info.)    + Raid[%d]: id=%d, cid=%d, IP=%s(%s), uniq=%d.\n", j,
@@ -647,8 +647,8 @@ void printModuleList(void) {
 	    printf("# %s():    + name= %s\n", __func__, CltModulelist[i].name);
 	    //printf("    + send_time= \n", sent_time., sent_time.);
 	    strncpy(printbuf, CltModulelist[i].ptx_image, len - 1 );
-	    printbuf[254]='\0';
-	    printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
+	    printbuf[256]='\0';
+	    //printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
 	    valid_cnt++;
 	}
     }
@@ -732,11 +732,11 @@ initCandServerList(const char *env) {
     if ((nsvr = dscudaSearchServer(buf, 1024*RC_NVDEVMAX)) > 0) {
 	int uniq = RC_UNIQ_CANDBASE; // begin with 
 	if (env) { // always true?
-	    ip = strtok(buf, " ");
+	    ip = strtok(buf, DELIM_CAND);
 	    Ncand = 0;
 	    while (ip != NULL) {
 		strcpy(svrCand[Ncand].ip, ip);
-		ip = strtok(NULL, " ");
+		ip = strtok(NULL, DELIM_CAND);
 		Ncand++;
 	    }
 	    for (int i=0; i<Ncand; i++) {
@@ -773,7 +773,7 @@ initIgnoreServerList(void)
 	}
 	strncpy(buf, env, sizeof(buf));
 	Nignore = 0;
-	ip = strtok(buf, " "); // a list of IPs which consist a single vdev.
+	ip = strtok(buf, DELIM_IGNORE); // a list of IPs which consist a single vdev.
 	while (ip) {
 	    strcpy(svrIgnore[Nignore].ip, ip);
 	    Nignore++; /* counts Nignore */
@@ -782,7 +782,7 @@ initIgnoreServerList(void)
 		     RC_NVDEVMAX);
 		exit(1);
 	    }
-	    ip = strtok(NULL, " ");
+	    ip = strtok(NULL, DELIM_IGNORE);
 	}
     }
     else {
@@ -790,8 +790,8 @@ initIgnoreServerList(void)
     }
 }
 
-static void
-initVirtualServerList(const char *env)
+static
+void initVirtualServerList(const char *env)
 {
     char *ip, *hostname, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
@@ -805,8 +805,8 @@ initVirtualServerList(const char *env)
 	}
 	strncpy(buf, env, sizeof(buf));
 	Nvdev = 0;
-	ip = strtok(buf, " "); // a list of IPs which consist a single vdev.
-	while (ip) {
+	ip = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
+	while (ip != NULL) {
 	    strcpy(ips[Nvdev], ip);
 	    Nvdev++; /* counts Nvdev */
 	    if (RC_NVDEVMAX < Nvdev) {
@@ -814,18 +814,18 @@ initVirtualServerList(const char *env)
 		     RC_NVDEVMAX);
 		exit(1);
 	    }
-	    ip = strtok(NULL, " ");
+	    ip = strtok(NULL, DELIM_VDEV);
 	}
 	for (int i=0; i<Nvdev; i++) {
 	    int nred=0;
 	    int uniq=0; // begin with 0.
 	    pvdev = Vdev + i;  /* vdev = &Vdev[i]  */
-	    ip = strtok(ips[i], ","); // an IP (optionally with devid preceded by a colon) of
+	    ip = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a colon) of
 	    // a single element of the vdev.
 	    while (ip != NULL) {
 		strcpy(pvdev->server[nred].ip, ip);
 		nred++;
-		ip = strtok(NULL, ",");
+		ip = strtok(NULL, DELIM_REDUN);
 	    }
 	    pvdev->nredundancy = nred;
 	    
@@ -989,8 +989,8 @@ updateDscudaPath(void) {
     WARN(1, "#(info.) DSCUDA_PATH= %s\n", Dscudapath);
 }
 
-static void
-initEnv(void) {
+static
+void initEnv(void) {
 /*
  * set "int Ndev",  "Vdev_t     Vdev[RC_NVDEVMAX]",
  *     "int Ncand", "RCServer_t svrCand[RC_NVDEVMAX]
@@ -1067,8 +1067,7 @@ initEnv(void) {
 
 static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
-void
-initClient(void) {
+void initClient(void) {
     static int firstcall = 1;
 
     pthread_mutex_lock(&InitClientMutex);
@@ -1187,21 +1186,21 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  * returns id for the module.
  * the module is cached and sent only once for a certain period.
  */
-int*
-dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
-    //WARN(10, "<---Entering %s()\n", __func__);
+int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated.
+{
     int i, j, mid;
     ClientModule *mp;
+    int idx;
 
     if (name != NULL) {
 	WARN(5, "dscudaLoadModule(%p) modulename:%s  ...\n", name, name);
 #if RC_CACHE_MODULE
 	// look for modulename in the module list.
-	mp = CltModulelist;
-	for (i=0; i < RC_NKMODULEMAX; i++) {
-	    if (mp->isInvalid()) continue;
-	    if (mp->vdevid != Vdevid[vdevidIndex()]) continue;
-	    if (!strcmp(name, mp->name)) {
+	for (i=0, mp=CltModulelist; i < RC_NKMODULEMAX; i++, mp++) {
+	    if ( mp->isInvalid() ) continue;
+	    idx = vdevidIndex();
+	    if (mp->vdevid != Vdevid[idx]) continue;
+	    if ( !strcmp(name, mp->name) ) {
 		if ( mp->isAlive() ) {
 		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
 			 mp->id[i], time(NULL) - mp->sent_time, mp->name);
@@ -1213,8 +1212,7 @@ dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminate
 		    mp->invalidate(); // invalidate the cache.
 		}
 	    }
-	    mp++;
-	}
+	} //for
 #endif // RC_CACHE_MODULE
     }
     else {
@@ -1225,16 +1223,16 @@ dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminate
     char *strdata_found = NULL;
     char *name_found=NULL;
     if (name==NULL && strdata==NULL) {
-	for (i=0, mp=CltModulelist; i<RC_NKMODULEMAX; i++) {
+        for (i=0, mp=CltModulelist; i<RC_NKMODULEMAX; i++, mp++) {
 	    WARN(10, "i=%d\n", i);
 	    if (mp->isInvalid()) continue;
-	    if (mp->vdevid != Vdevid[vdevidIndex()]) continue;
+	    idx = vdevidIndex();
+	    if (mp->vdevid != Vdevid[idx]) continue;
 	    if (!strcmp(name, mp->name)) {     /* matched */
 		strdata_found = mp->ptx_image;
 		name_found = mp->name;
 		break;
 	    }
-	    mp++;
 	}
     }
     else {
@@ -1245,24 +1243,26 @@ dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminate
 
     // module not found in the module list.
     // really need to send it to the server.
-    int vi = vdevidIndex();
-    Vdev_t *vdev = Vdev + Vdevid[vi];
+    idx = vdevidIndex();
+    Vdev_t *vdev = Vdev + Vdevid[idx];
 
     for (i=0; i < vdev->nredundancy; i++) {
 	// mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name, strdata, Vdevid[vi], i);
-	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name_found, strdata_found, Vdevid[vi], i);
-        WARN(3, "dscudaLoadModuleLocal returns %d\n", mid);
+	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name_found, strdata_found, Vdevid[idx], i);
+        WARN(3, "(info) dscudaLoadModuleLocal() returns mid=%d as Vdevid[%d], Redun[%d].\n", mid, idx, i);
 
         // register a new module into the list,
         // and then, return a module id assigned by the server.
         if (i==0) {
             for (j=0; j<RC_NKMODULEMAX; j++) { /* Search vacant sheet. */
                 if( CltModulelist[j].isInvalid() ) break;
-                if( j == RC_NKMODULEMAX ) {
-		    WARN(0, "module send buffer is full.\n");
-		    exit(1);
-		}
             }
+	    if( j >= RC_NKMODULEMAX ) {
+		WARN(0, "\n\n### (+_+) ERROR in DS-CUDA!\n");
+		WARN(0,     "### (+_+) module send buffer is full. and exit.\n");
+		WARN(0,     "### (+_+) Check if the array length of CltModulelist[%d].\n\n\n", j);
+		exit(1);
+	    }
             CltModulelist[j].validate();
             CltModulelist[j].sent_time = time(NULL);
             CltModulelist[j].setPtxPath(name_found);
@@ -1271,9 +1271,9 @@ dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminate
         }
         CltModulelist[j].id[i] = mid;
     }
-    CltModulelist[j].vdevid = Vdevid[vi];
+    CltModulelist[j].vdevid = Vdevid[idx];
     printModuleList();
-    //WARN(10, "--->Exiting  %s()\n", __func__);
+
     return CltModulelist[j].id; //mp->id;
 }
 

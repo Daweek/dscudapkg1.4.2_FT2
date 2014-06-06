@@ -2,7 +2,10 @@ DSCUDACPP        = ../../bin/dscudacpp -arch=sm_20
 CUDAPATH        ?= /usr/local/cuda-4.2/cuda
 CUDASDKPATH     ?= /usr/local/cuda-4.2/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES     = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
-NVCC             = $(CUDAPATH)/bin/nvcc -use_fast_math -O -arch=sm_20
+DSCUDAINCLUDE    = -I$(DSCUDA_PATH)/include
+NVCC             = $(CUDAPATH)/bin/nvcc -use_fast_math -O -arch=sm_20 
+
+
 
 TARGET = vecadd
 SRC = vecadd.cu
@@ -22,7 +25,7 @@ $(TARGET).o: $(SRC) ../../lib/libdscuda.a
 	$(DSCUDACPP) -c -o $@ -I. -i $< -ldscuda -libverbs -lrdmacm -lpthread
 
 $(TARGET)_local: $(SRC)
-	$(NVCC) -o $@ $(CUDAINCLUDES) $< -lcuda
+	$(NVCC) -o $@ $(CUDAINCLUDES) $(DSCUDAINCLUDE) $< -lcuda
 
 clean:
 	rm -rf *.o *.ptx $(TARGET)_{ibv,rpc,rpconly,local} *.linkinfo ./dscudatmp

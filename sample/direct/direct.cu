@@ -186,8 +186,8 @@ main(int argc, char **argv)
 
     eps = 0.02;
     dt = 0.01;
-    endt = 1.1;
-    //    endt = 10000.1;
+    //endt = 1.1;
+    endt = 10000.1;
     time = 0.0;
     nstep = endt/dt;
 

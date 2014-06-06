@@ -72,6 +72,11 @@ typedef struct ClientModule_t {
 	    return 0;
 	}
     }
+    /*
+    int isTimeout() {
+	
+    }
+    */
     ClientModule_t() {
 	valid  = -1;
 	vdevid = -1;

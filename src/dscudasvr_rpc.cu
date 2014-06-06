@@ -119,15 +119,15 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             pval = argp->val.RCargVal_u.valuev;
 	    /*if environ var found, then update its value with localhost's one.*/
 	    fault_conf = (FaultConf_t *)pval;
-	    if (strncmp(fault_conf->tag, "DSCUDA_FAULT_INJECTION", 32)==0) {
+	    if (strncmp(fault_conf->tag, IDTAG_0, 32)==0) {
                 WARN(10, "DSCUDA_FAULT_INJECTION found, ");
 		if (fault_conf->overwrite_en) {
 		    WARN(10, "then overwrite %d over %d.\n",
-			 DscudaSvr.getFaultInjection(), fault_conf->fault_on);
-		    fault_conf->fault_on = DscudaSvr.getFaultInjection();
+			 DscudaSvr.getFaultInjection(), fault_conf->fault_en);
+		    fault_conf->fault_en = DscudaSvr.getFaultInjection();
 		}
 		else {
-		    WARN(10, "but leave as is %d.\n", fault_conf->fault_on);
+		    WARN(10, "but leave as is %d.\n", fault_conf->fault_en);
 		}
 	    }
 	    
