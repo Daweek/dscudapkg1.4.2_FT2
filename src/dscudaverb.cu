@@ -624,8 +624,8 @@ recallRpcLaunchKernel(void *argp) {
 }
 
 //initialize redundant unit
-void
-dscudaVerbInit(void) {
+void dscudaVerbInit(void)
+{
     memset(storeArgsStub,   0, sizeof(DSCVMethod) * DSCVMethodEnd);
     memset(releaseArgsStub, 0, sizeof(DSCVMethod) * DSCVMethodEnd);
     memset(recallStub,      0, sizeof(DSCVMethod) * DSCVMethodEnd);
@@ -659,8 +659,8 @@ dscudaVerbInit(void) {
     St.unsetRecordHist();
 }
 
-void
-dscudaVerbAddHist(int funcID, void *argp) {
+void dscudaVerbAddHist(int funcID, void *argp)
+{
     int DSCVMethodId;
 
     if (verbHistNum == verbHistMax) { /* Extend the existing memory region. */
@@ -692,8 +692,8 @@ dscudaVerbAddHist(int funcID, void *argp) {
 /*
  *
  */
-void
-dscudaVerbClearHist(void) {
+void dscudaVerbClearHist(void)
+{
    if (verbHists) {
       for (int i=0; i<verbHistNum; i++) {
          (releaseArgsStub[funcID2DSCVMethod(verbHists[i].funcID)])(verbHists[i].args);
@@ -707,11 +707,13 @@ dscudaVerbClearHist(void) {
    return;
 }
 
-void dscudaClearHist(void) {
+void dscudaClearHist(void)
+{
     dscudaVerbClearHist();
 }
 
-void dscudaPrintHist(void) {
+void dscudaPrintHist(void)
+{
     WARN(1, "%s(): *************************************************\n", __func__);
     if (verbHistNum==0) {
 	WARN(1, "%s(): Recall History[]> (Empty).\n", __func__);
@@ -736,7 +738,8 @@ void dscudaPrintHist(void) {
 /*
  * Rerun the recorded history of cuda function series.
  */
-int dscudaVerbRecallHist(void) {
+int dscudaVerbRecallHist(void)
+{
    static int called_depth = 0;
    int result;
    WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, verbHistNum, __func__);
@@ -771,8 +774,8 @@ int dscudaVerbRecallHist(void) {
 /*
  *
  */
-void
-dscudaVerbMigrateModule() {
+void dscudaVerbMigrateModule()
+{
     // module not found in the module list.
     // really need to send it to the server.
     int vi = vdevidIndex();
@@ -792,8 +795,8 @@ dscudaVerbMigrateModule() {
 /*
  *
  */
-void
-dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
+void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to)
+{
     WARN(1, "#**********************************************************************\n");
     WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
     WARN(1, "#**********************************************************************\n\n");

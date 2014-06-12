@@ -310,12 +310,12 @@ response_to_search(void *arg)  /* call by pthread_create() */
 	recvfrom(sock, recvbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, &sin_size);
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
-	WARN(2, "###(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
+	WARN(2, "#(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	clt.sin_family = AF_INET;
 	clt.sin_port = htons( RC_DAEMON_IP_PORT - 2 );
 	inet_aton( inet_ntoa(clt.sin_addr), &(clt.sin_addr) );
 	sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
-	WARN(2, "###(info) Sent ack message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
+	WARN(2, "#(info) +-- Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
 	memset( recvbuf, 0, SEARCH_BUFLEN );
     }
 

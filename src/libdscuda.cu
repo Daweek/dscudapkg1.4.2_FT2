@@ -61,9 +61,6 @@ RCServer_t svrSpare[RC_NVDEVMAX];
 static int Nbroken;
 RCServer_t svrBroken[RC_NVDEVMAX];
 
-static int Nignore;
-RCServer_t svrIgnore[RC_NVDEVMAX];
-
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX]; /* RPC clients */
@@ -100,7 +97,9 @@ int requestDaemonForDevice(char *ipaddr, int devid, int useibv)
         exit(1);
     }
     if (connect(dsock, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1) {
-        perror("connect");
+        perror("(;_;) Connect");
+	fprintf( stderr, "(;_;) Program terminated at %s:L%d\n", __FILE__, __LINE__ );
+	fprintf( stderr, "(;_;) Maybe DS-CUDA daemon is not running...\n" );
         exit(1);
     }
     sprintf(msg, "deviceid:%d", devid);
@@ -599,15 +598,12 @@ printVirtualDeviceList(void)
 		   pSvr->id, pSvr->cid, pSvr->ip, pSvr->hostname, pSvr->uniq);
 	}
     }
-    printf("#(info.) *** Ignored Server Info.(Ningore=%d)\n",Nignore);
-    for( i=0, pSvr=svrIgnore; i<Nignore; i++, pSvr++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many ignored devices. %s().\nexit.", __func__);
 	    exit(1);
 	}
 	printf("#(info.)    - Ignore[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
 	       pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
-    }
     /*            */
     printf("#(info.) *** Candidate Server Info.(Ncand=%d)\n",Ncand);
     for( i=0, pSvr=svrCand; i<Ncand; i++, pSvr++ ){
@@ -674,7 +670,7 @@ int dscudaSearchServer(char *ips, int size)
     struct ifconf ifc;
     struct passwd *pwd;
 
-    WARN(2, "###(info) Searching DSCUDA servers...\n");
+    WARN(2, "#(info) Searching DSCUDA daemons...\n");
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( sock == -1 || recvsock == -1 ) {
@@ -718,14 +714,13 @@ int dscudaSearchServer(char *ips, int size)
     sleep(3);
     memset( recvbuf, 0, SEARCH_BUFLEN );
     while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
-	WARN(2, "###(info)    + Recieved ACK \"%s\" ", recvbuf);
+	WARN(2, "#(info)    + Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok(recvbuf, SEARCH_DELIM);
 	user_name  = strtok(NULL,    SEARCH_DELIM);
 	if ( magic_word==NULL ) {
 	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
 	    exit(1);
-	}
-	else {
+	} else {
 	    WARN(2, "from server \"%s\" ", inet_ntoa(svr.sin_addr));
 	    if ( strcmp( magic_word, SEARCH_ACK   )==0 &&
 		 strcmp( user_name,  pwd->pw_name )==0 ) { /* Found */
@@ -755,71 +750,44 @@ int dscudaSearchServer(char *ips, int size)
     return num_svr;
 }
 
-static void
-initCandServerList(const char *env)
+static
+void initCandServerList(const char *env)
 {
     char *ip;
-    char buf[1024*RC_NVDEVMAX];
+    char buf[1024 * RC_NVDEVMAX];
     int nsvr;
 
-    if ((nsvr = dscudaSearchServer(buf, 1024*RC_NVDEVMAX)) > 0) {
-	int uniq = RC_UNIQ_CANDBASE; // begin with 
-	if (env) { // always true?
-	    ip = strtok(buf, DELIM_CAND);
-	    Ncand = 0;
-	    while (ip != NULL) {
-		strcpy(svrCand[Ncand].ip, ip);
-		ip = strtok(NULL, DELIM_CAND);
-		Ncand++;
-	    }
-	    for (int i=0; i<Ncand; i++) {
-		strncpy(buf, svrCand[i].ip, sizeof(buf));
-		ip = strtok(buf, ":");
-		strcpy(svrCand[i].ip, ip);
-		ip = strtok(NULL, ":");
-		//sp->cid = ip ? atoi(ip) : 0; /* Yoshikawa's original */
-		if (ip != NULL) { svrCand[i].cid = atoi(ip); }
-		else            { svrCand[i].cid = 0;        }
-		//sp->id will be set on server reconnecting
-		svrCand[i].uniq = uniq;
-		uniq++;
-	    }
-	}
-	else {
-	    setenv("DSCUDA_SERVER", buf, 1);
-	    env = getenv("DSCUDA_SERVER");
-	}
+    nsvr = dscudaSearchServer( buf, 1024 * RC_NVDEVMAX );
+    if ( nsvr <= 0 ) {
+	fprintf(stderr, "(+_+) Not found DS-CUDA daemons in this cluster.\n");
+	fprintf(stderr, "(+_+) Program terminated..\n\n\n");
+	exit(1);
     }
-}
 
-static void
-initIgnoreServerList(void)
-{
-    char *env = getenv("DSCUDA_SERVER_IGNORE");
-    char *ip, *hostname, ips[RC_NVDEVMAX][256];
-    char buf[1024*RC_NVDEVMAX];
-    
-    if (env) {
-	if (sizeof(buf) < strlen(env)) {
-	    WARN(0, "%s():evironment variable DSCUDA_SERVER_IGNORE too long.\n", __func__);
-	    exit(1);
+    int uniq = RC_UNIQ_CANDBASE; // begin with 
+    if ( env != NULL ) { // always true?
+	ip = strtok( buf, DELIM_CAND );
+	Ncand = 0;
+	while ( ip != NULL ) {
+	    strcpy( svrCand[Ncand].ip, ip );
+	    ip = strtok(NULL, DELIM_CAND);
+	    Ncand++;
 	}
-	strncpy(buf, env, sizeof(buf));
-	Nignore = 0;
-	ip = strtok(buf, DELIM_IGNORE); // a list of IPs which consist a single vdev.
-	while (ip) {
-	    strcpy(svrIgnore[Nignore].ip, ip);
-	    Nignore++; /* counts Nignore */
-	    if (RC_NVDEVMAX < Nignore) {
-		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
-		     RC_NVDEVMAX);
-		exit(1);
-	    }
-	    ip = strtok(NULL, DELIM_IGNORE);
+	for (int i=0; i<Ncand; i++) {
+	    strncpy(buf, svrCand[i].ip, sizeof(buf));
+	    ip = strtok(buf, ":");
+	    strcpy(svrCand[i].ip, ip);
+	    ip = strtok(NULL, ":");
+	    //sp->cid = ip ? atoi(ip) : 0; /* Yoshikawa's original */
+	    if (ip != NULL) { svrCand[i].cid = atoi(ip); }
+	    else            { svrCand[i].cid = 0;        }
+	    //sp->id will be set on server reconnecting
+	    svrCand[i].uniq = uniq;
+	    uniq++;
 	}
-    }
-    else {
-	Nignore = 0;
+    } else {
+	setenv("DSCUDA_SERVER", buf, 1);
+	env = getenv("DSCUDA_SERVER");
     }
 }
 
@@ -911,8 +879,7 @@ void initVirtualServerList(const char *env)
 		}
 	    }
 	}
-    }
-    else {
+    } else {
 	Nvdev = 1;
 	Vdev[0].nredundancy = 1;
 	sp = Vdev[0].server;
@@ -920,8 +887,8 @@ void initVirtualServerList(const char *env)
 	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
     }
 }
-static void
-updateSpareServerList() //TODO: need more good algorithm.
+static
+void updateSpareServerList() //TODO: need more good algorithm.
 {
     int         spare_count = 0;;
     Vdev_t     *pVdev;
@@ -940,11 +907,6 @@ updateSpareServerList() //TODO: need more good algorithm.
 	    }
 	    pVdev++;
 	}
-	for (int j=0; j<Nignore; j++) {
-	    if (strcmp(svrCand[i].ip, svrIgnore[j].ip)==0) { /* check same IP */
-		found=1;
-	    }
-	}
 	if (found==0) { /* not found */
 	    svrSpare[spare_count].id   = svrCand[i].id;
 	    svrSpare[spare_count].cid  = svrCand[i].cid;
@@ -955,16 +917,16 @@ updateSpareServerList() //TODO: need more good algorithm.
     }
     Nspare = spare_count;
 }
-static void
-copyServer(RCServer_t *dst, RCServer_t *src)
+static
+void copyServer(RCServer_t *dst, RCServer_t *src)
 {
     //dst->id   = src->id;   // id must be the same.
     //dst->cid  = src->cid;  // cid too.
     dst->uniq = src->uniq;
     strcpy(dst->ip, src->ip);
 }
-static void
-swapServer(RCServer_t *s0, RCServer_t *s1)
+static
+void swapServer(RCServer_t *s0, RCServer_t *s1)
 {
     RCServer_t buf;
     copyServer(&buf, s0);
@@ -972,8 +934,8 @@ swapServer(RCServer_t *s0, RCServer_t *s1)
     copyServer(s1, &buf);
 }
 
-void
-replaceBrokenServer(RCServer_t *broken, RCServer_t *spare) {
+void replaceBrokenServer(RCServer_t *broken, RCServer_t *spare)
+{
     RCServer_t tmp;
 
     if (Nspare < 1) {  //redundant check?
@@ -1023,7 +985,8 @@ updateDscudaPath(void) {
 }
 
 static
-void initEnv(void) {
+void initEnv(void)
+{
 /*
  * set "int Ndev",  "Vdev_t     Vdev[RC_NVDEVMAX]",
  *     "int Ncand", "RCServer_t svrCand[RC_NVDEVMAX]
@@ -1041,13 +1004,11 @@ void initEnv(void) {
     // DSCUDA_SERVER
     if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
         env = readServerConf(sconfname);
-    }
-    else {
+    } else {
         env = getenv("DSCUDA_SERVER");
     }
 
     resetServerUniqID();      /* set all unique ID to invalid(-1)*/
-    initIgnoreServerList();
     initCandServerList(env);  /* search servers in which dscudad is running. */
     initVirtualServerList(env);  /* Update the list of virtual devices information. */
 
