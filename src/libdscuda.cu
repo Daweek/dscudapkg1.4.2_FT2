@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <ctype.h>
+#include <pwd.h>
 #include "dscuda.h"
 #include "libdscuda.h"
 #include "dscudaverb.h"
@@ -65,7 +66,7 @@ RCServer_t svrIgnore[RC_NVDEVMAX];
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
-CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
+CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX]; /* RPC clients */
 struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
@@ -657,22 +658,26 @@ void printModuleList(void) {
     fflush(stdout);
 }
 
-static int
-dscudaSearchServer(char *ips, int size)
+static
+int dscudaSearchServer(char *ips, int size)
 {
-    const int Len_Byte = 256;
-    int sock, rcvsock, nsvr, val = 1;
+    char sendbuf[SEARCH_BUFLEN];
+    char recvbuf[SEARCH_BUFLEN];
+    char *magic_word, *user_name;
+    int num_svr = 0; // # of dscuda daemons found.
+    int sock, recvsock, val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
-    char rcvbuf[Len_Byte];
+
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
     struct ifconf ifc;
+    struct passwd *pwd;
 
     WARN(2, "###(info) Searching DSCUDA servers...\n");
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    rcvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock == -1 || rcvsock == -1) {
+    recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if( sock == -1 || recvsock == -1 ) {
 	perror("dscudaSearchServer: socket()");
 	return -1;
     }
@@ -692,41 +697,67 @@ dscudaSearchServer(char *ips, int size)
     addr.sin_port = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = adr | ~mask;
 
-    sendto(sock, SEARCH_PING, strlen(SEARCH_PING), 0, (struct sockaddr *)&addr, sizeof(addr));
+    strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN - 1 );
+    sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&addr, sizeof(addr));
 
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
-    nsvr = 0;
 
     svr.sin_family = AF_INET;
     svr.sin_port = htons(RC_DAEMON_IP_PORT - 2);
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
-    ioctl(rcvsock, FIONBIO, &val);
+    ioctl(recvsock, FIONBIO, &val);
 
-    if (bind(rcvsock, (struct sockaddr *)&svr, sizeof(svr)) != 0) {
+    if( bind(recvsock, (struct sockaddr *)&svr, sizeof(svr)) != 0 ) {
 	perror("dscudaSearchServer: bind()");
 	return -1;
     }
-
+    
+    pwd = getpwuid( getuid() );
+    
     sleep(3);
-    memset(rcvbuf, 0, Len_Byte);
-    while (0 < recvfrom(rcvsock, rcvbuf, Len_Byte - 1, 0, (struct sockaddr *)&svr, &sin_size)) {
-	if (strcmp( rcvbuf, SEARCH_ACK ) == 0) {
-	    WARN(2, "found server: \"%s\"\n", inet_ntoa(svr.sin_addr));
-	    strcat(ips, inet_ntoa(svr.sin_addr));
-	    strcat(ips, " ");
-	    nsvr++;
+    memset( recvbuf, 0, SEARCH_BUFLEN );
+    while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
+	WARN(2, "###(info)    + Recieved ACK \"%s\" ", recvbuf);
+	magic_word = strtok(recvbuf, SEARCH_DELIM);
+	user_name  = strtok(NULL,    SEARCH_DELIM);
+	if ( magic_word==NULL ) {
+	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
+	    exit(1);
 	}
-	memset(rcvbuf, 0, Len_Byte);
+	else {
+	    WARN(2, "from server \"%s\" ", inet_ntoa(svr.sin_addr));
+	    if ( strcmp( magic_word, SEARCH_ACK   )==0 &&
+		 strcmp( user_name,  pwd->pw_name )==0 ) { /* Found */
+		WARN(2, "valid.\n");
+		strcat(ips, inet_ntoa(svr.sin_addr));
+		strcat(ips, " ");
+		num_svr++;
+	    } else {
+		WARN(2, "ignored.\n");
+	    }
+	}
+	memset( recvbuf, 0, SEARCH_BUFLEN );
     }
+    close( sock );
+    close( recvsock );
 
-    close(sock);
-    close(rcvsock);
-    return nsvr;
+    if ( num_svr < 0 ) {
+	WARN(0, "#(ERROR) Unexpected trouble occur in %s(), num_svr=%d\n", __func__, num_svr );
+	exit(-1);
+    } else if ( num_svr == 0 ) {
+	WARN(0, "###(info) No DSCUDA daemons found.%s()\n", __func__ );
+	WARN(0, "###(info) Program terminated.\n");
+	exit(-1);
+    } else {
+	WARN(2, "###(info) %d valid DSCUDA server%s found\n", num_svr, (num_svr>1)? "s":"" );
+    }
+    return num_svr;
 }
 
 static void
-initCandServerList(const char *env) {
+initCandServerList(const char *env)
+{
     char *ip;
     char buf[1024*RC_NVDEVMAX];
     int nsvr;

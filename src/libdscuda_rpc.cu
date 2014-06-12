@@ -29,8 +29,8 @@ int dscudaRemoteCallType(void) {
     return RC_REMOTECALL_TYPE_RPC;
 }
 
-void
-setupConnection(int idev, RCServer_t *sp) {
+void setupConnection(int idev, RCServer_t *sp)
+{
     int id   = sp->id;
     int cid  = sp->cid;
     int pgid = DSCUDA_PROG;
@@ -71,12 +71,40 @@ setupConnection(int idev, RCServer_t *sp) {
     WARN(2, "Established a socket connection to %s...\n", msg);
 }
 
-void
-checkResult(void *rp, RCServer_t *sp)
+void checkResult(void *rp, RCServer_t *sp)
 {
     if (rp) return;
     clnt_perror(Clnt[Vdevid[vdevidIndex()]][sp->id], sp->ip);
     exit(1);
+}
+
+static
+void recoverClntError(CLIENT *p_clnt)
+{
+    struct rpc_err err;
+    clnt_geterr( p_clnt, &err );
+    switch ( err.re_status ) {
+	/* re_status is "clnt_stat" type.
+	 * refer to /usr/include/rpc/clnt.h.
+	 */
+    case RPC_SUCCESS: //=0
+	break;
+    case RPC_CANTSEND: //=3
+	break;
+    case RPC_CANTRECV: //=4
+	break;
+    case RPC_TIMEDOUT: //=5
+	WARN(1, "%s():Going to try recovering from RPC:Timed Out.\n", __func__);
+	break;
+    case RPC_UNKNOWNHOST: //=13
+	break;
+    case RPC_UNKNOWNPROTO: //=17
+	break;
+    case RPC_UNKNOWNADDR: //=19
+	break;
+    default:
+	break;
+    }
 }
 
 /*
@@ -87,8 +115,7 @@ checkResult(void *rp, RCServer_t *sp)
  * Thread Management
  */
 
-cudaError_t
-cudaThreadExit(void)
+cudaError_t cudaThreadExit(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -462,19 +489,22 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
 /*
  * Memory Management
  */
-cudaError_t
-cudaMalloc(void **devAdrPtr, size_t size) {
-    cudaError_t err = cudaSuccess;
+
+cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     dscudaMallocResult *rp;
+    cudaError_t err = cudaSuccess;
     int vid = vdevidIndex();
     void *adrs[RC_NREDUNDANCYMAX];
+    CLIENT *p_clnt;
 
     initClient();
     WARN(3, "cudaMalloc(%p, %d)...", devAdrPtr, size);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
-        rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][sp->id]);
+	p_clnt = Clnt[Vdevid[vid]][sp->id]; 
+        rp = dscudamallocid_1(size, p_clnt);
+	recoverClntError(p_clnt);
         checkResult(rp, sp);
         if (rp->err != cudaSuccess) {
             err = (cudaError_t)rp->err;
@@ -500,8 +530,7 @@ cudaMalloc(void **devAdrPtr, size_t size) {
     return err;
 }
 
-cudaError_t
-cudaFree(void *mem)
+cudaError_t cudaFree(void *mem)
 {
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;

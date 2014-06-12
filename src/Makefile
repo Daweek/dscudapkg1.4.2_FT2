@@ -113,7 +113,9 @@ dscudatest.cu:     dscuda.h ibv_rdma.h
 ibv_rdma.cpp:      ibv_rdma.h 
 ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudamacros.h
 dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
-
+###
+### RPCGEN
+###
 $(DSCUDAIF)_clnt.c :	$(DSCUDAIF).x $(DSCUDAIF).h
 	$(RPCGEN) -l $< > $@
 $(DSCUDAIF)_svc.c:	$(DSCUDAIF).x $(DSCUDAIF).h

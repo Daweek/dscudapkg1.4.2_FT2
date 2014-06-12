@@ -33,8 +33,12 @@ const char DELIM_IGNORE[]= " "; //
 /*   */
 const char IDTAG_0[]     = "DSCUDA_FAULT_INJECTION" ; //
 /* DS-CUDA search daemons */
-const char SEARCH_PING[] = "DSCUDA_SEARCHSERVER" ;
-const char SEARCH_ACK[]  = "DSCUDA_SERVERRESPONSE" ;
+const char SEARCH_PING[] = "DSCUDA_DAEMON_PING" ;
+const char SEARCH_ACK[]  = "DSCUDA_DAEMON_ACK" ;
+const char SEARCH_DELIM[] = ":" ;
+const int  SEARCH_BUFLEN = 256 ;    // length of buffer using for dscudad searching.
+const int  SEARCH_NUM_TOKEN = 2 ;
+
 
 enum {
     RC_REMOTECALL_TYPE_RPC = 1,

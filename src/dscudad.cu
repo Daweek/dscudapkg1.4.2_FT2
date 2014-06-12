@@ -1,5 +1,5 @@
 //                             -*- Mode: C++ -*-
-// Filename         : dscudad.c
+// Filename         : dscudad.cu
 // Description      : DS-CUDA server daemon.
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
+#include <pwd.h>
 #include "dscuda.h"
 #include "dscudadefs.h"
 #include "sockutil.h"
@@ -272,39 +273,50 @@ signal_from_child(int sig)
 static void*
 response_to_search(void *arg)  /* call by pthread_create() */
 {
-    const int Len_Byte = 256;
+    char sendbuf[SEARCH_BUFLEN];
+    char recvbuf[SEARCH_BUFLEN];
+
     int sock;
     socklen_t sin_size;
+    uid_t uid;
     struct sockaddr_in addr, clt;
-    char recvbuf[Len_Byte];
+    struct passwd *pwd = NULL;
 
     sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
-    if ( sock == -1 ) {
+    if( sock == -1 ) {
 	perror("response_to_search:socket()");
 	return NULL;
     }
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(RC_DAEMON_IP_PORT - 1);
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    if ( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
+    addr.sin_addr.s_addr = htonl( INADDR_ANY );
+    if( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
 	perror("response_to_search:bind()");
 	return NULL;
     }
 
-    memset( recvbuf, 0, Len_Byte );
-    while (1) {
-	sin_size = (sizeof(struct sockaddr_in));
-	recvfrom(sock, recvbuf, Len_Byte - 1, 0, (struct sockaddr *)&clt, &sin_size);
-	if ( strcmp( recvbuf, SEARCH_PING ) != 0 )
-	    continue;
+    uid = getuid(); 
+    pwd = getpwuid(uid);
+    if ( pwd == NULL ) {
+	sprintf( sendbuf, "%s:NULL", SEARCH_ACK);	
+    } else {
+	sprintf( sendbuf, "%s%s%s", SEARCH_ACK, SEARCH_DELIM, pwd->pw_name);	
+    }
 
-	WARN(2, "received %s message from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
+    memset( recvbuf, 0, SEARCH_BUFLEN );
+    for(;;) {
+	sin_size = (sizeof(struct sockaddr_in));
+	recvfrom(sock, recvbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, &sin_size);
+	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
+
+	WARN(2, "###(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	clt.sin_family = AF_INET;
 	clt.sin_port = htons( RC_DAEMON_IP_PORT - 2 );
 	inet_aton( inet_ntoa(clt.sin_addr), &(clt.sin_addr) );
-	sendto(sock, SEARCH_ACK, strlen(SEARCH_ACK), 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
-	memset( recvbuf, 0, Len_Byte );
+	sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
+	WARN(2, "###(info) Sent ack message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
+	memset( recvbuf, 0, SEARCH_BUFLEN );
     }
 
   /* statement unreachable
