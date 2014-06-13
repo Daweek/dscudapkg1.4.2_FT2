@@ -52,14 +52,9 @@ int       Vdevid[RC_NPTHREADMAX] = { 0 };           // the virtual device curren
 static int Nvdev;                   /* # of virtual devices available. */
 Vdev_t     Vdev[RC_NVDEVMAX];       /* a list of virtual devices. */
 
-static int Ncand;                   /* # of server candidates. */
-RCServer_t svrCand[RC_NVDEVMAX];    /* a list of candidates of server. */
-
-static int Nspare;
-RCServer_t svrSpare[RC_NVDEVMAX];
-
-static int Nbroken;
-RCServer_t svrBroken[RC_NVDEVMAX];
+SvrList_t SvrCand;
+SvrList_t SvrSpare;
+SvrList_t SvrBroken;
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
@@ -69,17 +64,21 @@ struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 struct ClientState_t St; // is Singleton
 
-void dscudaRecordHistOn(void) {
+void dscudaRecordHistOn(void)
+{
     St.setRecordHist();
 }
-void dscudaRecordHistOff(void) {
+void dscudaRecordHistOff(void)
+{
     St.unsetRecordHist();
 }
 
-void dscudaAutoVerbOn(void) {
+void dscudaAutoVerbOn(void)
+{
     St.setAutoVerb();
 }
-void dscudaAutoVerbOff(void) {
+void dscudaAutoVerbOff(void)
+{
     St.unsetAutoVerb();
 }
 
@@ -184,8 +183,7 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
     RCmappedMemListTail = mem;
 }
 
-RCmappedMem *
-RCmappedMemQuery(void *pHost)
+RCmappedMem* RCmappedMemQuery(void *pHost)
 {
     RCmappedMem *mem = RCmappedMemListTop;
     while (mem) {
@@ -258,8 +256,7 @@ void showsta(void)
 }
 #endif
 
-RCstreamArray *
-RCstreamArrayQuery(cudaStream_t stream0)
+RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0)
 {
     static RCstreamArray default_stream = { 0,};
 
@@ -277,8 +274,8 @@ RCstreamArrayQuery(cudaStream_t stream0)
     return NULL;
 }
 
-static void
-RCstreamArrayUnregister(cudaStream_t stream0)
+static
+void RCstreamArrayUnregister(cudaStream_t stream0)
 {
     RCstreamArray *st = RCstreamArrayQuery(stream0);
     if (!st) return;
@@ -307,8 +304,7 @@ RCstreamArrayUnregister(cudaStream_t stream0)
  * Others, i.e., cuarrays[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-void
-RCcuarrayArrayRegister(cudaArray **cuarrays)
+void RCcuarrayArrayRegister(cudaArray **cuarrays)
 {
     RCcuarrayArray *ca = (RCcuarrayArray *)malloc(sizeof(RCcuarrayArray));
     if (!ca) {
@@ -328,8 +324,7 @@ RCcuarrayArrayRegister(cudaArray **cuarrays)
     RCcuarrayArrayListTail = ca;
 }
 
-RCcuarrayArray *
-RCcuarrayArrayQuery(cudaArray *cuarray0)
+RCcuarrayArray* RCcuarrayArrayQuery(cudaArray *cuarray0)
 {
     RCcuarrayArray *ca = RCcuarrayArrayListTop;
     while (ca) {
@@ -341,8 +336,7 @@ RCcuarrayArrayQuery(cudaArray *cuarray0)
     return NULL;
 }
 
-void
-RCcuarrayArrayUnregister(cudaArray *cuarray0)
+void RCcuarrayArrayUnregister(cudaArray *cuarray0)
 {
     RCcuarrayArray *ca = RCcuarrayArrayQuery(cuarray0);
     if (!ca) return;
@@ -369,8 +363,7 @@ RCcuarrayArrayUnregister(cudaArray *cuarray0)
  * Others, i.e., events[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-void
-RCeventArrayRegister(cudaEvent_t *events)
+void RCeventArrayRegister(cudaEvent_t *events)
 {
     RCeventArray *ev = (RCeventArray *)malloc(sizeof(RCeventArray));
     if (!ev) {
@@ -390,8 +383,7 @@ RCeventArrayRegister(cudaEvent_t *events)
     RCeventArrayListTail = ev;
 }
 
-RCeventArray *
-RCeventArrayQuery(cudaEvent_t event0)
+RCeventArray* RCeventArrayQuery(cudaEvent_t event0)
 {
     RCeventArray *ev = RCeventArrayListTop;
     while (ev) {
@@ -403,8 +395,7 @@ RCeventArrayQuery(cudaEvent_t event0)
     return NULL;
 }
 
-void
-RCeventArrayUnregister(cudaEvent_t event0)
+void RCeventArrayUnregister(cudaEvent_t event0)
 {
     RCeventArray *ev = RCeventArrayQuery(event0);
     if (!ev) return;
@@ -425,7 +416,7 @@ RCeventArrayUnregister(cudaEvent_t event0)
 }
 
 
-void *dscudaUvaOfAdr(void *adr, int devid)
+void* dscudaUvaOfAdr(void *adr, int devid)
 {
     unsigned long adri = (unsigned long)adr;
 #if __LP64__
@@ -569,10 +560,10 @@ resetServerUniqID(void)
 	}
     }
     for (j=0; j<RC_NVDEVMAX; j++) { /* svrCand[*] */
-	svrCand[j].uniq = RC_UNIQ_INVALID;
+	SvrCand.svr[j].uniq = RC_UNIQ_INVALID;
     }
     for (j=0; j<RC_NVDEVMAX; j++) { /* svrSpare[*] */
-	svrSpare[j].uniq = RC_UNIQ_INVALID;
+	SvrSpare.svr[j].uniq = RC_UNIQ_INVALID;
     }
 }
 
@@ -605,8 +596,8 @@ printVirtualDeviceList(void)
 	printf("#(info.)    - Ignore[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
 	       pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
     /*            */
-    printf("#(info.) *** Candidate Server Info.(Ncand=%d)\n",Ncand);
-    for( i=0, pSvr=svrCand; i<Ncand; i++, pSvr++ ){
+    printf("#(info.) *** Candidate Server Info.(Ncand=%d)\n",SvrCand.num);
+    for( i=0, pSvr=SvrCand.svr; i < SvrCand.num; i++, pSvr++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many candidate devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -615,8 +606,8 @@ printVirtualDeviceList(void)
 	       pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
     }
     /*                 */
-    printf("#(info.) *** Spare Server Info.(Nspare=%d)\n",Nspare);
-    for( i=0, pSvr=svrSpare; i<Nspare; i++, pSvr++ ){
+    printf("#(info.) *** Spare Server Info.(Nspare=%d)\n", SvrSpare.num);
+    for( i=0, pSvr=SvrSpare.svr; i < SvrSpare.num; i++, pSvr++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many spare devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -655,12 +646,13 @@ void printModuleList(void) {
 }
 
 static
-int dscudaSearchServer(char *ips, int size)
+int dscudaSearchDaemon(char *ips, int size)
 {
     char sendbuf[SEARCH_BUFLEN];
     char recvbuf[SEARCH_BUFLEN];
     char *magic_word, *user_name;
     int num_svr = 0; // # of dscuda daemons found.
+    int num_ignore = 0;
     int sock, recvsock, val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
@@ -674,7 +666,7 @@ int dscudaSearchServer(char *ips, int size)
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( sock == -1 || recvsock == -1 ) {
-	perror("dscudaSearchServer: socket()");
+	perror("dscudaSearchDaemon: socket()");
 	return -1;
     }
     setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
@@ -705,13 +697,13 @@ int dscudaSearchServer(char *ips, int size)
     ioctl(recvsock, FIONBIO, &val);
 
     if( bind(recvsock, (struct sockaddr *)&svr, sizeof(svr)) != 0 ) {
-	perror("dscudaSearchServer: bind()");
+	perror("dscudaSearchDaemon: bind()");
 	return -1;
     }
     
     pwd = getpwuid( getuid() );
     
-    sleep(3);
+    sleep(RC_SEARCH_DAEMON_TIMEOUT);
     memset( recvbuf, 0, SEARCH_BUFLEN );
     while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
 	WARN(2, "#(info)    + Recieved ACK \"%s\" ", recvbuf);
@@ -730,6 +722,7 @@ int dscudaSearchServer(char *ips, int size)
 		num_svr++;
 	    } else {
 		WARN(2, "ignored.\n");
+		num_ignore++;
 	    }
 	}
 	memset( recvbuf, 0, SEARCH_BUFLEN );
@@ -741,11 +734,12 @@ int dscudaSearchServer(char *ips, int size)
 	WARN(0, "#(ERROR) Unexpected trouble occur in %s(), num_svr=%d\n", __func__, num_svr );
 	exit(-1);
     } else if ( num_svr == 0 ) {
-	WARN(0, "###(info) No DSCUDA daemons found.%s()\n", __func__ );
-	WARN(0, "###(info) Program terminated.\n");
+	WARN(0, "#(info) No DSCUDA daemons found.%s()\n", __func__ );
+	WARN(0, "#(info) Program terminated.\n");
 	exit(-1);
     } else {
-	WARN(2, "###(info) %d valid DSCUDA server%s found\n", num_svr, (num_svr>1)? "s":"" );
+	WARN( 2, "#(info)    + ===> %d valid DSCUDA daemon%s found. (%d ignored).\n",
+	      num_svr, (num_svr>1)? "s":"", num_ignore );
     }
     return num_svr;
 }
@@ -757,7 +751,7 @@ void initCandServerList(const char *env)
     char buf[1024 * RC_NVDEVMAX];
     int nsvr;
 
-    nsvr = dscudaSearchServer( buf, 1024 * RC_NVDEVMAX );
+    nsvr = dscudaSearchDaemon( buf, 1024 * RC_NVDEVMAX );
     if ( nsvr <= 0 ) {
 	fprintf(stderr, "(+_+) Not found DS-CUDA daemons in this cluster.\n");
 	fprintf(stderr, "(+_+) Program terminated..\n\n\n");
@@ -767,22 +761,21 @@ void initCandServerList(const char *env)
     int uniq = RC_UNIQ_CANDBASE; // begin with 
     if ( env != NULL ) { // always true?
 	ip = strtok( buf, DELIM_CAND );
-	Ncand = 0;
+	SvrCand.clear();
 	while ( ip != NULL ) {
-	    strcpy( svrCand[Ncand].ip, ip );
+	    SvrCand.cat( ip );
 	    ip = strtok(NULL, DELIM_CAND);
-	    Ncand++;
 	}
-	for (int i=0; i<Ncand; i++) {
-	    strncpy(buf, svrCand[i].ip, sizeof(buf));
+	for (int i=0; i < SvrCand.num; i++) {
+	    strncpy(buf, SvrCand.svr[i].ip, sizeof(buf));
 	    ip = strtok(buf, ":");
-	    strcpy(svrCand[i].ip, ip);
+	    strcpy(SvrCand.svr[i].ip, ip);
 	    ip = strtok(NULL, ":");
 	    //sp->cid = ip ? atoi(ip) : 0; /* Yoshikawa's original */
-	    if (ip != NULL) { svrCand[i].cid = atoi(ip); }
-	    else            { svrCand[i].cid = 0;        }
+	    if (ip != NULL) { SvrCand.svr[i].cid = atoi(ip); }
+	    else            { SvrCand.svr[i].cid = 0;        }
 	    //sp->id will be set on server reconnecting
-	    svrCand[i].uniq = uniq;
+	    SvrCand.svr[i].uniq = uniq;
 	    uniq++;
 	}
     } else {
@@ -894,13 +887,13 @@ void updateSpareServerList() //TODO: need more good algorithm.
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
 
-    for (int i=0; i<Ncand; i++) {
+    for ( int i=0; i < SvrCand.num; i++ ) {
 	int found = 0;
 	pVdev = Vdev;
 	for (int j=0; j<Nvdev; j++) {
 	    pSvr = pVdev->server;
 	    for (int k=0; k < pVdev->nredundancy; k++) {
-		if (strcmp(svrCand[i].ip, pSvr->ip)==0) { /* check same IP */
+		if (strcmp(SvrCand.svr[i].ip, pSvr->ip)==0) { /* check same IP */
 		    found=1;
 		}
 		pSvr++;
@@ -908,14 +901,14 @@ void updateSpareServerList() //TODO: need more good algorithm.
 	    pVdev++;
 	}
 	if (found==0) { /* not found */
-	    svrSpare[spare_count].id   = svrCand[i].id;
-	    svrSpare[spare_count].cid  = svrCand[i].cid;
-	    svrSpare[spare_count].uniq = svrCand[i].uniq;
-	    strcpy(svrSpare[spare_count].ip, svrCand[i].ip);
+	    SvrSpare.svr[spare_count].id   = SvrCand.svr[i].id;
+	    SvrSpare.svr[spare_count].cid  = SvrCand.svr[i].cid;
+	    SvrSpare.svr[spare_count].uniq = SvrCand.svr[i].uniq;
+	    strcpy(SvrSpare.svr[spare_count].ip, SvrCand.svr[i].ip);
 	    spare_count++;
 	}
     }
-    Nspare = spare_count;
+    SvrSpare.num = spare_count;
 }
 static
 void copyServer(RCServer_t *dst, RCServer_t *src)
@@ -938,11 +931,10 @@ void replaceBrokenServer(RCServer_t *broken, RCServer_t *spare)
 {
     RCServer_t tmp;
 
-    if (Nspare < 1) {  //redundant check?
+    if ( SvrSpare.num < 1) {  //redundant check?
 	WARN(0, "(+_+) Not found any spare server.\n");
 	exit(1);
-    }
-    else {
+    } else {
 	swapServer(broken, spare);
     }
 }
@@ -959,13 +951,11 @@ static void updateWarnLevel(void)
         val = atoi(strtok(env, " "));
         if (val >= 0) {
 	    dscudaSetWarnLevel(val);
-	}
-        else {
+	} else {
 	    WARN(0, "(;_;) Invalid DSCUDA_WARNLEVEL(%d), set 0 or positive integer.\n", val);
 	    exit(1);
 	}
-    }
-    else {
+    } else {
 	dscudaSetWarnLevel(RC_WARNLEVEL_DEFAULT);
     }
     WARN(1, "#(info.) DSCUDA_WARNLEVEL= %d\n", dscudaWarnLevel());
@@ -976,8 +966,7 @@ updateDscudaPath(void) {
     char *env = getenv("DSCUDA_PATH");
     if (env) {
 	strncpy(Dscudapath, env, sizeof(Dscudapath)); //"Dscudapath" has global scape.
-    }
-    else {
+    } else {
         fprintf(stderr, "(;_;) An environment variable 'DSCUDA_PATH' not found.\n");
         exit(1);
     }
@@ -1030,8 +1019,7 @@ void initEnv(void)
         St.setAutoVerb();
         dscudaVerbInit();
 	WARN(2, "#(info.) Automatic data recovery: on.\n");
-    }
-    else {
+    } else {
 	WARN(2, "#(info.) Automatic data recovery: off.\n");
     }
 
@@ -1040,8 +1028,7 @@ void initEnv(void)
     if (env && atoi(env)) {
         WARN(3, "#(info.) Connect to the server via daemon.\n");
         St.setUseDaemon();
-    }
-    else {
+    } else {
         WARN(3, "#(info.) Do not use daemon. connect to the server directly.\n");
         St.unsetUseDaemon();
     }
@@ -1051,8 +1038,7 @@ void initEnv(void)
     if (env && atoi(env)) {
         WARN(3, "#(info.) Device Migrataion is enabled.\n");
         St.setMigrateDevice();
-    }
-    else {
+    } else {
         WARN(3, "#(info.) Device Migration is disabled.\n");
         St.unsetMigrateDevice();
     }
@@ -1092,8 +1078,7 @@ void invalidateModuleCache(void) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
         if( CltModulelist[i].isValid() ){
 	    CltModulelist[i].invalidate();
-	}
-	else { 
+	} else { 
 	    continue;
 	}
     }
@@ -1199,8 +1184,7 @@ int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL termi
 		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
 			 mp->id[i], time(NULL) - mp->sent_time, mp->name);
 		    return mp->id; // module found. i.e, it's already loaded.
-		}
-		else {
+		} else {
 		    WARN(5, "found a cached one with id:%d, but it is too old (age:%d). resend it.\n",
 			 mp->id[i], time(NULL) - mp->sent_time);
 		    mp->invalidate(); // invalidate the cache.
@@ -1208,8 +1192,7 @@ int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL termi
 	    }
 	} //for
 #endif // RC_CACHE_MODULE
-    }
-    else {
+    } else {
 	WARN(5, "dscudaLoadModule(%p) modulename:-\n", name);
     }
 
@@ -1228,8 +1211,7 @@ int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL termi
 		break;
 	    }
 	}
-    }
-    else {
+    } else {
 	strdata_found = strdata;
 	name_found = name;
     }
@@ -1285,8 +1267,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
 #warning fill this part in dscudaFuncGetAttributesWrapper().
-        }
-        else {
+        } else {
             rp = dscudafuncgetattributesid_1(moduleid[i], (char*)func, Clnt[Vdevid[vdevidIndex()]][sp->id]);
             checkResult(rp, sp);
             if (rp->err != cudaSuccess) {
@@ -1395,13 +1376,11 @@ dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
             err = dscudaMemcpyFromSymbolD2H(moduleid[i], &dstbuf, (char *)symbol, count, offset, Vdevid[vdevidIndex()], i);
             if (i == 0) {
                 memcpy(dst, dstbuf, count);
-            }
-            else if (bcmp(dst, dstbuf, count) != 0) {
+            } else if (bcmp(dst, dstbuf, count) != 0) {
                 if (errorHandler) {
                     errorHandler(errorHandlerArg);
                 }
-            }
-            else {
+            } else {
                 WARN(3, "cudaMemcpyFromSymbol() data copied from device%d matched with that from device0.\n", i);
             }
         }
@@ -1502,13 +1481,11 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
                                                  (RCstream)st->s[i], Vdevid[vdevidIndex()], i);
             if (i == 0) {
                 memcpy(dst, dstbuf, count);
-            }
-            else if (bcmp(dst, dstbuf, count) != 0) {
+            } else if (bcmp(dst, dstbuf, count) != 0) {
                 if (errorHandler) {
                     errorHandler(errorHandlerArg);
                 }
-            }
-            else {
+            } else {
                 WARN(3, "cudaMemcpyFromSymbol() data copied from device%d matched with that from device0.\n", i);
             }
         }
@@ -1545,8 +1522,7 @@ setTextureParams(RCtexture *texbufp, const struct textureReference *tex, const s
         texbufp->z = desc->z;
         texbufp->w = desc->w;
         texbufp->f = desc->f;
-    }
-    else {
+    } else {
         texbufp->x = tex->channelDesc.x;
         texbufp->y = tex->channelDesc.y;
         texbufp->z = tex->channelDesc.z;
@@ -1628,8 +1604,7 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
         if (St.isIbv()) {
 
 #warning fill this part in dscudaBindTexture2DWrapper().
-        }
-        else {
+        } else {
 
             rp = dscudabindtexture2did_1(moduleid[i], texname,
                                          (RCadr)devPtr, width, height, pitch, (RCtexture)texbuf, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1680,8 +1655,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
         if (St.isIbv()) {
 
 #warning fill this part in dscudaBindTextureToArrayWrapper().
-        }
-        else {
+        } else {
 
             rp = dscudabindtexturetoarrayid_1(moduleid[i], texname, (RCadr)ca->ap[i], (RCtexture)texbuf, Clnt[Vdevid[vdevidIndex()]][sp->id]);
             checkResult(rp, sp);
@@ -1696,8 +1670,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
 }
 
 
-cudaError_t
-cudaGetDevice(int *device) {
+cudaError_t cudaGetDevice(int *device) {
     cudaError_t err = cudaSuccess;
 
     initClient();
@@ -1708,8 +1681,7 @@ cudaGetDevice(int *device) {
     return err;
 }
 
-cudaError_t
-cudaSetDevice(int device) {
+cudaError_t cudaSetDevice(int device) {
     cudaError_t err = cudaSuccess;
     int         vi  = vdevidIndex();
 
@@ -1719,8 +1691,7 @@ cudaSetDevice(int device) {
 
     if (device >= 0 && device < Nvdev) {
         Vdevid[vi] = device;
-    }
-    else {
+    } else {
         err = cudaErrorInvalidDevice;
     }
 
@@ -1747,8 +1718,7 @@ cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     return err;
 }
 
-cudaError_t
-cudaGetDeviceCount(int *count)
+cudaError_t cudaGetDeviceCount(int *count)
 {
     cudaError_t err = cudaSuccess;
 
@@ -1761,8 +1731,7 @@ cudaGetDeviceCount(int *count)
     return err;
 }
 
-cudaError_t
-cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
+cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
 {
     cudaError_t err = cudaSuccess;
 
@@ -1779,8 +1748,7 @@ cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
     return err;
 }
 
-cudaError_t
-cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
+cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
 {
     cudaError_t err = cudaSuccess;
 
@@ -1793,8 +1761,7 @@ cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
     return err;
 }
 
-cudaError_t
-cudaDeviceDisablePeerAccess(int peerDevice)
+cudaError_t cudaDeviceDisablePeerAccess(int peerDevice)
 {
     cudaError_t err = cudaSuccess;
 

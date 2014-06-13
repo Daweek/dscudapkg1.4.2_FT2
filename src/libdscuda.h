@@ -28,6 +28,22 @@ typedef struct RCServer {
     }
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
+typedef struct SvrList {
+    int num;                      /* # of server candidates.         */
+    RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
+    /* methods */
+    void clear(void) { num = 0; }
+    int cat( const char *ip )
+    {
+	if ( num >= (RC_NVDEVMAX - 1) ) {
+	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
+	    exit(1);
+	}
+	num += 1;	
+	strcpy( svr[num].ip, ip );
+    }
+} SvrList_t;
+
 typedef struct {
     int        nredundancy;
     RCServer_t server[RC_NREDUNDANCYMAX];
@@ -173,9 +189,10 @@ extern struct ClientState_t St;
 
 extern const char *DEFAULT_SVRIP;
 extern Vdev_t Vdev[RC_NVDEVMAX];
-extern RCServer_t svrCand[RC_NVDEVMAX];
-extern RCServer_t svrSpare[RC_NVDEVMAX];
-extern RCServer_t svrBroken[RC_NVDEVMAX];
+//extern RCServer_t svrCand[RC_NVDEVMAX];
+//extern RCServer_t svrSpare[RC_NVDEVMAX];
+extern SvrList_t SvrSpare;
+//extern RCServer_t svrBroken[RC_NVDEVMAX];
 extern int    Vdevid[RC_NPTHREADMAX];
 extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void (*errorHandler)(void *arg);

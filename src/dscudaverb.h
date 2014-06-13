@@ -5,13 +5,32 @@
 /*** ==========================================================================
  *** Backup memory region of devices allocated by cudaMemcpy().
  ***/
-typedef struct verbAllocatedMem_t {
-    void *dst;
-    void *src;
+typedef struct BkupMem_t {
+    void *dst; /* device momeory space */
+    void *src; /* client memory space */
     int   size; /* Byte */
-    struct verbAllocatedMem_t *next;
-    struct verbAllocatedMem_t *prev;
-} verbAllocatedMem;
+    struct BkupMem_t *next;
+    struct BkupMem_t *prev;
+    //--- methods
+    int isHead( void );
+    int isTail( void );
+} BkupMem;
+
+typedef struct BkupMemList_t {
+    BkupMem *head;
+    BkupMem *tail;
+    int     length;
+    //--- methods
+    int      isEmpty( void );
+    int      countRegion( void );
+    int      checkSumRegion( void *targ, int size );
+    BkupMem* queryRegion( void *dst );
+    void     registerRegion( void *dst, int size );
+    void     unregisterRegion( void *dst );
+    void*    searchUpdateRegion( void *dst );
+    void     updateRegion( void *dst, void *src, int size );
+    BkupMemList_t( void ) { head = tail = NULL; length = 0; }
+} BkupMemList;
 /*** ==========================================================================
  *** Each argument types and lists for historical recall.
  *** If you need to memorize another function into history, add new one.
@@ -91,10 +110,6 @@ void dscudaClearHist(void);
 void dscudaPrintHist(void);
 void printRegionalCheckSum(void);
 
-verbAllocatedMem *verbAllocatedMemQuery(void *dst);
-void verbAllocatedMemRegister(void *dst, int size);
-void verbAllocatedMemUnregister(void *dst);
-void verbAllocatedMemUpdate(void *dst, void *src, int size);
-int  verbGetLengthOfMemList(void);
+extern BkupMemList BKUPMEM;
 
 #endif // __DSCUDAVERB_H__

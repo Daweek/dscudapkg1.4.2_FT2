@@ -18,11 +18,172 @@
 
 #define DEBUG
 
+int BkupMem_t::isHead(void)
+{
+    if ( prev==NULL ) return 1;
+    else              return 0;
+}
+
+int BkupMem_t::isTail(void)
+{
+    if ( next==NULL ) return 1;
+    else              return 0;
+}
+
+
+int BkupMemList_t::isEmpty(void)
+{
+    if      ( head==NULL && tail==NULL ) return 1;
+    else if ( head!=NULL && tail!=NULL ) return 0;
+    else {
+	fprintf(stderr, "Unexpected error in %s().\n", __func__);
+	exit(1);
+    }
+}
+
+int BkupMemList_t::countRegion(void)
+{
+    BkupMem *mem = head;
+    int count = 0;
+    while ( mem != NULL ) {
+	mem = mem->next;
+	count++;
+    }
+    return count;
+}
+
+int BkupMemList_t::checkSumRegion(void *targ, int size) {
+    int sum=0;
+    int  *ptr = (int *)targ;
+    
+    for (int s=0; s < size; s+=sizeof(int)) {
+	sum += *ptr;
+	ptr++;
+    }
+    return sum;
+}
+
+BkupMem* BkupMemList_t::queryRegion(void *dst)
+{
+    BkupMem *mem = head;
+    while ( mem != NULL ) { /* Search */
+	if ( mem->dst == dst ) { /* tagged by its address on GPU */
+	    WARN(10, "---> %s(%p): return %p\n", __func__, dst, mem);
+	    return mem;
+	}
+	mem = mem->next;
+    }
+    return NULL;
+}
+
+void BkupMemList_t::registerRegion(void *dst, int size)
+{
+    BkupMem *mem;
+    
+    mem = (BkupMem *)malloc(sizeof(BkupMem));
+    if ( mem==NULL ) {
+	perror("registerRegion()");
+    }
+    mem->dst  = dst;
+    mem->size = size;
+    mem->src  = (void *)malloc(size);
+    if ( mem->src == NULL ) {
+	perror("registerRegion()");
+    }
+    mem->next = NULL;
+    
+    if ( isEmpty() ) {
+	head = mem;
+	mem->prev = NULL;
+    } else {
+	tail->next = mem;
+	mem->prev = tail;
+    }
+    tail = mem;
+}
+
+void BkupMemList_t::unregisterRegion(void *dst)
+{
+    BkupMem *mem = queryRegion(dst);
+    BkupMem *p_list = head;
+    int i;
+    if ( mem == NULL ) {
+	WARN(0, "%s(): not found requested memory region.\n", __func__);
+	WARN(0, "mem. list length= %d \n", countRegion());
+	i = 0;
+	while ( p_list != NULL ) {
+	    WARN(0, "mem-list[%d] = %p\n", i, p_list->dst);
+	    p_list = p_list->next;
+	    i++;
+	}
+	return;
+    } else if ( mem->isHead() ) { // remove head, begin with 2nd.
+	head = mem->next;
+	if ( head != NULL ) {
+	    head->prev = NULL;
+	}
+    } else if ( mem->isTail() ) {
+	tail = mem->prev;
+    } else {
+	mem->prev->next = mem->next;
+    }
+    
+    free(mem->src);
+    free(mem);
+}
+
+void* BkupMemList_t::searchUpdateRegion(void *dst)
+{
+    BkupMem *mem = head;
+    char *d_targ  = (char *)dst;
+    char *d_begin;
+    char *h_begin;
+    char *h_p     = NULL;
+    int   i = 0;
+    
+    while (mem) { /* Search */
+	d_begin = (char *)mem->dst;
+	h_begin = (char *)mem->src;
+	
+	if (d_targ >= d_begin &&
+	    d_targ < (d_begin + mem->size)) {
+	    h_p = h_begin + (d_targ - d_begin);
+	    break;
+	}
+	mem = mem->next;
+	i++;
+    }
+    return (void *)h_p;
+}
+
+void BkupMemList_t::updateRegion( void *dst, void *src, int size )
+// dst : GPU device memory region
+// src : HOST memory region
+{
+    BkupMem *mem;
+    void             *src_mirrored;
+    
+    if ( src == NULL ) {
+	WARN(0, "(+_+) not found backup target memory region (%p).\n", dst);
+	exit(1);
+    } else {
+	//mem = BkupMem.queryRegion(dst);
+	//src_mirrored = mem->src;
+	src_mirrored = searchUpdateRegion(dst);
+	memcpy(src_mirrored, src, size); // update historical memory region.
+	WARN(10, "        Also copied to backup region (%p), checksum=%d.\n",
+	     dst, checkSumRegion(src, size));
+    }
+}
+
 static dscudaVerbHist   *verbHists = NULL;
 static int               verbHistNum = 0; /* Number of recorded function calls to be recalled */
 static int               verbHistMax = 0; /* Upper bound of "verbHistNum", extensible */
-static verbAllocatedMem *verbAllocatedMemListTop = NULL;
-static verbAllocatedMem *verbAllocatedMemListTail = NULL;
+
+/*
+ * Backup memory regions against all GPU devices.
+ */
+BkupMemList BKUPMEM;
 
 typedef enum {
     DSCVMethodNone = 0,
@@ -41,58 +202,6 @@ typedef enum {
     DSCVMethodEnd
 } DSCVMethod;
 
-int
-verbGetLengthOfMemList(void) {
-    verbAllocatedMem *pMem = verbAllocatedMemListTop;
-    int length = 0;
-    while (pMem != NULL) {
-	pMem = pMem->next;
-	length++;
-    }
-    return length;
-}
-
-verbAllocatedMem *
-verbAllocatedMemQuery(void *dst) {
-    verbAllocatedMem *mem = verbAllocatedMemListTop;
-
-    while (mem != NULL) { /* Search */
-	if (mem->dst == dst) { /* tagged by its address on GPU */
-	    WARN(10, "---> %s(%p): return %p\n", __func__, dst, mem);
-	    return mem;
-	}
-	mem = mem->next;
-    }
-    return NULL;
-}
-
-void *
-verbAllocatedMemUpdateQuery(void *dst) {
-    verbAllocatedMem *mem = verbAllocatedMemListTop;
-    //WARN(2, "<--- %s(%p):\n", __func__, dst);
-    char *d_targ  = (char *)dst;
-    char *d_begin;
-    char *h_begin;
-    char *h_p     = NULL;
-    int   i = 0;
-
-    //WARN(2, "   + d_targ  = %p\n", d_targ);
-    while (mem) { /* Search */
-	d_begin = (char *)mem->dst;
-	h_begin = (char *)mem->src;
-	//WARN(2, "   + d_begin[%d] = %p\n", i, d_begin);
-	//WARN(2, "   + h_begin[%d] = %p\n", i, h_begin);
-	if (d_targ >= d_begin &&
-	    d_targ < (d_begin + mem->size)) {
-	    h_p = h_begin + (d_targ - d_begin);
-	    break;
-	}
-	mem = mem->next;
-	i++;
-    }
-    WARN(10, "---> %s(%p): return %p\n", __func__, dst, h_p);
-    return (void *)h_p;
-}
 static int
 checkSum(void *targ, int size) {
     int sum=0, *ptr = (int *)targ;
@@ -106,7 +215,7 @@ checkSum(void *targ, int size) {
 }
 void
 printRegionalCheckSum(void) {
-    verbAllocatedMem *pMem = verbAllocatedMemListTop;
+    BkupMem *pMem = BKUPMEM.head;
     int length = 0;
     while (pMem != NULL) {
 	printf("Region[%d](dp=%p, size=%d): checksum=0x%08x\n",
@@ -116,98 +225,7 @@ printRegionalCheckSum(void) {
 	length++;
     }
 }
-/*
- * Register cudaMalloc()
- */
-void
-verbAllocatedMemRegister(void *dst, int size) {
-    static int i=0;
-    // WARN(10, "<--- %s(dst=%p, size=%d) [%d]\n", __func__, dst, size, i);
-    verbAllocatedMem *mem = (verbAllocatedMem *)malloc(sizeof(verbAllocatedMem));
-    if (!mem) {
-	perror("verbAllocatedMemRegister");
-    }
-    mem->dst  = dst;
-    mem->size = size;
-    mem->src  = malloc(size);
-    mem->next = NULL;
-    
-    if (verbAllocatedMemListTop == NULL) {
-	verbAllocatedMemListTop = mem;
-	mem->prev = NULL;
-    }
-    else {
-	verbAllocatedMemListTail->next = mem;
-	mem->prev = verbAllocatedMemListTail;
-    }
-    verbAllocatedMemListTail = mem;
-    // WARN(10, "---> %s(dst=%p, size=%d: mem=%p, src=%p) [%d]\n", __func__, dst, size, mem, mem->src, i);
-    i++;
-}
 
-void
-verbAllocatedMemUnregister(void *dst) {
-    // WARN(10, "<--- %s(dst=%p)\n", __func__, dst);
-    verbAllocatedMem *mem = verbAllocatedMemQuery(dst);
-    verbAllocatedMem *p_list = verbAllocatedMemListTop;
-    int i;
-    if (!mem) {
-	WARN(0, "%s(): not found requested memory region.\n", __func__);
-	WARN(0, "mem. list length= %d \n", verbGetLengthOfMemList());
-	i = 0;
-	while (p_list != NULL) {
-	    WARN(0, "mem-list[%d] = %p\n", i, p_list->dst);
-	    p_list = p_list->next;
-	    i++;
-	}
-	return;
-    }
-
-    if (mem->prev != NULL) { /* not Top */
-	//WARN(2, "not TOP\n");
-	mem->prev->next = mem->next;
-    }
-    else {
-	//WARN(2, "is TOP\n");
-	verbAllocatedMemListTop = mem->next;
-	if (mem->next) {
-	    mem->next->prev = NULL;
-	}
-    }
-
-    if (!mem->next) {
-	verbAllocatedMemListTail = mem->prev;
-    }
-
-    free(mem->src);
-    free(mem);
-    // WARN(10, "---> %s(dst=%p)\n", __func__, dst);
-}
-
-void
-verbAllocatedMemUpdate(void *dst, void *src, int size) {
-// dst : GPU device memory region
-// src : HOST memory region
-    verbAllocatedMem *mem;
-    void             *src_mirrored;
-
-    WARN(10, "    <--- %s(dst=%p, src=%p, size=%d)\n", __func__, dst, src, size);
-
-    if (src == NULL) {
-	WARN(0, "(+_+) not found backup target memory region (%p).\n", dst);
-	exit(1);
-    }
-    else {
-	//mem = verbAllocatedMemQuery(dst);
-	//src_mirrored = mem->src;
-	src_mirrored = verbAllocatedMemUpdateQuery(dst);
-	memcpy(src_mirrored, src, size); // update historical memory region.
-	WARN(10, "        Also copied to backup region (%p), checksum=%d.\n",
-	     dst, checkSum(src, size));
-	//printRegionalCheckSum();
-    }
-    WARN(10, "    ---> %s(dst=%p, src=%p, size=%d)\n", __func__, dst, src, size); 
-}
 static cudaError_t
 dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
     int      vid = vdevidIndex();
@@ -230,14 +248,14 @@ dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
 
     RCuvaRegister(Vdevid[vid], &adrs, size);
     *devAdrPtr = dscudaUvaOfAdr(adrs, Vdevid[vid]);
-    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, verbGetLengthOfMemList());
+    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
     return err;
 }
 
 void
 dscudaVerbRealloc(RCServer_t *svr) {
-    verbAllocatedMem *mem = verbAllocatedMemListTop;
+    BkupMem *mem = BKUPMEM.head;
     int               verb = St.isAutoVerb();
     int               copy_count = 0;
     
@@ -257,7 +275,7 @@ dscudaVerbRealloc(RCServer_t *svr) {
  * Resore the all data of a GPU device with backup data on client node.
  */
 void dscudaVerbMemDup(void) {
-    verbAllocatedMem *mem = verbAllocatedMemListTop;
+    BkupMem *mem = BKUPMEM.head;
     int               verb = St.isAutoVerb();
     int               copy_count = 0;
     unsigned char    *mon;
@@ -676,7 +694,7 @@ void dscudaVerbAddHist(int funcID, void *argp)
     switch (funcID2DSCVMethod(funcID)) {
       case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
 	  cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
-	  verbAllocatedMem *mem = verbAllocatedMemQuery(args->dst);
+	  BkupMem *mem = BKUPMEM.queryRegion(args->dst);
 	  if (!mem) {
 	      break;
 	  }

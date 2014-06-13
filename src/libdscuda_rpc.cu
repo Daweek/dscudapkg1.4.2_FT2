@@ -523,9 +523,9 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
 	cudaMallocArgs args;
 	args.devPtr = *devAdrPtr;
 	args.size = size;
-	verbAllocatedMemRegister(args.devPtr, args.size);  /* Allocate mirroring memory */
+	BKUPMEM.registerRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
-    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, verbGetLengthOfMemList());
+    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
     return err;
 }
@@ -555,7 +555,7 @@ cudaError_t cudaFree(void *mem)
      * Automatic Recoverly
      */
     if (St.isAutoVerb()) {
-	verbAllocatedMemUnregister(mem);
+	BKUPMEM.unregisterRegion(mem);
     }
     //WARN(3, "done.\n");
     return err;
@@ -587,7 +587,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 	args.src   = (void *)src;
 	args.count = count;
 	args.kind  = cudaMemcpyHostToDevice;
-	verbAllocatedMemUpdate(args.dst, args.src, args.count); /* update shadow copy.*/
+	BKUPMEM.updateRegion(args.dst, args.src, args.count); /* update shadow copy.*/
 	// if (St.isRecordHist()) {
 	//     if (St.isHistoCalling()==0) {
 	// 	dscudaVerbAddHist(dscudaMemcpyH2DId, (void *)&args);
@@ -664,7 +664,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	     * Update backuped memory region.
 	     */
 	    if (St.isHistoCalling()==0) {
-		verbAllocatedMemUpdate(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
+		BKUPMEM.updateRegion(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
 	    }
 	}
 	else { /* redundant failed */
@@ -691,7 +691,8 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	    if (recall_result != 0) {
 		printModuleList();
 		printVirtualDeviceList();
-		dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
+		//dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
+		dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
 	    }
 	    St.setRecordHist();  // ---> restore recordHist enable.
 	    St.setAutoVerb();    // ===> restore autoVerb enabled. 
