@@ -523,7 +523,7 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
 	cudaMallocArgs args;
 	args.devPtr = *devAdrPtr;
 	args.size = size;
-	BKUPMEM.registerRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
+	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
     WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
@@ -555,7 +555,7 @@ cudaError_t cudaFree(void *mem)
      * Automatic Recoverly
      */
     if (St.isAutoVerb()) {
-	BKUPMEM.unregisterRegion(mem);
+	BKUPMEM.removeRegion(mem);
     }
     //WARN(3, "done.\n");
     return err;
@@ -619,7 +619,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	args.kind  = cudaMemcpyDeviceToHost;
 	if (St.isRecordHist()) {
 	    if (St.isHistoCalling()==0) {
-		dscudaVerbAddHist(dscudaMemcpyD2HId, (void *)&args); // not needed?
+		HISTREC.addHist(dscudaMemcpyD2HId, (void *)&args); // not needed?
 	    }
 	}
     }
@@ -683,9 +683,9 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	    St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
 	    St.unsetRecordHist();  // <--- Must not record Historical call list.
 
-	    dscudaVerbMemDup();
+	    BKUPMEM.restructDeviceRegion();
 	    St.setHistoCalling();
-	    recall_result = dscudaVerbRecallHist();
+	    recall_result = HISTREC.recallHist();
 	    St.unsetHistoCalling();
 
 	    if (recall_result != 0) {
@@ -727,7 +727,7 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 	args.count = count;
 	args.kind  = cudaMemcpyDeviceToDevice;
 	if (St.isRecordHist()) {
-	    dscudaVerbAddHist(dscudaMemcpyD2DId, (void *)&args);
+	    HISTREC.addHist(dscudaMemcpyD2DId, (void *)&args);
 	}
     }
     //--->
@@ -956,7 +956,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         args2.smemsize = smemsize;
         args2.stream = stream;
         args2.args = args;
-        dscudaVerbAddHist(dscudaLaunchKernelId, (void *)&args2);
+        HISTREC.addHist(dscudaLaunchKernelId, (void *)&args2);
     }
     WARN(10, "--->Exiting  %s().\n", __func__)
 }

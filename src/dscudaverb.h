@@ -1,3 +1,13 @@
+//                             -*- Mode: C++ -*-
+// Filename         : dscudaverb.h
+// Description      : DS-CUDA verb function.
+// Author           : A.Kawai, K.Yoshikawa, T.Narumi
+// Created On       : 2011-01-01 00:00:00
+// Last Modified By : M.Oikawa
+// Last Modified On : 2014-02-12 20:57:57
+// Update Count     : 0.1
+// Status           : Unknown, Use with caution!
+//------------------------------------------------------------------------------
 #ifndef __DSCUDAVERB_H__
 #define __DSCUDAVERB_H__
 #include "libdscuda.h"
@@ -17,19 +27,25 @@ typedef struct BkupMem_t {
 } BkupMem;
 
 typedef struct BkupMemList_t {
-    BkupMem *head;
-    BkupMem *tail;
-    int     length;
+    BkupMem *head;        /* pointer to 1st  BkupMem */
+    BkupMem *tail;        /* pointer to last BkupMem */
+    int     length;       /* Counts of allocated memory region */
+    long    total_size;   /* Total size of backuped memory in Byte */
     //--- methods
     int      isEmpty( void );
+    int      getLen( void ) { return length; }
+    long     getTotalSize( void ) { return total_size; }
     int      countRegion( void );
     int      checkSumRegion( void *targ, int size );
     BkupMem* queryRegion( void *dst );
-    void     registerRegion( void *dst, int size );
-    void     unregisterRegion( void *dst );
+    void     addRegion( void *dst, int size );
+    void     removeRegion( void *dst );
     void*    searchUpdateRegion( void *dst );
     void     updateRegion( void *dst, void *src, int size );
-    BkupMemList_t( void ) { head = tail = NULL; length = 0; }
+    void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
+    void     restructDeviceRegion(void);              /* ReLoad backups */
+    //---
+    BkupMemList_t( void ) { head = tail = NULL; length = 0; total_size = 0; }
 } BkupMemList;
 /*** ==========================================================================
  *** Each argument types and lists for historical recall.
@@ -97,19 +113,26 @@ typedef struct {
     void *args;
 } dscudaVerbHist;
 
+typedef struct HistRecord_t {
+    dscudaVerbHist *hist;
+    int length;    /* # of recorded function calls to be recalled */
+    int max_len;   /* Upper bound of "verbHistNum", extensible */
+    //
+    void addHist( int funcID, void *argp ); /* Add */
+    void clear(void);           /* Clear */
+    void printHist(void);           /* Print to stdout */
+    int  recallHist(void);          /* Recall */
+    HistRecord_t(void) { hist = NULL; length = max_len = 0; }
+} HistRecord;
+
 void dscudaVerbInit(void);                /* Initializer    */
-void dscudaVerbAddHist(int, void *);      /* Add            */
-void dscudaVerbClearHist(void);           /* Clear          */
-int  dscudaVerbRecallHist(void);          /* Recall         */
-void dscudaVerbRealloc(void);             /* ReLoad backups */
-void dscudaVerbMemDup(void);              /* ReLoad backups */
+
 
 void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
-
 void dscudaClearHist(void);
-void dscudaPrintHist(void);
 void printRegionalCheckSum(void);
 
 extern BkupMemList BKUPMEM;
+extern HistRecord  HISTREC;
 
 #endif // __DSCUDAVERB_H__

@@ -470,8 +470,8 @@ cudaMemcpyD2H(void *dst, const void *src, size_t count, int vdevid)
                 args.src = (void *)src;
                 args.count = count;
                 args.kind = cudaMemcpyDeviceToHost;
-                dscudaVerbAddHist(dscudaMemcpyD2HId, (void *)&args);
-                dscudaVerbRecallHist();
+                HISTREC.addHist(dscudaMemcpyD2HId, (void *)&args);
+                HISTREC.recallHist();
                 break;
             }
             else if (errorHandler) {
@@ -630,7 +630,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
             args.src = (void *)src;
             args.count = count;
             args.kind = kind;
-            dscudaVerbAddHist(dscudaMemcpyH2DId, (void *)&args);
+            HISTREC.addHist(dscudaMemcpyH2DId, (void *)&args);
             break;
 
           case cudaMemcpyDeviceToDevice:
@@ -638,11 +638,11 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
             args.src = (void *)src;
             args.count = count;
             args.kind = kind;
-            dscudaVerbAddHist(dscudaMemcpyD2DId, (void *)&args);
+            HISTREC.addHist(dscudaMemcpyD2DId, (void *)&args);
             break;
 
           case cudaMemcpyDeviceToHost:
-            dscudaVerbClearHist();
+            HISTREC.clear();
             break;
         }
     }
@@ -806,7 +806,7 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
         args2.stream = stream;
         args2.narg = narg;
         args2.arg = arg;
-        dscudaVerbAddHist(dscudaLaunchKernelId, (void *)&args2);
+        HISTREC.addHist(dscudaLaunchKernelId, (void *)&args2);
     }
 }
 

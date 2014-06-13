@@ -1339,7 +1339,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
         args.count = count;
         args.offset = offset;
         args.kind = kind;
-        dscudaVerbAddHist(dscudaMemcpyToSymbolH2DId, (void *)&args);
+        HISTREC.addHist(dscudaMemcpyToSymbolH2DId, (void *)&args);
     }
 
     return err;
@@ -1689,7 +1689,7 @@ cudaError_t cudaSetDevice(int device) {
     WARN(3, "%s(%d), verb=%d, history=%d...", __func__, device,
 	 St.isAutoVerb(), St.isRecordHist());
 
-    if (device >= 0 && device < Nvdev) {
+    if ( device >= 0 && device < Nvdev ) {
         Vdevid[vi] = device;
     } else {
         err = cudaErrorInvalidDevice;
@@ -1698,7 +1698,7 @@ cudaError_t cudaSetDevice(int device) {
     if (St.isAutoVerb() && St.isRecordHist()) {
         cudaSetDeviceArgs args;
         args.device = device;
-        dscudaVerbAddHist(dscudaSetDeviceId, (void *)&args);
+        HISTREC.addHist(dscudaSetDeviceId, (void *)&args);
     }
     WARN(3, "done.\n");
     return err;
