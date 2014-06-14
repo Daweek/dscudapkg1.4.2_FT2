@@ -490,7 +490,8 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
  * Memory Management
  */
 
-cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
+cudaError_t cudaMalloc(void **devAdrPtr, size_t size)
+{
     dscudaMallocResult *rp;
     cudaError_t err = cudaSuccess;
     int vid = vdevidIndex();
@@ -498,19 +499,19 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     CLIENT *p_clnt;
 
     initClient();
-    WARN(3, "cudaMalloc(%p, %d)...", devAdrPtr, size);
+    WARN(3, "(WARN-3) cudaMalloc( %p, %d )...\n", devAdrPtr, size);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
 	p_clnt = Clnt[Vdevid[vid]][sp->id]; 
         rp = dscudamallocid_1(size, p_clnt);
 	recoverClntError(p_clnt);
         checkResult(rp, sp);
-        if (rp->err != cudaSuccess) {
+        if ( rp->err != cudaSuccess ) {
             err = (cudaError_t)rp->err;
         }
         adrs[i] = (void*)rp->devAdr;
-	WARN(3, "device %d: devAdrPtr:%p\n", i, adrs[i]);	
+	WARN(3, "(WARN-3) +--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
         xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
     }
 
@@ -519,13 +520,11 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     /*
      * Automatic Recoverly
      */
-    if (St.isAutoVerb()) {
-	cudaMallocArgs args;
-	args.devPtr = *devAdrPtr;
-	args.size = size;
+    if ( St.isAutoVerb() ) {
+	cudaMallocArgs args( *devAdrPtr, size );
 	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
-    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
+    WARN(3, "(WARN-3) +--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
     return err;
 }
@@ -562,8 +561,9 @@ cudaError_t cudaFree(void *mem)
 }
 
 static cudaError_t
-cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
-    WARN(10, "#<--- Entering %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
+cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
+{
+    WARN(3, "(WARN-3) +------ %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
 	 __func__, St.isAutoVerb(), St.isRecordHist(), St.isHistoCalling());
     dscudaResult *rp;
     RCServer_t *sp;
@@ -574,6 +574,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     srcbuf.RCbuf_val = (char *)src;
     sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+	WARN(3, "(WARN-3) +--- redun[%d] dst=%p\n", i, dst);
         rp = dscudamemcpyh2did_1((RCadr)dst, srcbuf, count, clnt[sp->id]);
         checkResult(rp, sp);
         if (rp->err != cudaSuccess) {
@@ -582,11 +583,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
     if (St.isAutoVerb()) {
-	cudaMemcpyArgs args;
-	args.dst   = dst;
-	args.src   = (void *)src;
-	args.count = count;
-	args.kind  = cudaMemcpyHostToDevice;
+	cudaMemcpyArgs args( dst, (void*)src, count, cudaMemcpyHostToDevice );
 	BKUPMEM.updateRegion(args.dst, args.src, args.count); /* update shadow copy.*/
 	// if (St.isRecordHist()) {
 	//     if (St.isHistoCalling()==0) {
@@ -594,13 +591,13 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 	//     }
 	// }
     }
-    WARN(10, "#---> Exiting  %s()\n", __func__);
+    WARN(3, "(WARN-3) +------ Exiting  %s()\n", __func__);
     return err;
 }
 
 static cudaError_t
 cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
-    WARN(10, "#<--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
+    WARN(3, "(WARN-3) +--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
     int matched_count=0;
     int unmatched_count=0;
     int recall_result;
@@ -611,15 +608,12 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     //    int fail_flag[RC_NVDEVMAX]={0};
     cudaError_t err = cudaSuccess;
 
-    cudaMemcpyArgs args;
+
     if (St.isAutoVerb()) { /* Register called history */
-	args.dst   = dst;
-	args.src   = (void *)src;
-	args.count = count;
-	args.kind  = cudaMemcpyDeviceToHost;
+	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
 	if (St.isRecordHist()) {
 	    if (St.isHistoCalling()==0) {
-		HISTREC.addHist(dscudaMemcpyD2HId, (void *)&args); // not needed?
+		HISTREC.add(dscudaMemcpyD2HId, (void *)&args); // not needed?
 	    }
 	}
     }
@@ -627,6 +621,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     /* Get the data from remote GPU(s), then verify */
     sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++) {
+	WARN(3, "(WARN-3) +--- redun[%d] dst=%p, src=%p\n", i, dst, src);
         rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]); /* Recieve data from server node */
         checkResult(rp, sp);
         err = (cudaError_t)rp->err;
@@ -685,7 +680,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 
 	    BKUPMEM.restructDeviceRegion();
 	    St.setHistoCalling();
-	    recall_result = HISTREC.recallHist();
+	    recall_result = HISTREC.recall();
 	    St.unsetHistoCalling();
 
 	    if (recall_result != 0) {
@@ -699,7 +694,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	} // redundant failed.
     }
 
-    WARN(10, "#---> #Exiting  %s()\n", __func__);
+    WARN(3, "(WARN-3) +--- Exiting  %s()\n", __func__);
     return err;
 }
 
@@ -721,13 +716,9 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     }
     //<--- oikawa moved to here from cudaMemcpy();
     if (St.isAutoVerb() > 0) {
-	cudaMemcpyArgs args;
-	args.dst   = dst;
-	args.src   = (void *)src;
-	args.count = count;
-	args.kind  = cudaMemcpyDeviceToDevice;
+	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToDevice );
 	if (St.isRecordHist()) {
-	    HISTREC.addHist(dscudaMemcpyD2DId, (void *)&args);
+	    HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
 	}
     }
     //--->
@@ -788,18 +779,19 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     lsrc = dscudaAdrOfUva((void *)src);
     ldst = dscudaAdrOfUva(dst);
     switch (kind) {
-      case cudaMemcpyDeviceToHost:
-	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n", dst, src, count, vdevid);
+    case cudaMemcpyDeviceToHost:
+	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n", ldst, lsrc, count, vdevid);
         err = cudaMemcpyD2H(ldst, lsrc, count, vdev, clnt);
         break;
-      case cudaMemcpyHostToDevice:
-	WARN(3, "cudaMemcpy(%p, %p, %d, HostToDevice)...\n", dst, src, count);
+    case cudaMemcpyHostToDevice:
+	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, HostToDevice)...\n", ldst, lsrc, count);
         err = cudaMemcpyH2D(ldst, lsrc, count, vdev, clnt);
         break;
-      case cudaMemcpyDeviceToDevice:
+    case cudaMemcpyDeviceToDevice:
+	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, DeviceToDevice)...\n", ldst, lsrc, count);
         err = cudaMemcpyD2D(ldst, lsrc, count, vdev, clnt);
         break;
-      case cudaMemcpyDefault:
+    case cudaMemcpyDefault:
 #if !__LP64__
         WARN(0, "cudaMemcpy:In 32-bit environment, cudaMemcpyDefault cannot be given as arg4."
              "UVA is supported for 64-bit environment only.\n");
@@ -810,7 +802,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
         suva = RCuvaQuery((void *)src);
         duva = RCuvaQuery(dst);
         if (!suva && !duva) {
-            WARN(0, "cudaMemcpy:invalid argument.\n");
+            WARN(0, "(WARN-0) cudaMemcpy:invalid argument.\n");
             exit(1);
         }
         else if (!suva) { // sbuf resides in the client.
@@ -839,7 +831,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
         WARN(0, "Unsupported value for cudaMemcpyKind : %s\n", dscudaMemcpyKindName(kind));
         exit(1);
     }
-    WARN(3, "%s() done.\n", __func__);
+    WARN(3, "(WARN-3) +--- done %s().\n", __func__);
     return err;
 }
 
@@ -949,14 +941,14 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     if (St.isAutoVerb() && St.isRecordHist()) {
         cudaRpcLaunchKernelArgs args2;
         args2.moduleid = moduleid;
-        args2.kid = kid;
-        args2.kname = kname;
-        args2.gdim = gdim;
-        args2.bdim = bdim;
+        args2.kid      = kid;
+        args2.kname    = kname;
+        args2.gdim     = gdim;
+        args2.bdim     = bdim;
         args2.smemsize = smemsize;
-        args2.stream = stream;
-        args2.args = args;
-        HISTREC.addHist(dscudaLaunchKernelId, (void *)&args2);
+        args2.stream   = stream;
+        args2.args     = args;
+        HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
     }
     WARN(10, "--->Exiting  %s().\n", __func__)
 }

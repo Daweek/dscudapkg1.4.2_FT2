@@ -174,7 +174,7 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
     mem->size = size;
     mem->prev = RCmappedMemListTail;
     mem->next = NULL;
-    if (!RCmappedMemListTop) { // mem will be the 1st entry.
+    if ( !RCmappedMemListTop ) { // mem will be the 1st entry.
         RCmappedMemListTop = mem;
     }
     else {
@@ -202,20 +202,17 @@ void RCmappedMemUnregister(void *pHost)
 
     if (mem->prev) { // reconnect the linked list.
         mem->prev->next = mem->next;
-    }
-    else { // mem was the 1st entry.
+    } else { // mem was the 1st entry.
         RCmappedMemListTop = mem->next;
         if (mem->next) {
             mem->next->prev = NULL;
         }
     }
-    if (!mem->next) { // mem was the last entry.
+    if ( !mem->next ) { // mem was the last entry.
         RCmappedMemListTail = mem->prev;
     }
-    free(mem);
+    free( mem );
 }
-
-
 
 /*
  * Register a stream array. each component is associated to a stream
@@ -662,7 +659,7 @@ int dscudaSearchDaemon(char *ips, int size)
     struct ifconf ifc;
     struct passwd *pwd;
 
-    WARN(2, "#(info) Searching DSCUDA daemons...\n");
+    WARN(2, "#(info) Searching DSCUDA daemons.\n");
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if( sock == -1 || recvsock == -1 ) {
@@ -687,7 +684,7 @@ int dscudaSearchDaemon(char *ips, int size)
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN - 1 );
     sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&addr, sizeof(addr));
-
+    WARN(2, "#(info) +--- Sent message \"%s\"...\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
 
@@ -706,7 +703,7 @@ int dscudaSearchDaemon(char *ips, int size)
     sleep(RC_SEARCH_DAEMON_TIMEOUT);
     memset( recvbuf, 0, SEARCH_BUFLEN );
     while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
-	WARN(2, "#(info)    + Recieved ACK \"%s\" ", recvbuf);
+	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok(recvbuf, SEARCH_DELIM);
 	user_name  = strtok(NULL,    SEARCH_DELIM);
 	if ( magic_word==NULL ) {
@@ -738,7 +735,7 @@ int dscudaSearchDaemon(char *ips, int size)
 	WARN(0, "#(info) Program terminated.\n");
 	exit(-1);
     } else {
-	WARN( 2, "#(info)    + ===> %d valid DSCUDA daemon%s found. (%d ignored).\n",
+	WARN( 2, "#(info) +--- %d valid DSCUDA daemon%s found. (%d ignored).\n",
 	      num_svr, (num_svr>1)? "s":"", num_ignore );
     }
     return num_svr;
@@ -1047,13 +1044,14 @@ void initEnv(void)
 
 static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
-void initClient(void) {
+void initClient( void )
+{
     static int firstcall = 1;
 
-    pthread_mutex_lock(&InitClientMutex);
+    pthread_mutex_lock( &InitClientMutex );
 
-    if (!firstcall) {
-        pthread_mutex_unlock(&InitClientMutex);
+    if ( !firstcall ) {
+        pthread_mutex_unlock( &InitClientMutex );
         return;
     }
 
@@ -1071,7 +1069,7 @@ void initClient(void) {
     St.setIpAddress(addrin.sin_addr.s_addr);
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
     firstcall = 0;
-    pthread_mutex_unlock(&InitClientMutex);
+    pthread_mutex_unlock( &InitClientMutex );
 }
 
 void invalidateModuleCache(void) {
@@ -1339,7 +1337,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
         args.count = count;
         args.offset = offset;
         args.kind = kind;
-        HISTREC.addHist(dscudaMemcpyToSymbolH2DId, (void *)&args);
+        HISTREC.add(dscudaMemcpyToSymbolH2DId, (void *)&args);
     }
 
     return err;
@@ -1686,7 +1684,7 @@ cudaError_t cudaSetDevice(int device) {
     int         vi  = vdevidIndex();
 
     initClient();
-    WARN(3, "%s(%d), verb=%d, history=%d...", __func__, device,
+    WARN(3, "(WARN-3) %s(%d), verb=%d, history=%d...\n", __func__, device,
 	 St.isAutoVerb(), St.isRecordHist());
 
     if ( device >= 0 && device < Nvdev ) {
@@ -1698,9 +1696,9 @@ cudaError_t cudaSetDevice(int device) {
     if (St.isAutoVerb() && St.isRecordHist()) {
         cudaSetDeviceArgs args;
         args.device = device;
-        HISTREC.addHist(dscudaSetDeviceId, (void *)&args);
+        HISTREC.add(dscudaSetDeviceId, (void *)&args);
     }
-    WARN(3, "done.\n");
+    WARN(3, "(WARN-3) +--- done.\n");
     return err;
 }
 

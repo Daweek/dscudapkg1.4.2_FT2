@@ -18,6 +18,26 @@
 
 #define DEBUG
 
+HistRecord  HISTREC; /* CUDA calling history. */
+BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */
+
+typedef enum {
+    DSCVMethodNone = 0,
+    DSCVMethodSetDevice,
+    //DSCVMethodGetDeviceProperties,
+    DSCVMethodMalloc,
+    DSCVMethodMemcpyH2D,
+    DSCVMethodMemcpyD2D,
+    DSCVMethodMemcpyD2H,
+    DSCVMethodMemcpyToSymbolH2D,
+    DSCVMethodMemcpyToSymbolD2D,
+    DSCVMethodFree,
+    //DSCVMethodLoadModule,
+    DSCVMethodRpcLaunchKernel,
+    DSCVMethodIbvLaunchKernel,
+    DSCVMethodEnd
+} DSCVMethod;
+
 int BkupMem_t::isHead(void)
 {
     if ( prev==NULL ) return 1;
@@ -90,7 +110,7 @@ void BkupMemList_t::addRegion(void *dst, int size)
 	perror("addRegion()");
     }
     mem->next = NULL;
-    
+
     if ( isEmpty() ) {
 	head = mem;
 	mem->prev = NULL;
@@ -101,6 +121,8 @@ void BkupMemList_t::addRegion(void *dst, int size)
     tail = mem;
     length++;
     total_size += size;
+
+    WARN( 5, "(WARN-5) +--- add BkupMemList[%d]: p_dev=%p, size=%d\n", length - 1, dst, size );
     if ( getLen() < 0 ) {
 	fprintf( stderr, "(+_+) Unexpected error in %s()\n", __func__ );
 	exit(1);
@@ -175,37 +197,18 @@ void BkupMemList_t::updateRegion( void *dst, void *src, int size )
     void             *src_mirrored;
     
     if ( src == NULL ) {
-	WARN(0, "(+_+) not found backup target memory region (%p).\n", dst);
+	WARN(0, "(WARN-0) (+_+) not found backup target memory region (%p).\n", dst);
 	exit(1);
     } else {
 	//mem = BkupMem.queryRegion(dst);
 	//src_mirrored = mem->src;
 	src_mirrored = searchUpdateRegion(dst);
 	memcpy(src_mirrored, src, size); // update historical memory region.
-	WARN(10, "        Also copied to backup region (%p), checksum=%d.\n",
+	WARN(3, "(WARN-3) +--- Also copied to backup region (%p), checksum=%d.\n",
 	     dst, checkSumRegion(src, size));
     }
 }
 
-HistRecord  HISTREC; /* CUDA calling history. */
-BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */
-
-typedef enum {
-    DSCVMethodNone = 0,
-    DSCVMethodSetDevice,
-    //DSCVMethodGetDeviceProperties,
-    DSCVMethodMalloc,
-    DSCVMethodMemcpyH2D,
-    DSCVMethodMemcpyD2D,
-    DSCVMethodMemcpyD2H,
-    DSCVMethodMemcpyToSymbolH2D,
-    DSCVMethodMemcpyToSymbolD2D,
-    DSCVMethodFree,
-    //DSCVMethodLoadModule,
-    DSCVMethodRpcLaunchKernel,
-    DSCVMethodIbvLaunchKernel,
-    DSCVMethodEnd
-} DSCVMethod;
 
 static int
 checkSum(void *targ, int size) {
@@ -681,13 +684,13 @@ void dscudaVerbInit(void)
     St.unsetRecordHist();
 }
 
-void HistRecord_t::addHist(int funcID, void *argp)
+void HistRecord_t::add(int funcID, void *argp)
 {
     int DSCVMethodId;
 
     if ( length == max_len ) { /* Extend the existing memory region. */
 	max_len += DSCUDAVERB_HISTMAX_GROWSIZE;
-	hist = (dscudaVerbHist *)realloc( hist, sizeof(dscudaVerbHist) * max_len);
+	hist = (HistCell *)realloc( hist, sizeof(HistCell) * max_len );
     }
 
     DSCVMethodId = funcID2DSCVMethod(funcID);
@@ -696,17 +699,17 @@ void HistRecord_t::addHist(int funcID, void *argp)
     length++; /* Increment the count of cuda call */
 
     switch (funcID2DSCVMethod(funcID)) {
-      case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
-	  cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
-	  BkupMem *mem = BKUPMEM.queryRegion(args->dst);
-	  if (!mem) {
-	      break;
-	  }
-	  int verb = St.isAutoVerb();
-	  St.unsetAutoVerb();
-	  cudaMemcpy(mem->dst, args->src, args->count, cudaMemcpyDeviceToHost);
-	  St.setAutoVerb(verb);
-	  break;
+    case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
+	cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
+	BkupMem *mem = BKUPMEM.queryRegion(args->dst);
+	if (!mem) {
+	    break;
+	}
+	int verb = St.isAutoVerb();
+	St.unsetAutoVerb();
+	cudaMemcpy(mem->dst, args->src, args->count, cudaMemcpyDeviceToHost);
+	St.setAutoVerb(verb);
+	break;
       }
     }
     return;
@@ -731,7 +734,7 @@ void dscudaClearHist(void)
     HISTREC.clear();
 }
 
-void HistRecord_t::printHist(void)
+void HistRecord_t::print(void)
 {
     WARN(1, "%s(): *************************************************\n", __func__);
     if ( length == 0 ) {
@@ -757,7 +760,7 @@ void HistRecord_t::printHist(void)
 /*
  * Rerun the recorded history of cuda function series.
  */
-int HistRecord_t::recallHist(void)
+int HistRecord_t::recall(void)
 {
    static int called_depth = 0;
    int result;
@@ -771,7 +774,7 @@ int HistRecord_t::recallHist(void)
        exit(1);
    }
    else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
-       printHist();
+       this->print();
        called_depth++;       
        for (int i=0; i< length; i++) { /* Do recall history */
 	   (recallStub[funcID2DSCVMethod(HISTREC.hist[i].funcID)])(HISTREC.hist[i].args); /* partially recursive */
@@ -828,5 +831,5 @@ void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to)
     printModuleList();
     invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
     dscudaVerbMigrateModule(); // not good ;_;, or no need.
-    HISTREC.recallHist();  /* ----- Do redundant calculation(recursive) ----- */
+    HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
 }

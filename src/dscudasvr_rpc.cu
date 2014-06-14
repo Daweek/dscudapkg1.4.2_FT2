@@ -829,7 +829,7 @@ dscudamallocid_1_svc(RCsize size, struct svc_req *sr)
     int *devadr;
 
     WARN(3, "cudaMalloc(");
-#if 1 //force time out error
+#if 0 //force time out error
     sleep(30);
 #endif
     if (!dscuContext) createDscuContext();

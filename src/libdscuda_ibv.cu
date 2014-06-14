@@ -465,13 +465,9 @@ cudaMemcpyD2H(void *dst, const void *src, size_t count, int vdevid)
         else if (bcmp(dst, &rpkt->dstbuf, count) != 0) {
             WARN(1, "\n\ncudaMemcpy() data copied from device%d & device0 UNMATCHED.\n\n\n", i);
             if (St.isAutoVerb()) {
-                cudaMemcpyArgs args;
-                args.dst = dst;
-                args.src = (void *)src;
-                args.count = count;
-                args.kind = cudaMemcpyDeviceToHost;
-                HISTREC.addHist(dscudaMemcpyD2HId, (void *)&args);
-                HISTREC.recallHist();
+                cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
+                HISTREC.add(dscudaMemcpyD2HId, (void *)&args);
+                HISTREC.recall();
                 break;
             }
             else if (errorHandler) {
@@ -630,7 +626,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
             args.src = (void *)src;
             args.count = count;
             args.kind = kind;
-            HISTREC.addHist(dscudaMemcpyH2DId, (void *)&args);
+            HISTREC.add(dscudaMemcpyH2DId, (void *)&args);
             break;
 
           case cudaMemcpyDeviceToDevice:
@@ -638,7 +634,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
             args.src = (void *)src;
             args.count = count;
             args.kind = kind;
-            HISTREC.addHist(dscudaMemcpyD2DId, (void *)&args);
+            HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
             break;
 
           case cudaMemcpyDeviceToHost:
@@ -806,7 +802,7 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
         args2.stream = stream;
         args2.narg = narg;
         args2.arg = arg;
-        HISTREC.addHist(dscudaLaunchKernelId, (void *)&args2);
+        HISTREC.add(dscudaLaunchKernelId, (void *)&args2);
     }
 }
 

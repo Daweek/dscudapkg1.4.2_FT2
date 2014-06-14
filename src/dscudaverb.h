@@ -51,20 +51,44 @@ typedef struct BkupMemList_t {
  *** Each argument types and lists for historical recall.
  *** If you need to memorize another function into history, add new one.
  ***/
+typedef struct HistCell_t {
+    int   funcID;
+    void *args;
+} HistCell;
+typedef struct HistRecord_t {
+    HistCell *hist;
+    int length;    /* # of recorded function calls to be recalled */
+    int max_len;   /* Upper bound of "verbHistNum", extensible */
+    //
+    void add( int funcID, void *argp ); /* Add */
+    void clear( void );           /* Clear */
+    void print( void );           /* Print to stdout */
+    int  recall( void );          /* Recall */
+    //
+    HistRecord_t( void ) { hist = NULL; length = max_len = 0; }
+} HistRecord;
+
 typedef struct {                        /* cudaSetDevice() */
     int device;
 } cudaSetDeviceArgs;
 
-typedef struct {                        /* cudaMalloc() */
+typedef struct CudaMallocArgs_t {                        /* cudaMalloc() */
     void *devPtr;
     size_t size;
+    CudaMallocArgs_t( void ) { devPtr = NULL, size = 0; }
+    CudaMallocArgs_t( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
 } cudaMallocArgs;
 
-typedef struct {                        /* cudaMemcpy() */
+typedef struct CudaMemcpyArgs_t {                        /* cudaMemcpy() */
     void *dst;
     void *src;
     size_t count;
-    enum cudaMemcpyKind kind;  
+    enum cudaMemcpyKind kind;
+    CudaMemcpyArgs_t( void ) { dst = src = NULL; count = 0; }
+    CudaMemcpyArgs_t( void *d, void *s, size_t c, enum cudaMemcpyKind k )
+    {
+	dst = d; src = s; count = c; kind = k;
+    }
 } cudaMemcpyArgs;
 
 typedef struct {                        /* cudaMemcpyToSymbol */
@@ -108,22 +132,6 @@ typedef struct {
     IbvArg   *arg;
 } cudaIbvLaunchKernelArgs;
 
-typedef struct {
-    int   funcID;
-    void *args;
-} dscudaVerbHist;
-
-typedef struct HistRecord_t {
-    dscudaVerbHist *hist;
-    int length;    /* # of recorded function calls to be recalled */
-    int max_len;   /* Upper bound of "verbHistNum", extensible */
-    //
-    void addHist( int funcID, void *argp ); /* Add */
-    void clear(void);           /* Clear */
-    void printHist(void);           /* Print to stdout */
-    int  recallHist(void);          /* Recall */
-    HistRecord_t(void) { hist = NULL; length = max_len = 0; }
-} HistRecord;
 
 void dscudaVerbInit(void);                /* Initializer    */
 
