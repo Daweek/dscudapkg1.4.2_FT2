@@ -25,7 +25,8 @@
 
 #define DEBUG 1
 
-int dscudaRemoteCallType(void) {
+int dscudaRemoteCallType(void)
+{
     return RC_REMOTECALL_TYPE_RPC;
 }
 
@@ -42,10 +43,9 @@ void setupConnection(int idev, RCServer_t *sp)
     int sport; // port number of the server. given by the daemon, or calculated from cid.
 
     St.useRpc();
-    if (St.isUseDaemon()) { // access to the server via daemon.
+    if ( St.isUseDaemon() ) { // access to the server via daemon.
         sport = requestDaemonForDevice(sp->ip, cid, St.isIbv());
-    }
-    else { // directly access to the server.
+    } else { // directly access to the server.
         sport = RC_SERVER_IP_PORT + cid;
     }
     sockaddr = setupSockaddr(sp->ip, sport);
@@ -58,12 +58,11 @@ void setupConnection(int idev, RCServer_t *sp)
 
     sprintf(msg, "%s:%d (port %d) ", sp->ip, cid, sport);
 
-    if (!Clnt[idev][id]) {
+    if ( !Clnt[idev][id] ) {
         clnt_pcreateerror(msg);
-        if (0 == strcmp(sp->ip, DEFAULT_SVRIP)) {
+        if ( 0 == strcmp(sp->ip, DEFAULT_SVRIP) ) {
             WARN(0, "You may need to set an environment variable 'DSCUDA_SERVER'.\n");
-        }
-        else {
+        } else {
             WARN(0, "DSCUDA server (dscudasrv on %s:%d) may be down.\n", sp->ip, id);
         }
         exit(1);
@@ -128,7 +127,7 @@ cudaError_t cudaThreadExit(void)
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadexitid_1(Clnt[Vdevid[vid]][sp->id]);
         checkResult(rp, sp);
-        if (rp->err != cudaSuccess) {
+        if ( rp->err != cudaSuccess ) {
             err = (cudaError_t)rp->err;
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
@@ -138,15 +137,14 @@ cudaError_t cudaThreadExit(void)
     return err;
 }
 
-cudaError_t
-cudaThreadSynchronize(void)
+cudaError_t cudaThreadSynchronize(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     initClient();
-    WARN(3, "cudaThreadSynchronize()...");
+    WARN(3, "(WARN-3) cudaThreadSynchronize()...");
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -157,13 +155,12 @@ cudaThreadSynchronize(void)
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    WARN(3, "done.\n");
+    WARN(3, "(WARN-3) done.\n");
 
     return err;
 }
 
-cudaError_t
-cudaThreadSetLimit(enum cudaLimit limit, size_t value)
+cudaError_t cudaThreadSetLimit(enum cudaLimit limit, size_t value)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -186,8 +183,7 @@ cudaThreadSetLimit(enum cudaLimit limit, size_t value)
     return err;
 }
 
-cudaError_t
-cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
+cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
 {
     cudaError_t err = cudaSuccess;
     dscudaThreadGetLimitResult *rp;
@@ -221,7 +217,7 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
     int vid = vdevidIndex();
 
     initClient();
-    WARN(3, "cudaThreadSetCacheConfig(%d)...", cacheConfig);
+    WARN(3, "(WARN-3) cudaThreadSetCacheConfig(%d)...", cacheConfig);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -232,7 +228,7 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    WARN(3, "done.\n");
+    WARN(3, "(WARN-3) done.\n");
 
     return err;
 }
@@ -269,8 +265,7 @@ cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
  * Error Handling
  */
 
-cudaError_t
-cudaGetLastError(void)
+cudaError_t cudaGetLastError(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -293,8 +288,7 @@ cudaGetLastError(void)
     return err;
 }
 
-cudaError_t
-cudaPeekAtLastError(void)
+cudaError_t cudaPeekAtLastError(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -317,8 +311,7 @@ cudaPeekAtLastError(void)
     return err;
 }
 
-const char *
-cudaGetErrorString(cudaError_t error)
+const char *cudaGetErrorString(cudaError_t error)
 {
     dscudaGetErrorStringResult *rp;
     static char str[4096];
@@ -345,8 +338,8 @@ cudaGetErrorString(cudaError_t error)
  * Device Management
  */
 
-cudaError_t
-cudaSetDeviceFlags(unsigned int flags) {
+cudaError_t cudaSetDeviceFlags(unsigned int flags)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
@@ -370,9 +363,7 @@ cudaSetDeviceFlags(unsigned int flags) {
     return err;
 }
 
-
-cudaError_t
-cudaDriverGetVersion (int *driverVersion)
+cudaError_t cudaDriverGetVersion (int *driverVersion)
 {
     cudaError_t err = cudaSuccess;
     dscudaDriverGetVersionResult *rp;
@@ -396,8 +387,7 @@ cudaDriverGetVersion (int *driverVersion)
     return err;
 }
 
-cudaError_t
-cudaRuntimeGetVersion(int *runtimeVersion)
+cudaError_t cudaRuntimeGetVersion(int *runtimeVersion)
 {
     cudaError_t err = cudaSuccess;
     dscudaRuntimeGetVersionResult *rp;
@@ -424,8 +414,7 @@ cudaRuntimeGetVersion(int *runtimeVersion)
     return err;
 }
 
-cudaError_t
-cudaDeviceSynchronize(void)
+cudaError_t cudaDeviceSynchronize(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -448,8 +437,7 @@ cudaDeviceSynchronize(void)
     return err;
 }
 
-cudaError_t
-cudaDeviceReset(void)
+cudaError_t cudaDeviceReset(void)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -536,7 +524,7 @@ cudaError_t cudaFree(void *mem)
     dscudaResult *rp;
 
     initClient();
-    //WARN(3, "cudaFree(%p)...", (unsigned long)mem);
+    WARN(3, "(WARN-3) cudaFree(%p)...", (unsigned long)mem);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++, sp++) {
@@ -556,7 +544,7 @@ cudaError_t cudaFree(void *mem)
     if (St.isAutoVerb()) {
 	BKUPMEM.removeRegion(mem);
     }
-    //WARN(3, "done.\n");
+    WARN(3, "(WARN-3) done.\n");
     return err;
 }
 
@@ -630,15 +618,13 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
         }
         if (i == 0) { /* reference data */
 	    memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
-        }
-        else { /* compared data */
+        } else { /* compared data */
 	    if (bcmp(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len) != 0) {  /* Unmatched case  */
 		unmatched_count++;
 		//fail_flag[i]=1;
 		failed_1st = sp; // temporary
 		WARN(2, "   #(;_;) UNMATCHED redundant device %d/%d with device 0. %s()\n", i, vdev->nredundancy - 1, __func__);
-	    }
-	    else { /* Matched case */
+	    } else { /* Matched case */
 		matched_count++;
 		//fail_flag[i]=0;
 		WARN(3, "   #(^_^) MATCHED   reduncant device %d/%d with device 0. %s()\n", i, vdev->nredundancy - 1, __func__);
@@ -661,16 +647,14 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	    if (St.isHistoCalling()==0) {
 		BKUPMEM.updateRegion(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
 	    }
-	}
-	else { /* redundant failed */
+	} else { /* redundant failed */
 	    if (unmatched_count>0 && matched_count<(vdev->nredundancy-1)) {
 		WARN(1, "### #   #\n");
 		WARN(1, "###  # #\n");
 		WARN(1, "###   #  (+_+) Unmatched result from some redundant devices. OK/NG= %d/%d.\n", matched_count, unmatched_count);
 		WARN(1, "###  # #\n");
 		WARN(1, "### #   #\n");
-	    }
-	    else {
+	    } else {
 		WARN(1, "   #(;_;)   All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
 		     vdev->nredundancy-1, matched_count, unmatched_count);
 	    }
@@ -765,8 +749,8 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
     return err;
 }
 
-cudaError_t
-cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
+{
     int         vdevid = Vdevid[ vdevidIndex() ];
     Vdev_t     *vdev   = Vdev + vdevid;
     CLIENT    **clnt   = Clnt[vdevid];
@@ -778,7 +762,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     initClient();
     lsrc = dscudaAdrOfUva((void *)src);
     ldst = dscudaAdrOfUva(dst);
-    switch (kind) {
+    switch ( kind ) {
     case cudaMemcpyDeviceToHost:
 	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n", ldst, lsrc, count, vdevid);
         err = cudaMemcpyD2H(ldst, lsrc, count, vdev, clnt);
@@ -801,30 +785,27 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
         cudaGetDevice(&dev0);
         suva = RCuvaQuery((void *)src);
         duva = RCuvaQuery(dst);
-        if (!suva && !duva) {
+        if ( !suva && !duva ) {
             WARN(0, "(WARN-0) cudaMemcpy:invalid argument.\n");
             exit(1);
-        }
-        else if (!suva) { // sbuf resides in the client.
-            if (duva->devid != dev0) {
-                cudaSetDevice(duva->devid);
+        } else if ( !suva ) { // sbuf resides in the client.
+            if ( duva->devid != dev0 ) {
+                cudaSetDevice( duva->devid );
             }
-            err = cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
-            if (duva->devid != dev0) {
-                cudaSetDevice(dev0);
+            err = cudaMemcpy( dst, src, count, cudaMemcpyHostToDevice );
+            if ( duva->devid != dev0 ) {
+                cudaSetDevice( dev0 );
             }
-        }
-        else if (!duva) { // dbuf resides in the client.
-            if (suva->devid != dev0) {
-                cudaSetDevice(suva->devid);
+        } else if ( !duva ) { // dbuf resides in the client.
+            if ( suva->devid != dev0 ) {
+                cudaSetDevice( suva->devid );
             }
-            err = cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
-            if (suva->devid != dev0) {
-                cudaSetDevice(dev0);
+            err = cudaMemcpy( dst, src, count, cudaMemcpyDeviceToHost );
+            if ( suva->devid != dev0 ) {
+                cudaSetDevice( dev0 );
             }
-        }
-        else {
-            err = cudaMemcpyP2P(dst, duva->devid, src, suva->devid, count);
+        } else {
+            err = cudaMemcpyP2P( dst, duva->devid, src, suva->devid, count );
         }
         break;
       default:
@@ -1173,13 +1154,11 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
             }
             if (i == 0) {
                 memcpy(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len);
-            }
-            else if (bcmp(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len) != 0) {
+            } else if (bcmp(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len) != 0) {
                 if (errorHandler) {
                     errorHandler(errorHandlerArg);
                 }
-            }
-            else {
+            } else {
                 WARN(3, "cudaMemcpy2DToArray() data copied from device%d matched with that from device0.\n", i);
             }
             xdr_free((xdrproc_t)xdr_dscudaMemcpy2DToArrayD2HResult, (char *)d2hrp);
@@ -1252,13 +1231,11 @@ cudaMemcpy2D(void *dst, size_t dpitch,
             }
             if (i == 0) {
                 memcpy(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len);
-            }
-            else if (bcmp(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len) != 0) {
+            } else if (bcmp(dst, d2hrp->buf.RCbuf_val, d2hrp->buf.RCbuf_len) != 0) {
                 if (errorHandler) {
                     errorHandler(errorHandlerArg);
                 }
-            }
-            else {
+            } else {
                 WARN(3, "cudaMemcpy() data copied from device%d matched with that from device0.\n", i);
             }
             xdr_free((xdrproc_t)xdr_dscudaMemcpy2DD2HResult, (char *)d2hrp);
@@ -1356,8 +1333,7 @@ cudaMallocHost(void **ptr, size_t size)
     *ptr = malloc(size);
     if (*ptr) {
         return cudaSuccess;
-    }
-    else {
+    } else {
         return cudaErrorMemoryAllocation;
     }
 #endif
@@ -1446,8 +1422,7 @@ cudaFreeHost(void *ptr)
         err = cudaFree(mem->pDevice);
         RCmappedMemUnregister(ptr);
         return err;
-    }
-    else {
+    } else {
         return cudaSuccess;
     }
 #endif

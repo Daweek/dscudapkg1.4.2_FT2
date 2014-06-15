@@ -96,9 +96,14 @@ static cudaError_t setTextureParams(CUtexref texref, RCtexture texbuf, char *tex
 
 #undef WARN
 #define WARN(lv, fmt, args...)						\
-    if (lv <= dscudaWarnLevel()) {					\
-	fprintf(stderr, "dscudasvr[%d] : " fmt, TcpPort - RC_SERVER_IP_PORT, ## args); \
-	fflush(stderr); \
+    if ( lv <= dscudaWarnLevel() ) {					\
+    time_t now = time(NULL);						\
+    struct tm *local = localtime( &now );				\
+    char tfmt[16];							\
+    strftime( tfmt, 16, "%T", local );					\
+    fprintf(stderr, "[%s]", tfmt);					\
+    fprintf(stderr, "dscudasvr[%d] : " fmt, TcpPort - RC_SERVER_IP_PORT, ## args); \
+    fflush(stderr);							\
     }
 
 #if 0

@@ -117,8 +117,7 @@ int requestDaemonForDevice(char *ipaddr, int devid, int useibv)
 
     if (useibv) {
         sprintf(msg, "remotecall:ibv");
-    }
-    else {
+    } else {
         sprintf(msg, "remotecall:rpc");
     }
     WARN(3, "send \"%s\" to the server.\n", msg);
@@ -176,8 +175,7 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
     mem->next = NULL;
     if ( !RCmappedMemListTop ) { // mem will be the 1st entry.
         RCmappedMemListTop = mem;
-    }
-    else {
+    } else {
         RCmappedMemListTail->next = mem;
     }
     RCmappedMemListTail = mem;
@@ -234,8 +232,7 @@ void RCstreamArrayRegister(cudaStream_t *streams)
     st->next = NULL;
     if (!RCstreamArrayListTop) { // st will be the 1st entry.
         RCstreamArrayListTop = st;
-    }
-    else {
+    } else {
         RCstreamArrayListTail->next = st;
     }
     RCstreamArrayListTail = st;
@@ -279,8 +276,7 @@ void RCstreamArrayUnregister(cudaStream_t stream0)
 
     if (st->prev) { // reconnect the linked list.
         st->prev->next = st->next;
-    }
-    else { // st was the 1st entry.
+    } else { // st was the 1st entry.
         RCstreamArrayListTop = st->next;
         if (st->next) {
             st->next->prev = NULL;
@@ -314,8 +310,7 @@ void RCcuarrayArrayRegister(cudaArray **cuarrays)
     ca->next = NULL;
     if (!RCcuarrayArrayListTop) { // ca will be the 1st entry.
         RCcuarrayArrayListTop = ca;
-    }
-    else {
+    } else {
         RCcuarrayArrayListTail->next = ca;
     }
     RCcuarrayArrayListTail = ca;
@@ -340,8 +335,7 @@ void RCcuarrayArrayUnregister(cudaArray *cuarray0)
 
     if (ca->prev) { // reconnect the linked list.
         ca->prev->next = ca->next;
-    }
-    else { // ca was the 1st entry.
+    } else { // ca was the 1st entry.
         RCcuarrayArrayListTop = ca->next;
         if (ca->next) {
             ca->next->prev = NULL;
@@ -373,8 +367,7 @@ void RCeventArrayRegister(cudaEvent_t *events)
     ev->next = NULL;
     if (!RCeventArrayListTop) { // ev will be the 1st entry.
         RCeventArrayListTop = ev;
-    }
-    else {
+    } else {
         RCeventArrayListTail->next = ev;
     }
     RCeventArrayListTail = ev;
@@ -399,8 +392,7 @@ void RCeventArrayUnregister(cudaEvent_t event0)
 
     if (ev->prev) { // reconnect the linked list.
         ev->prev->next = ev->next;
-    }
-    else { // ev was the 1st entry.
+    } else { // ev was the 1st entry.
         RCeventArrayListTop = ev->next;
         if (ev->next) {
             ev->next->prev = NULL;
@@ -466,8 +458,7 @@ void RCuvaRegister(int devid, void *adr[], size_t size)
     uva->next = NULL;
     if (!RCuvaListTop) { // uva will be the 1st entry.
         RCuvaListTop = uva;
-    }
-    else {
+    } else {
         RCuvaListTail->next = uva;
     }
     RCuvaListTail = uva;
@@ -502,8 +493,7 @@ RCuvaUnregister(void *adr)
 
     if (uva->prev) { // reconnect the linked list.
         uva->prev->next = uva->next;
-    }
-    else { // uva was the 1st entry.
+    } else { // uva was the 1st entry.
         RCuvaListTop = uva->next;
         if (uva->next) {
             uva->next->prev = NULL;
@@ -848,8 +838,7 @@ void initVirtualServerList(const char *env)
 		    if (isdigit((unsigned char)letter || letter=='.')) {
 			det_abc = 0;
 			printf("%c", letter);
-		    }
-		    else {
+		    } else {
 			det_abc = 1;
 			break;
 		    }
@@ -861,8 +850,7 @@ void initVirtualServerList(const char *env)
 		    if (hostent0==NULL) {
 			fprintf(stderr, "gethostbyname() returned NULL.\n");
 			exit(1);
-		    }
-		    else {
+		    } else {
 			ip_ref = inet_ntoa(*(struct in_addr*)hostent0->h_addr_list[0]);
 			strcpy(ip, ip_ref);
 		    }

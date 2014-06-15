@@ -288,33 +288,34 @@ freeHost(Remd_t &remd)
   debug_print(5, "Exiting  %s().\n", __func__);  
 }
 
-static void
-freeDev(Simu_t &simu)
+static
+void freeDev(Simu_t &simu)
 {
-  debug_print(6, "Entering %s().\n", __func__);
+    debug_print(6, "Entering %s().\n", __func__);
 
-  for (int gpu_i = 0; gpu_i < simu.Ngpu; gpu_i++) {
+    for (int gpu_i = 0; gpu_i < simu.Ngpu; gpu_i++) {
+	cudaSetDevice(gpu_i);
 #if defined(HOST_RUN)
-    free(remd.d_pos_ar[gpu_i]);
-    free(remd.d_vel_ar[gpu_i]);
-    free(remd.d_foc_ar[gpu_i]);
-    free(remd.d_temp_ar[gpu_i]);
-    free(remd.d_exch_ar[gpu_i]);
-    free(remd.d_energy[gpu_i]);
-    free(remd.d_temp_meas[gpu_i]);
+	free(remd.d_pos_ar[gpu_i]);
+	free(remd.d_vel_ar[gpu_i]);
+	free(remd.d_foc_ar[gpu_i]);
+	free(remd.d_temp_ar[gpu_i]);
+	free(remd.d_exch_ar[gpu_i]);
+	free(remd.d_energy[gpu_i]);
+	free(remd.d_temp_meas[gpu_i]);
 #elif defined(DEVICE_RUN)
-    cudaFree(remd.d_pos_ar[gpu_i]);
-    cudaFree(remd.d_vel_ar[gpu_i]);
-    cudaFree(remd.d_foc_ar[gpu_i]);
-    cudaFree(remd.d_temp_ar[gpu_i]);
-    cudaFree(remd.d_exch_ar[gpu_i]);
-    cudaFree(remd.d_energy[gpu_i]);
-    cudaFree(remd.d_temp_meas[gpu_i]);
+	cudaFree(remd.d_pos_ar[gpu_i]);
+	cudaFree(remd.d_vel_ar[gpu_i]);
+	cudaFree(remd.d_foc_ar[gpu_i]);
+	cudaFree(remd.d_temp_ar[gpu_i]);
+	cudaFree(remd.d_exch_ar[gpu_i]);
+	cudaFree(remd.d_energy[gpu_i]);
+	cudaFree(remd.d_temp_meas[gpu_i]);
 #else
-  die("undefined HOST_RUN or DEVICE_RUN.\n");
+	die("undefined HOST_RUN or DEVICE_RUN.\n");
 #endif
-  }
-  debug_print(6, "Exiting  %s().\n", __func__);
+    }
+    debug_print(6, "Exiting  %s().\n", __func__);
 }
 //==============================================================================
 // [Description]

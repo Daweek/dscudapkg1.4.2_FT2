@@ -38,8 +38,8 @@ typedef struct BkupMemList_t {
     int      countRegion( void );
     int      checkSumRegion( void *targ, int size );
     BkupMem* queryRegion( void *dst );
-    void     addRegion( void *dst, int size );
-    void     removeRegion( void *dst );
+    void     addRegion( void *dst, int size ); // verbAllocatedMemRegister()
+    void     removeRegion( void *dst );        // verbAllocatedMemUnregister()
     void*    searchUpdateRegion( void *dst );
     void     updateRegion( void *dst, void *src, int size );
     void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
@@ -134,8 +134,6 @@ typedef struct {
 
 
 void dscudaVerbInit(void);                /* Initializer    */
-
-
 void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
 void dscudaClearHist(void);
 void printRegionalCheckSum(void);

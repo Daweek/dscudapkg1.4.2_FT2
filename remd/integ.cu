@@ -19,24 +19,24 @@
 
 #define ENERGY_WARNING 0
 
-__device__ void calcVelScale_dev(Real_t targ_temp, Real3_t *vel_ar, Real_t mass, int Nmol, Real3_t *shared_mem);
-
+__device__
+void calcVelScale_dev(Real_t targ_temp, Real3_t *vel_ar, Real_t mass, int Nmol, Real3_t *shared_mem);
 void checkEnergyVal( int t0, const Real_t *h_energy, int len);
 void calcHistogram( int *histo_ar, Remd_t &remd, Simu_t &simu);
 void saveHistogram( const int *histo_ar, Remd_t &remd, Simu_t &simu);
 void exchTemp( int t0, Remd_t &remd, Simu_t &simu);
 void saveAccRatio( Remd_t &remd, int step_numkernel);
-
-__device__ int ctrlTemp_dev( int, int, Real3_t *velo_ar, Real_t zeta, int Nmol, Real_t dt);
+__device__
+int ctrlTemp_dev( int, int, Real3_t *velo_ar, Real_t zeta, int Nmol, Real_t dt);
 static void calcZetaSum( Real_t&, Real_t, Real_t);
 static Real_t hamiltonian( Real_t, Real_t, Real_t, Real_t, Real_t, Real_t, int);
 
 // Debug
-__device__ int
-chksum(int *start, int count)
+__device__
+int chksum(int *start, int count)
 {
     int sum, *p, i;
-    if (threadIdx.x==0 && threadIdx.y==0 && threadIdx.z==0) { /* Do by only 1 thread */
+    if ( threadIdx.x==0 && threadIdx.y==0 && threadIdx.z==0 ) { /* Do by only 1 thread */
 	p=start;
 	sum=0;
 	for (i=0; i<count; i++) {
@@ -122,7 +122,7 @@ integTime_dev(int t0,
     Real_t calc_err;
     if (threadIdx.x==0) {
 	fault_cnt = *FAULT_CONF.d_Nfault;
-	printf("FAULT_CONF= %d/%d %s.\n", fault_cnt, FAULT_CONF.fault_on, FAULT_CONF.tag);
+	printf("FAULT_CONF= %d/%d %s.\n", fault_cnt, FAULT_CONF.fault_en, FAULT_CONF.tag);
     }
 
     Real3_t *pos_ar    = d_pos_ar + (Nmol * blockIdx.x);
@@ -180,7 +180,7 @@ integTime_dev(int t0,
 
    __syncthreads();
    if (blockIdx.x==0 && threadIdx.x==0) {
-       if (FAULT_CONF.fault_on==0 || fault_cnt==0) {  /* Normal calc */
+       if (FAULT_CONF.fault_en==0 || fault_cnt==0) {  /* Normal calc */
 	   printf("[Normal calculation] (t0=%d)\n", t0);
 	   /* nop */
        }
@@ -194,7 +194,7 @@ integTime_dev(int t0,
     *  <--- FAULT INJECTION
     */
    if (threadIdx.x==0) {
-       if (FAULT_CONF.fault_on==0 || fault_cnt==0) {
+       if (FAULT_CONF.fault_en==0 || fault_cnt==0) {
 	   calc_err = 0.0;
        }
        else {
@@ -203,7 +203,7 @@ integTime_dev(int t0,
 	   if (blockIdx.x==2) { calc_err = +500.0; }
 	   if (blockIdx.x==3) { calc_err = -500.0; }
        }
-       printf("(%d,%d)calc_err[%d]:blockIdx.x=%d= %f\n", FAULT_CONF.fault_on, fault_cnt, t0, blockIdx.x, calc_err);
+       printf("(%d,%d)calc_err[%d]:blockIdx.x=%d= %f\n", FAULT_CONF.fault_en, fault_cnt, t0, blockIdx.x, calc_err);
    }
    /*
     *  ---> FAULT INJECTION 
@@ -284,7 +284,7 @@ integTime_dev(int t0,
    
    __syncthreads();
    if (blockIdx.x==0 && threadIdx.x==0) {
-       if (FAULT_CONF.fault_on>0 && fault_cnt>0) {
+       if (FAULT_CONF.fault_en>0 && fault_cnt>0) {
 	   *FAULT_CONF.d_Nfault = fault_cnt - 1;
        }
    }
@@ -372,7 +372,7 @@ simRemd( Remd_t &remd, Simu_t &simu)
     step_progress = 0.05;
 
     FaultConf_t FAULT_CONF(5); // fault 1 times.
-    for (int t0=0; t0<simu.step_max; t0++) {
+    for ( int t0 = 0; t0 < simu.step_max; t0++ ) {
 	printf("###=============================================================\n");
 	printf("### t0 = %d / %d\n", t0, simu.step_max-1);
 	printf("###=============================================================\n");
@@ -403,32 +403,32 @@ simRemd( Remd_t &remd, Simu_t &simu)
 	copyExch(H2D, remd, simu);                               // cudaMemcpyH2D * ?
 	if (simu.report_ene  >= 1)   { saveSorted(remd, t0); }   // cudaMemcpyD2H * ?
 
-	if (t0 < 2) {
-	    FAULT_CONF.fault_on     = 0;
+	if ( t0 < 2 ) {
+	    FAULT_CONF.fault_en     = 0;
 	    FAULT_CONF.overwrite_en = 0;
 	}
 	else {
-#if defined(FAULT_ON)
-	    FAULT_CONF.fault_on     = 1;
+#if defined( FAULT_ON )
+	    FAULT_CONF.fault_en     = 1;
 #endif
 	    FAULT_CONF.overwrite_en = 1;
 	}
 
-#if defined(__DSCUDA__)
+#if defined( __DSCUDA__ )
 	dscudaRecordHistOn();  /*** <--- Enable recording history. ***/ 
 #endif
 
 	//	printf("checksum: Pos[t0=%d before]= %d\n",
 	//     t0, checkSum((void*)remd.h_pos_ar, sizeof(Real3_t)*Nmol*Nrep)); fflush(stdout);
 
-	for (gpu_i=0; gpu_i<Ngpu; gpu_i++) {                          // Sweep GPU.
-	    cu_err[0] = cudaSetDevice(gpu_i);
-	    if( cu_err[0] != cudaSuccess) { die("cudaSetDevice() failed.\n"); }
-	    integTime_dev <<<blocks, threads>>>                       // rpcLaunchKernel
+	for ( gpu_i = 0; gpu_i < Ngpu; gpu_i++ ) {                          // Sweep GPU.
+	    cu_err[0] = cudaSetDevice( gpu_i );
+	    if( cu_err[0] != cudaSuccess ) { die("cudaSetDevice() failed.\n"); }
+	    integTime_dev <<< blocks, threads >>>                       // rpcLaunchKernel
 		( t0, Nmol, step_exch, dt, cellsize, rcut, lj_sigma, lj_epsilon, mass, 
 		  remd.d_pos_ar[gpu_i], remd.d_vel_ar[gpu_i], remd.d_foc_ar[gpu_i],
 		  remd.d_energy[gpu_i], remd.d_temp_ar[gpu_i],remd.d_temp_meas[gpu_i],
-		  remd.d_exch_ar[gpu_i], FAULT_CONF);
+		  remd.d_exch_ar[gpu_i], FAULT_CONF );
 	}
 	//	printf("checksum: Pos[t0=%d after ]= %d\n",
 	//      t0, checkSum((void*)remd.h_pos_ar, sizeof(Real3_t)*Nmol*Nrep)); fflush(stdout);
@@ -438,13 +438,13 @@ simRemd( Remd_t &remd, Simu_t &simu)
 //        if (cudaSetDevice(gpu_i) != cudaSuccess) { die("cudaSetDevice() failed.\n"); }
 //        cudaThreadSynchronize(); // if no exist, calculation error occurs.
 //      }
-	copyEnergy(D2H, remd, simu);       /* Correct data of potential energy. */
+	copyEnergy( D2H, remd, simu );       /* Correct data of potential energy. */
 
-#if defined(__DSCUDA__)
+#if defined( __DSCUDA__ )
 	dscudaRecordHistOff();
 #endif
 	//savePosAll(t0 * step_exch + 100000);
-#if defined(__DSCUDA__)
+#if defined( __DSCUDA__ )
 	dscudaAutoVerbOn();
 	dscudaClearHist();          /*** <--- Clear Recall List.        ***/
 #endif

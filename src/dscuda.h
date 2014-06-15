@@ -77,7 +77,7 @@ typedef struct FaultConf
 	}
 #if defined(__DSCUDA__)
 	dscudaRecordHistOn();
-	verbAllocatedMemUnregister(d_Nfault);
+	BKUPMEM.removeRegion(d_Nfault);
 #endif
     }
 #if 0

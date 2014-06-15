@@ -38,19 +38,19 @@ typedef enum {
     DSCVMethodEnd
 } DSCVMethod;
 
-int BkupMem_t::isHead(void)
+int BkupMem_t::isHead( void )
 {
     if ( prev==NULL ) return 1;
     else              return 0;
 }
 
-int BkupMem_t::isTail(void)
+int BkupMem_t::isTail( void )
 {
     if ( next==NULL ) return 1;
     else              return 0;
 }
 
-int BkupMemList_t::isEmpty(void)
+int BkupMemList_t::isEmpty( void )
 {
     if      ( head==NULL && tail==NULL ) return 1;
     else if ( head!=NULL && tail!=NULL ) return 0;
@@ -60,7 +60,7 @@ int BkupMemList_t::isEmpty(void)
     }
 }
 
-int BkupMemList_t::countRegion(void)
+int BkupMemList_t::countRegion( void )
 {
     BkupMem *mem = head;
     int count = 0;
@@ -71,7 +71,7 @@ int BkupMemList_t::countRegion(void)
     return count;
 }
 
-int BkupMemList_t::checkSumRegion(void *targ, int size) {
+int BkupMemList_t::checkSumRegion( void *targ, int size ) {
     int sum=0;
     int  *ptr = (int *)targ;
     
@@ -82,7 +82,7 @@ int BkupMemList_t::checkSumRegion(void *targ, int size) {
     return sum;
 }
 
-BkupMem* BkupMemList_t::queryRegion(void *dst)
+BkupMem* BkupMemList_t::queryRegion( void *dst )
 {
     BkupMem *mem = head;
     while ( mem != NULL ) { /* Search */
@@ -95,19 +95,19 @@ BkupMem* BkupMemList_t::queryRegion(void *dst)
     return NULL;
 }
 
-void BkupMemList_t::addRegion(void *dst, int size)
+void BkupMemList_t::addRegion( void *dst, int size )
 {
     BkupMem *mem;
     
     mem = (BkupMem *)malloc(sizeof(BkupMem));
     if ( mem==NULL ) {
-	perror("addRegion()");
+	perror( "addRegion()" );
     }
     mem->dst  = dst;
     mem->size = size;
-    mem->src  = (void *)malloc(size);
+    mem->src  = (void *)malloc( size );
     if ( mem->src == NULL ) {
-	perror("addRegion()");
+	perror( "addRegion()" );
     }
     mem->next = NULL;
 
@@ -684,7 +684,7 @@ void dscudaVerbInit(void)
     St.unsetRecordHist();
 }
 
-void HistRecord_t::add(int funcID, void *argp)
+void HistRecord_t::add( int funcID, void *argp )
 {
     int DSCVMethodId;
 
@@ -717,7 +717,7 @@ void HistRecord_t::add(int funcID, void *argp)
 /*
  *
  */
-void HistRecord_t::clear(void)
+void HistRecord_t::clear( void )
 {
    if ( hist != NULL ) {
       for (int i=0; i < length; i++) {
@@ -772,8 +772,7 @@ int HistRecord_t::recall(void)
        WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
        WARN(1, "#**********************************************************************\n\n");
        exit(1);
-   }
-   else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
+   } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
        this->print();
        called_depth++;       
        for (int i=0; i< length; i++) { /* Do recall history */
@@ -781,8 +780,7 @@ int HistRecord_t::recall(void)
        }
        called_depth=0;
        result = 0;
-   }
-   else { /* try migraion or not. */
+   } else { /* try migraion or not. */
        WARN(1, "#**********************************************************************\n");
        WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
        WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);

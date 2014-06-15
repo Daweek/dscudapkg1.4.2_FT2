@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <pwd.h>
+#include <time.h>
 #include "dscuda.h"
 #include "dscudadefs.h"
 #include "sockutil.h"
@@ -31,8 +32,15 @@
 
 static int WarnLevel = 2;
 #undef WARN
-#define WARN(lv, fmt, args...) if (lv <= WarnLevel) \
-        fprintf(stderr, "dscudad : " fmt, ## args);
+
+#define WARN(lv, fmt, args...) if (lv <= WarnLevel) {		\
+	time_t now = time(NULL);				\
+	struct tm *local = localtime( &now );			\
+	char tfmt[16];						\
+	strftime( tfmt, 16, "%T", local );			\
+	fprintf(stderr, "[%s]", tfmt);				\
+	fprintf(stderr, "dscudad: " fmt, ## args);		\
+    }
 
 typedef struct Server_t {
     pid_t pid;
@@ -116,8 +124,8 @@ register_server(pid_t pid, int port)
     WARN(3, "register_server done.\n");
 }
 
-static void
-unregister_server(pid_t pid)
+static
+void unregister_server(pid_t pid)
 {
     WARN(3, "unregister_server(%d).\n", pid);
     Server *svr = server_with_pid(pid);
@@ -140,6 +148,11 @@ unregister_server(pid_t pid)
         ServerListTail = svr->prev;
     }
     WARN(3, "unregister_server done. port:%d released.\n", svr->port);
+    WARN(3, "###     ###   #   #  #####\n");
+    WARN(3, "#   #  #   #  ##  #  #    \n");
+    WARN(3, "#   #  #   #  # # #  #### \n");
+    WARN(3, "#   #  #   #  #  ##  #    \n");
+    WARN(3, "###     ###   #   #  #####\n\n\n\n\n\n");
     free(svr);
 }
 
