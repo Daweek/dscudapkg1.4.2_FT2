@@ -75,8 +75,8 @@ typedef struct FaultConf
 	    exit(1);
 	}
 #if defined(__DSCUDA__)
-	dscudaRecordHistOn();
-	BKUPMEM.removeRegion(d_Nfault);
+	//dscudaRecordHistOn();
+	//BKUPMEM.removeRegion(d_Nfault);
 #endif
     }
 #if 0

@@ -72,17 +72,19 @@ void setupConnection(int idev, RCServer_t *sp)
 
 void checkResult(void *rp, RCServer_t *sp)
 {
-    if (rp) return;
-    clnt_perror(Clnt[Vdevid[vdevidIndex()]][sp->id], sp->ip);
-    exit(1);
+    if (rp) {
+	return;
+    } else {
+	WARN(0, "(WARN-0) NULL pointer returned, %s(). exit.\n", __func__);
+	clnt_perror(Clnt[Vdevid[vdevidIndex()]][sp->id], sp->ip);
+	exit(1);
+    }
 }
 
 static
-void recoverClntError(RCServer_t *failed, RCServer_t *spare, CLIENT *p_clnt)
+void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err)
 {
-    struct rpc_err err;
-    clnt_geterr( p_clnt, &err );
-    switch ( err.re_status ) {
+    switch ( err->re_status ) {
 	/* re_status is "clnt_stat" type.
 	 * refer to /usr/include/rpc/clnt.h.
 	 */
@@ -919,6 +921,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
 
     Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
+    struct rpc_err rpc_error;
 
     for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
 	p_clnt = Clnt[Vdevid[vdevidIndex()]][sp->id] ;
@@ -926,11 +929,16 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
                                           gdim, bdim, smemsize, (RCstream)st->s[i],
                                           args, p_clnt );
 	//<--- Timed Out
-	recoverClntError(sp, &(SvrSpare.svr[0]), p_clnt);
+	clnt_geterr( p_clnt, &rpc_error );
+	if ( rpc_error.re_status != RPC_SUCCESS ) {
+	    break;
+	}
 	//--->
         checkResult(rp, sp);
     }
 
+    recoverClntError(sp, &(SvrSpare.svr[0]), &rpc_error );
+    
     mem = RCmappedMemListTop;
     while (mem) {
         cudaMemcpy(mem->pHost, mem->pDevice, mem->size, cudaMemcpyDeviceToHost);

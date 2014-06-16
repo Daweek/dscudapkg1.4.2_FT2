@@ -110,7 +110,7 @@ register_server(pid_t pid, int port)
     if (!svr) {
         perror("dscudad:register_server");
     }
-    svr->pid = pid;
+    svr->pid  = pid;
     svr->port = port;
     svr->prev = ServerListTail;
     svr->next = NULL;
@@ -206,7 +206,7 @@ void spawn_server( int listening_sock )
     char portstr[128], devstr[128], sockstr[128];
 
     WARN(3, "listening request from client...\n");
-    sock = accept(listening_sock, NULL, NULL);
+    sock = accept( listening_sock, NULL, NULL );
     if (sock == -1) {
         WARN(0, "accept() error\n");
         exit(1);

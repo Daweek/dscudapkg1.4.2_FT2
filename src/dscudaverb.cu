@@ -292,12 +292,14 @@ void BkupMemList_t::restructDeviceRegion(void) {
     int              *imon;
 
     WARN(2, "(WARN-2) %s(void).\n", __func__);
+    St.unsetAutoVerb();
     while (mem != NULL) {
 	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
 	     copy_count++, mem->dst, mem->src, mem->size, checkSum(mem->src, mem->size));
 	cudaMemcpy(mem->dst, mem->src, mem->size, cudaMemcpyHostToDevice);
 	mem = mem->next;
     }
+    St.setAutoVerb( verb );
     WARN(2, "(WARN-2) +--- done.\n");
 }
 
@@ -829,6 +831,6 @@ void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to)
     BKUPMEM.restructDeviceRegion(); /* */
     printModuleList();
     invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
-    //dscudaVerbMigrateModule(); // not good ;_;, or no need.
+    dscudaVerbMigrateModule(); // not good ;_;, or no need.
     HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
 }

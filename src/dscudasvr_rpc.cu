@@ -28,13 +28,16 @@ rpcWatchDisconnection(void *arg)
 #if 0 // oikawa, temporary
     sleep(3); // wait long enough so that connection is certainly establised.
 #else
-    sleep(30); // wait long enough so that connection is certainly establised.
+    sleep(35); // wait long enough so that connection is certainly establised.
 #endif
     
     WARN(3, "start socket polling:%d.\n", clientsock);
     for (;;) {
         // nrecvd = recv(clientsock, buf, 1, MSG_PEEK | MSG_DONTWAIT);
         nrecvd = recv(clientsock, buf, 1, MSG_PEEK);
+#if 1 // debug
+	WARN(3, "(WARN-3) recv(clientsock, buf, 1, MSG_PEEK);\n");
+#endif
         if (nrecvd == 0) {
             WARN(2, "disconnected.\n");
             exit(0);
