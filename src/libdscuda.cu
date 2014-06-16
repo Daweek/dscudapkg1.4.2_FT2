@@ -554,8 +554,7 @@ resetServerUniqID(void)
     }
 }
 
-void
-printVirtualDeviceList(void)
+void printVirtualDeviceList(void)
 {
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
@@ -576,12 +575,6 @@ printVirtualDeviceList(void)
 		   pSvr->id, pSvr->cid, pSvr->ip, pSvr->hostname, pSvr->uniq);
 	}
     }
-	if (i >= RC_NVDEVMAX) {
-	    WARN(0, "(;_;) Too many ignored devices. %s().\nexit.", __func__);
-	    exit(1);
-	}
-	printf("#(info.)    - Ignore[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
-	       pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
     /*            */
     printf("#(info.) *** Candidate Server Info.(Ncand=%d)\n",SvrCand.num);
     for( i=0, pSvr=SvrCand.svr; i < SvrCand.num; i++, pSvr++ ){
@@ -745,10 +738,10 @@ void initCandServerList(const char *env)
 	exit(1);
     }
 
-    int uniq = RC_UNIQ_CANDBASE; // begin with 
+    int uniq = RC_UNIQ_CANDBASE; // begin with
+    SvrCand.clear();
     if ( env != NULL ) { // always true?
 	ip = strtok( buf, DELIM_CAND );
-	SvrCand.clear();
 	while ( ip != NULL ) {
 	    SvrCand.cat( ip );
 	    ip = strtok(NULL, DELIM_CAND);
@@ -1032,9 +1025,16 @@ void initEnv(void)
 
 static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
+/*
+ * Client initialize.
+ */
 void initClient( void )
 {
     static int firstcall = 1;
+    int idev;
+    int ired;
+    Vdev_t *vdev;
+    RCServer_t *sp;
 
     pthread_mutex_lock( &InitClientMutex );
 
@@ -1045,10 +1045,10 @@ void initClient( void )
 
     initEnv();
 
-    for (int idev = 0; idev < Nvdev; idev++) {
-        Vdev_t *vdev = Vdev + idev;
-        RCServer_t *sp = vdev->server;
-        for (int ired = 0; ired < vdev->nredundancy; ired++, sp++) {
+    for ( idev = 0; idev < Nvdev; idev++ ) {
+        vdev = Vdev + idev;
+        sp = vdev->server;
+        for ( ired = 0; ired < vdev->nredundancy; ired++, sp++ ) {
             setupConnection(idev, sp);
         }
     }
@@ -1666,7 +1666,9 @@ cudaError_t cudaGetDevice(int *device) {
 
     return err;
 }
-
+/*
+ * cudaSetDevice()
+ */
 cudaError_t cudaSetDevice(int device) {
     cudaError_t err = cudaSuccess;
     int         vi  = vdevidIndex();
@@ -1675,7 +1677,7 @@ cudaError_t cudaSetDevice(int device) {
     WARN(3, "(WARN-3) %s(%d), verb=%d, history=%d...\n", __func__, device,
 	 St.isAutoVerb(), St.isRecordHist());
 
-    if ( device >= 0 && device < Nvdev ) {
+    if ( 0 <= device && device < Nvdev ) {
         Vdevid[vi] = device;
     } else {
         err = cudaErrorInvalidDevice;

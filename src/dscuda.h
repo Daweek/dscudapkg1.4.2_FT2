@@ -29,7 +29,6 @@
 const char DELIM_VDEV[]  = " "; // Virtual device is seperated by space.
 const char DELIM_REDUN[] = ","; // Redundant device is seperated by comma.
 const char DELIM_CAND[]  = " "; //
-const char DELIM_IGNORE[]= " "; //
 /*   */
 const char IDTAG_0[]     = "DSCUDA_FAULT_INJECTION" ; //
 /* DS-CUDA search daemons */

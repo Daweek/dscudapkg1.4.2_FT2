@@ -58,12 +58,14 @@ static ServerModule SvrModulelist[RC_NKMODULEMAX] = {0};
 
 struct ServerState_t{
     int  fault_injection; // fault injection pattarn. "0" means no faults.
+    int  force_timeout;
     
     void setFaultInjection(int val=1) { fault_injection=val; }
     void unsetFaultInjection(void)    { fault_injection=0; }
     int  getFaultInjection(void)      { return fault_injection; }
     ServerState_t() {
 	fault_injection = 0;
+	force_timeout = 0;
     }
 };
 struct ServerState_t DscudaSvr;
@@ -77,7 +79,6 @@ static int Devid[RC_NDEVICEMAX] = {0,}; // real device ids of the ones in the sy
 static int dscuDevice;                   // virtual device id of the one used in the current context.
 static CUcontext dscuContext = NULL;
 static int Devid2Vdevid[RC_NDEVICEMAX]; // device id conversion table from real to virtual.
-
 
 static void notifyIamReady(void);
 static void showUsage(char *command);
@@ -174,12 +175,10 @@ receiveProtocolPreference(void)
         WARN(2, "method of remote procedure call: %s\n", rc);
         if (!strncmp("ibv", rc, strlen("ibv"))) {
             return 1;
-        }
-        else {
+        } else {
             return 0;
         }
-    }
-    else {
+    } else {
         return UseIbv; // do not modify the preference.
     }
 }
@@ -199,8 +198,7 @@ int main(int argc, char **argv)
         notifyIamReady();
         ibvMainLoop(NULL);
 #endif
-    }
-    else {
+    } else {
         setupRpc();
         notifyIamReady();
         svc_run(); // RPC main loop.
@@ -451,6 +449,20 @@ static void initEnv(void)
 	}
     }
     WARN(1, "Fault Injection Config: 0x%x\n", DscudaSvr.getFaultInjection());
+
+    /* Timed out */
+    env = getenv("DSCUDA_FORCE_TIMEOUT"); // integer type.
+    if (env) {
+	for (int i = 0; i < FAULT_INJECTION_LEN; i++) {
+	    tmp2[i]=0;
+	}
+	tmp2[0] = atoi(strtok(env, ""));
+	if (tmp2[0] >= 0) {
+	    DscudaSvr.force_timeout = tmp2[0];
+	}
+    }
+    WARN(1, "Force Timeout Config: 0x%x\n", DscudaSvr.force_timeout);
+
     // --> add by Oikawa
 }
 
@@ -629,9 +641,18 @@ static void *
 dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
                    RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args)
 {
-    WARN(10, "<--- Entering %s(int moduleid=%d, int kid=%d, char *kname=%s)\n", __func__,
-	 moduleid, kid, kname);
-    static int dummyres = 123;
+    static int called_count = 0;
+    static int dummyres     = 123;
+    WARN(10, "%s(int moduleid=%d, int kid=%d, char *kname=%s), %d called.\n",
+	 __func__, moduleid, kid, kname, called_count);
+
+    if ( DscudaSvr.force_timeout > 0 ) {
+	if ( called_count >= 3 ) {
+	    WARN(2, "sleeping 60 sec...\n");
+	    sleep(60);
+	}
+    }
+    
     int paramsize;
     CUresult cuerr;
 
@@ -670,8 +691,7 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
 	WARN(10, "ibvUnpackKernelParam()\n");
         paramsize = ibvUnpackKernelParam(&kfunc, args.RCargs_len, (IbvArg *)args.RCargs_val);
 #endif
-    }
-    else {
+    } else {
 	WARN(10, "rpcUnpackKernelParam()\n");
         paramsize = rpcUnpackKernelParam(&kfunc, &args);
     }
@@ -707,8 +727,7 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
             fatal_error(1);
         }
         WARN(3, "cuLaunchGrid() done. kname:%s\n", kname);
-    }
-    else {
+    } else {
         cuerr = cuLaunchGridAsync(kfunc, gdim.x, gdim.y, (cudaStream_t)stream);
         if (cuerr != CUDA_SUCCESS) {
             WARN(0, "cuLaunchGridAsync() failed. kname:%s  %s\n",
@@ -717,7 +736,8 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
         }
         WARN(3, "cuLaunchGridAsync() done.  kname:%s  stream:0x%08llx\n", kname, stream);
     }
-    WARN(10, "---> Exiting %s()\n", __func__);
+    WARN(10, "+--- Done. %s() %d called.\n", __func__, called_count );
+    called_count++;
     return &dummyres; // seems necessary to return something even if it's not used by the client.
 }
 

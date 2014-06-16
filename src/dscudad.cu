@@ -116,8 +116,7 @@ register_server(pid_t pid, int port)
     svr->next = NULL;
     if (!ServerListTop) { // svr will be the 1st entry.
         ServerListTop = svr;
-    }
-    else {
+    } else {
         ServerListTail->next = svr;
     }
     ServerListTail = svr;
@@ -137,8 +136,7 @@ void unregister_server(pid_t pid)
 
     if (svr->prev) { // reconnect the linked list.
         svr->prev->next = svr->next;
-    }
-    else { // svr was the 1st entry.
+    } else { // svr was the 1st entry.
         ServerListTop = svr->next;
         if (svr->next) {
             svr->next->prev = NULL;
@@ -152,7 +150,9 @@ void unregister_server(pid_t pid)
     WARN(3, "#   #  #   #  ##  #  #    \n");
     WARN(3, "#   #  #   #  # # #  #### \n");
     WARN(3, "#   #  #   #  #  ##  #    \n");
-    WARN(3, "###     ###   #   #  #####\n\n\n\n\n\n");
+    WARN(3, "###     ###   #   #  #####\n");
+    WARN(3, "\n");
+    WARN(3, "==============================================================================\n");
     free(svr);
 }
 
@@ -196,8 +196,8 @@ unused_server_port(void)
     return -1;
 }
 
-static void
-spawn_server(int listening_sock)
+static
+void spawn_server( int listening_sock )
 {
     int len, dev, sock, sport;
     pid_t pid;
@@ -226,13 +226,12 @@ spawn_server(int listening_sock)
 
     Nserver++;
     pid = fork();
-    if (pid) { // parent
+    if ( pid ) { // parent
         signal(SIGCHLD, signal_from_child);
         WARN(3, "spawn a server with sock: %d\n", sock);
         register_server(pid, sport);
         close(sock);
-    }
-    else { // child
+    } else { // child
 #if RPC_ONLY
         argv[0] = "dscudasvr_rpc";
 #else
@@ -255,8 +254,8 @@ spawn_server(int listening_sock)
 }
 
 
-static void
-signal_from_child(int sig)
+static
+void signal_from_child( int sig )
 {
     int status;
     int pid = waitpid(-1, &status, WNOHANG);
@@ -274,8 +273,7 @@ signal_from_child(int sig)
 
         if (WIFEXITED(status)) {
             WARN(2, "exit status:%d\n", WEXITSTATUS(status));
-        }
-        else if (WIFSIGNALED(status)) {
+        } else if (WIFSIGNALED(status)) {
             WARN(2, "terminated by signal %d.\n", WTERMSIG(status));
         }
         Nserver--;
@@ -338,8 +336,7 @@ response_to_search(void *arg)  /* call by pthread_create() */
   */
 }
 
-static void
-initEnv(void)
+static void initEnv(void)
 {
     static int firstcall = 1;
     char *env;
@@ -360,8 +357,7 @@ initEnv(void)
     }
 }
 
-static void
-showUsage(char *command)
+static void showUsage(char *command)
 {
     fprintf(stderr,
             "usage: %s [-d]\n"
@@ -371,67 +367,64 @@ showUsage(char *command)
 
 extern char *optarg;
 extern int optind;
-static void
-parseArgv(int argc, char **argv)
+static void parseArgv( int argc, char **argv )
 {
     int c;
     char *param = "dl:h";
 
     while ((c = getopt(argc, argv, param)) != EOF) {
         switch (c) {
-          case 'd':
+	case 'd':
             Daemonize = 1;
             break;
-          case 'l':
+	case 'l':
             strncpy(LogFileName, optarg, sizeof(LogFileName));
             break;
-          case 'h':
-          default:
-            showUsage(argv[0]);
+	case 'h':
+	default:
+	    showUsage(argv[0]);
             exit(1);
         }
     }
 }
 
-int main(int argc, char **argv)
+int main( int argc, char **argv )
 {
     int sock, nserver0;
     int errfd;
     pthread_t th;
 
-    pthread_create(&th, NULL, response_to_search, NULL);
-    parseArgv(argc, argv);
-    if (Daemonize) {
-        if (fork()) {
+    pthread_create( &th, NULL, response_to_search, NULL );
+    parseArgv( argc, argv );
+    if ( Daemonize ) {
+        if ( fork() ) {
             exit(0);
-        }
-        else {
+        } else {
             close(2);
-            errfd = open(LogFileName, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
-            if (errfd < 0) {
-                perror("open:");
+            errfd = open( LogFileName, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR );
+            if ( errfd < 0 ) {
+		perror( "open:" );
             }
             close(0);
             close(1);
         }
     }
-
+    
     initEnv();
-    sock = create_daemon_socket(RC_DAEMON_IP_PORT, NBACKLOG);
-    if (sock == -1) {
+    sock = create_daemon_socket( RC_DAEMON_IP_PORT, NBACKLOG );
+    if ( sock == -1 ) {
 	WARN(0, "create_daemon_socket() failed\n");
 	exit(1);
     }
     nserver0 = Nserver;
-    while (1) {
-        if (Nserver < RC_NSERVERMAX) {
-            spawn_server(sock);
+    for (;;) {
+        if ( Nserver < RC_NSERVERMAX ) {
+            spawn_server( sock );
 
-            if (nserver0 != Nserver) {
-                if (Nserver < RC_NSERVERMAX) {
+            if ( nserver0 != Nserver ) {
+                if ( Nserver < RC_NSERVERMAX ) {
                     WARN(0, "%d servers active (%d max possible).\n", Nserver, RC_NSERVERMAX);
-                }
-                else {
+                } else {
                     WARN(0, "%d servers active. reached the limit.\n", Nserver);
                 }
             }
@@ -439,8 +432,8 @@ int main(int argc, char **argv)
         sleep(1);
         nserver0 = Nserver;
     }
-    WARN(0, "%s: cannot be reached.\n", __FILE__);
+    WARN( 0, "%s: cannot be reached.\n", __FILE__ );
 
-    pthread_join(th, NULL);
+    pthread_join( th, NULL );
     exit(1);
 }

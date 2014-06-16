@@ -25,22 +25,24 @@ rpcWatchDisconnection(void *arg)
     int nrecvd;
     char buf[16];
 
+#if 0 // oikawa, temporary
     sleep(3); // wait long enough so that connection is certainly establised.
-
+#else
+    sleep(30); // wait long enough so that connection is certainly establised.
+#endif
+    
     WARN(3, "start socket polling:%d.\n", clientsock);
-    while (1) {
+    for (;;) {
         // nrecvd = recv(clientsock, buf, 1, MSG_PEEK | MSG_DONTWAIT);
         nrecvd = recv(clientsock, buf, 1, MSG_PEEK);
         if (nrecvd == 0) {
             WARN(2, "disconnected.\n");
             exit(0);
-        }
-        else if (nrecvd == -1) {
+        } else if (nrecvd == -1) {
             if (errno == ENOTCONN) {
                 WARN(0, "disconnected by peer.\n");
                 exit(1);
-            }
-            else {
+            } else {
                 perror("dscudasvr_rpc:rpcWatchDisconnection:");
                 exit(1);
             }
@@ -76,8 +78,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    if (cuerr == CUDA_SUCCESS) {
                 WARN(0, "(P)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
-	    }
-            else if (cuerr != CUDA_SUCCESS) {
+	    } else if (cuerr != CUDA_SUCCESS) {
                 WARN(0, "(P)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) failed. %s\n",
                      kfunc, argp->offset, pval, argp->size,
                      cudaGetErrorString((cudaError_t)cuerr));
@@ -91,8 +92,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    if (cuerr == CUDA_SUCCESS) {
                 WARN(0, "(I)cuParamSeti(0x%08llx, %d, %d) success.\n",
                      kfunc, argp->offset, ival);
-	    }
-            else if (cuerr != CUDA_SUCCESS) {
+	    } else if (cuerr != CUDA_SUCCESS) {
                 WARN(0, "(I)cuParamSeti(0x%08llx, %d, %d) failed. %s\n",
                      kfunc, argp->offset, ival,
                      cudaGetErrorString((cudaError_t)cuerr));
@@ -106,8 +106,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    if (cuerr == CUDA_SUCCESS) {
                 WARN(5, "(F)cuParamSetf(0x%08llx, %d, %f) success.\n",
                      kfunc, argp->offset, fval);
-	    }
-            else if (cuerr != CUDA_SUCCESS) {
+	    } else if (cuerr != CUDA_SUCCESS) {
                 WARN(0, "(F)cuParamSetf(0x%08llx, %d, %f) failed. %s\n",
                      kfunc, argp->offset, fval,
                      cudaGetErrorString((cudaError_t)cuerr));
@@ -125,8 +124,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 		    WARN(10, "then overwrite %d over %d.\n",
 			 DscudaSvr.getFaultInjection(), fault_conf->fault_en);
 		    fault_conf->fault_en = DscudaSvr.getFaultInjection();
-		}
-		else {
+		} else {
 		    WARN(10, "but leave as is %d.\n", fault_conf->fault_en);
 		}
 	    }
@@ -135,8 +133,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    if (cuerr == CUDA_SUCCESS) {
                 WARN(0, "(V)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
-	    }
-            else if (cuerr != CUDA_SUCCESS) {
+	    } else if (cuerr != CUDA_SUCCESS) {
                 WARN(0, "(V)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) failed. %s\n",
                      kfunc, argp->offset, pval, argp->size,
                      cudaGetErrorString((cudaError_t)cuerr));
@@ -830,14 +827,14 @@ dscudamallocid_1_svc(RCsize size, struct svc_req *sr)
 
     WARN(3, "cudaMalloc(");
 #if 0 //force time out error
-    sleep(30);
+    sleep(60);
 #endif
     if (!dscuContext) createDscuContext();
     err = cudaMalloc((void**)&devadr, size);
     res.devAdr = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d) done. devadr:0x%08llx\n", &devadr, size, devadr);
+    WARN(3, "0x%p, %d) done. devadr:0x%p\n", &devadr, size, devadr);
 
     return &res;
 }
@@ -918,8 +915,7 @@ dscudamemcpyd2hid_1_svc(RCadr src, RCsize count, struct svc_req *sr)
             WARN(2, "################ bad data generatad.\n\n");
             res.buf.RCbuf_val[0] = 123;
             err_in_prev_call = 1;
-        }
-        else {
+        } else {
             err_in_prev_call = 0;
         }
     }
@@ -1749,10 +1745,11 @@ void *
 dscudalaunchkernelid_1_svc(int moduleid, int kid, char *kname,
                           RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args, struct svc_req *sr)
 {
-    WARN(10, "<---Entering %s\n", __func__);
-    static int dummyres = 0;
+    static int dummyres     = 0;
+    
+    WARN(5, "<---Entering %s()\n", __func__ );
     dscudaLaunchKernel(moduleid, kid, kname, gdim, bdim, smemsize, stream, args);
-    WARN(10, "--->Exiting  %s\n", __func__);
+    WARN(5, "--->Exiting  %s\n", __func__);
     return &dummyres; // seems necessary to return something even if it's not used by the client.
 }
 

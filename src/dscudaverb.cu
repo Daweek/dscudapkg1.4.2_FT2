@@ -242,7 +242,7 @@ dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
     dscudaMallocResult *rp;
     cudaError_t err = cudaSuccess;
     
-    WARN(3, "%s(%p, %d, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
+    WARN(3, "(WARN-3) %s(%p, %d, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
 	 __func__, devAdrPtr, size, pSvr->id, pSvr->cid, pSvr->uniq);
     //initClient();
     rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][pSvr->id]);
@@ -265,18 +265,20 @@ void BkupMemList_t::reallocDeviceRegion(RCServer_t *svr) {
     BkupMem *mem = head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
+    int     i = 0;
     
-    WARN(1, "###============================================================\n");
-    WARN(1, "### <--- %s() called.\n", __func__);
-    WARN(1, "###------------------------------------------------------------\n");
-
+    WARN(1, "#(WARN-1) %s(RCServer_t *sp).\n", __func__);
+    WARN(1, "#(WARN-1) Num. of realloc region = %d\n", BKUPMEM.length );
+    St.unsetAutoVerb();
     while ( mem != NULL ) {
+	/* TODO: select migrateded virtual device, not all region. */
+	WARN(5, "#(WARN-1) mem[%d]->dst = %p, size= %d\n", i, mem->dst, mem->size);
 	dscudaVerbMalloc(&mem->dst, mem->size, svr);
 	mem = mem->next;
+	i++;
     }
-    WARN(1, "###------------------------------------------------------------\n");
-    WARN(1, "### ---> %s() done.\n", __func__);
-    WARN(1, "###============================================================\n");
+    St.setAutoVerb(verb);
+    WARN(1, "(WARN-1) +--- Done.\n");
 }
 /* 
  * Resore the all data of a GPU device with backup data on client node.
@@ -289,22 +291,14 @@ void BkupMemList_t::restructDeviceRegion(void) {
     float            *fmon;
     int              *imon;
 
-    WARN(2, "###============================================================\n");
-    WARN(2, "### <--- %s() called.\n", __func__);
-    WARN(2, "###------------------------------------------------------------\n");
-
-    WARN(1, "###============================================================\n");
-    WARN(1, "### %s() restores GPU device memory regions.\n", __func__);
-    WARN(1, "###------------------------------------------------------------\n");
+    WARN(2, "(WARN-2) %s(void).\n", __func__);
     while (mem != NULL) {
 	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
 	     copy_count++, mem->dst, mem->src, mem->size, checkSum(mem->src, mem->size));
 	cudaMemcpy(mem->dst, mem->src, mem->size, cudaMemcpyHostToDevice);
 	mem = mem->next;
     }
-    WARN(2, "###------------------------------------------------------------\n");
-    WARN(2, "### ---> %s() done.\n", __func__);
-    WARN(2, "###============================================================\n");
+    WARN(2, "(WARN-2) +--- done.\n");
 }
 
 //stubs for store/release args, and recall functions.
@@ -764,6 +758,10 @@ int HistRecord_t::recall(void)
 {
    static int called_depth = 0;
    int result;
+   int verb = St.isAutoVerb();
+
+   St.unsetAutoVerb();
+   
    WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, length, __func__);
    WARN(1, "called_depth= %d.\n", called_depth);
    if (called_depth < 0) {       /* irregal error */
@@ -788,6 +786,8 @@ int HistRecord_t::recall(void)
        called_depth=0;
        result = 1;
    }
+
+   St.setAutoVerb( verb );
    WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
    return result;
 }
@@ -820,14 +820,15 @@ void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to)
     WARN(1, "#**********************************************************************\n");
     WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
     WARN(1, "#**********************************************************************\n\n");
-    WARN(1, "   # Failed 1st= %s\n", from->ip);
+    WARN(1, "#(WARN-1) Failed 1st= %s\n", from->ip);
     replaceBrokenServer(from, to);
-    WARN(1, "#(info.) Reconnecting to %s replacing %s\n", from->ip, to->ip);
+    WARN(1, "#(WARN-1) Reconnecting to %s replacing %s\n", from->ip, to->ip);
     setupConnection(Vdevid[vdevidIndex()], from);
+
     BKUPMEM.reallocDeviceRegion(from);
     BKUPMEM.restructDeviceRegion(); /* */
     printModuleList();
     invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
-    dscudaVerbMigrateModule(); // not good ;_;, or no need.
+    //dscudaVerbMigrateModule(); // not good ;_;, or no need.
     HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
 }

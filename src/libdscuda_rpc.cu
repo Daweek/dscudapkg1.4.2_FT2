@@ -67,7 +67,7 @@ void setupConnection(int idev, RCServer_t *sp)
         }
         exit(1);
     }
-    WARN(2, "Established a socket connection to %s...\n", msg);
+    WARN(2, "(WARN-2) Established a socket connection to %s...\n", msg);
 }
 
 void checkResult(void *rp, RCServer_t *sp)
@@ -78,7 +78,7 @@ void checkResult(void *rp, RCServer_t *sp)
 }
 
 static
-void recoverClntError(CLIENT *p_clnt)
+void recoverClntError(RCServer_t *failed, RCServer_t *spare, CLIENT *p_clnt)
 {
     struct rpc_err err;
     clnt_geterr( p_clnt, &err );
@@ -93,7 +93,8 @@ void recoverClntError(CLIENT *p_clnt)
     case RPC_CANTRECV: //=4
 	break;
     case RPC_TIMEDOUT: //=5
-	WARN(1, "%s():Going to try recovering from RPC:Timed Out.\n", __func__);
+	WARN(1, "(WARN-1) Detected RPC:Timed Out in  %s().\n", __func__);
+	dscudaVerbMigrateDevice( failed, spare );
 	break;
     case RPC_UNKNOWNHOST: //=13
 	break;
@@ -492,8 +493,8 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size)
     RCServer_t *sp = vdev->server;
     for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
 	p_clnt = Clnt[Vdevid[vid]][sp->id]; 
-        rp = dscudamallocid_1(size, p_clnt);
-	recoverClntError(p_clnt);
+        rp = dscudamallocid_1( size, p_clnt );
+	//recoverClntError( sp, &(SvrSpare.svr[0]),  p_clnt);
         checkResult(rp, sp);
         if ( rp->err != cudaSuccess ) {
             err = (cudaError_t)rp->err;
@@ -884,9 +885,25 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
                              RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
                              RCargs args)
 {
-    WARN(10, "<---Entering %s().\n", __func__)
+    WARN(5, "(WARN-5) %s().\n", __func__)
     RCmappedMem *mem;
     RCstreamArray *st;
+    CLIENT *p_clnt;
+    /*     
+     * Automatic Recovery, Register to the called history.
+     */
+    if (St.isAutoVerb() && St.isRecordHist()) {
+        cudaRpcLaunchKernelArgs args2;
+        args2.moduleid = moduleid;
+        args2.kid      = kid;
+        args2.kname    = kname;
+        args2.gdim     = gdim;
+        args2.bdim     = bdim;
+        args2.smemsize = smemsize;
+        args2.stream   = stream;
+        args2.args     = args;
+        HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
+    }
 
     st = RCstreamArrayQuery((cudaStream_t)stream);
     if (!st) {
@@ -903,11 +920,14 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
 
-
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
+	p_clnt = Clnt[Vdevid[vdevidIndex()]][sp->id] ;
         void *rp = dscudalaunchkernelid_1(moduleid[i], kid, kname,
                                           gdim, bdim, smemsize, (RCstream)st->s[i],
-                                          args, Clnt[Vdevid[vdevidIndex()]][sp->id]);
+                                          args, p_clnt );
+	//<--- Timed Out
+	recoverClntError(sp, &(SvrSpare.svr[0]), p_clnt);
+	//--->
         checkResult(rp, sp);
     }
 
@@ -916,22 +936,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         cudaMemcpy(mem->pHost, mem->pDevice, mem->size, cudaMemcpyDeviceToHost);
         mem = mem->next;
     }
-    /*     
-     * Automatic Recovery, Register to the called history.
-     */
-    if (St.isAutoVerb() && St.isRecordHist()) {
-        cudaRpcLaunchKernelArgs args2;
-        args2.moduleid = moduleid;
-        args2.kid      = kid;
-        args2.kname    = kname;
-        args2.gdim     = gdim;
-        args2.bdim     = bdim;
-        args2.smemsize = smemsize;
-        args2.stream   = stream;
-        args2.args     = args;
-        HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
-    }
-    WARN(10, "--->Exiting  %s().\n", __func__)
+    WARN(5, "(WARN-5) +--- done. %s().\n", __func__)
 }
 
 void

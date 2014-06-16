@@ -21,6 +21,7 @@ typedef struct RCServer {
     char ip[512];      // ex. "192.168.0.92"
     char hostname[64]; // ex. "titan01"
     int  uniq; // unique number in all RCServer_t including svrCand[].
+    int  *d_faultconf;
     RCServer() {
 	id = cid = uniq = 0xffff;
 	strcpy(ip, "empty");
@@ -39,8 +40,8 @@ typedef struct SvrList {
 	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
 	    exit(1);
 	}
-	num += 1;	
 	strcpy( svr[num].ip, ip );
+	num++;
     }
 } SvrList_t;
 

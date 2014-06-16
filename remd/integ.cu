@@ -304,8 +304,7 @@ int checkSum(void *targ, int size) {
 }
 // simRemd()
 //------------------------------------------------------------------------------
-void
-simRemd( Remd_t &remd, Simu_t &simu)
+void simRemd( Remd_t &remd, Simu_t &simu)
 {
     debug_print(2, "Entering %s().\n", __func__);
    
@@ -396,18 +395,17 @@ simRemd( Remd_t &remd, Simu_t &simu)
 	//     t0, checkSum((void*)remd.h_vel_ar, sizeof(Real3_t)*Nmol*Nrep)); fflush(stdout);
 	
 	// Update target temperature of each replica. //
-	copyTempTarg(H2D);                                       // cudaMemcpyH2D * ?
+	copyTempTarg( H2D );                                       // cudaMemcpyH2D * ?
 	if (simu.report_temp >= 1)   { saveTempTarg(remd, t0); } // cudaMemcpyD2H * ?
       
 	// Update exchanging information. //
-	copyExch(H2D, remd, simu);                               // cudaMemcpyH2D * ?
-	if (simu.report_ene  >= 1)   { saveSorted(remd, t0); }   // cudaMemcpyD2H * ?
+	copyExch( H2D, remd, simu );                               // cudaMemcpyH2D * ?
+	if ( simu.report_ene  >= 1 )   { saveSorted(remd, t0); }   // cudaMemcpyD2H * ?
 
 	if ( t0 < 2 ) {
 	    FAULT_CONF.fault_en     = 0;
 	    FAULT_CONF.overwrite_en = 0;
-	}
-	else {
+	} else {
 #if defined( FAULT_ON )
 	    FAULT_CONF.fault_en     = 1;
 #endif
