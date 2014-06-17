@@ -25,13 +25,12 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	    - (+_+)set environment variable "LD_LIBRARY_PATH" on server node.
 
 	(4) What's UVA in dscuda's source code mean?
-	    DSCUDA global address spaceing is called "UVA"(Univasal Virtual Address).
-	    The UVA has 64bit width and consists of 2 elements, each GPU address
-	    and its device number.
-	    Upper 16bit of UVA is equal to device number, and
-	    Lower 48bit of UVA is equal to each GPU address space.
-	    I define new variable type for UVA as "DscudaUva_t" instead of original
-	    "unsigned long".
+	    DSCUDA global address spaceing is called "UVA"(Univasal Virtual
+	    Address). The UVA has 64bit width and consists of 2 elements, each
+	    GPU address and its device number. Upper 16bit of UVA is equal to
+	    device number, and Lower 48bit of UVA is equal to each GPU address
+	    space. I define new variable type for UVA as "DscudaUva_t" instead of
+	    original "unsigned long".
 	    *CAUTION* Therefore, 32bit OS is not allowed to use UVA.
 
 	       [UVA APIs]
