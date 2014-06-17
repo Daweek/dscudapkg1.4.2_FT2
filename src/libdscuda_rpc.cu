@@ -638,9 +638,13 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	sp++;
     } // for (int i=0; ...
 
-    
-    if (vdev->nredundancy > 1) {
-    //if (St.isAutoVerb() && vdev->nredundancy > 1) {
+    if (vdev->nredundancy == 1) {
+	if ( St.isAutoVerb() && St.isHistoCalling()==0 ) {
+	    BKUPMEM.updateRegion( src, dst, count );
+	}
+	
+    } else if (vdev->nredundancy > 1) {
+	//if (St.isAutoVerb() && vdev->nredundancy > 1) {
 	if (unmatched_count==0 && matched_count==(vdev->nredundancy-1)) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 vdev->nredundancy-1, matched_count, unmatched_count);
@@ -679,6 +683,10 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
 	    St.setRecordHist();  // ---> restore recordHist enable.
 	    St.setAutoVerb();    // ===> restore autoVerb enabled. 
 	} // redundant failed.
+    } else {
+	/* irregular condition */
+	WARN(1, "ERROR: # of redundancy is zero or minus value????. %s\n", __func__);
+	exit(1);
     }
 
     WARN(3, "(WARN-3) +--- Exiting  %s()\n", __func__);

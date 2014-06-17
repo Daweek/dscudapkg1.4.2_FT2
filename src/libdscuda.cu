@@ -403,31 +403,36 @@ void RCeventArrayUnregister(cudaEvent_t event0)
     }
     free(ev);
 }
-
-
-void* dscudaUvaOfAdr(void *adr, int devid)
+/*
+ * 
+ */
+void* dscudaUvaOfAdr( void *adr, int devid )
 {
-    unsigned long adri = (unsigned long)adr;
+    DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
-    adri |= ((unsigned long)devid << 48);
+    adri |= ((DscudaUva_t)devid << 48);
 #endif
     return (void *)adri;
 }
-
-int dscudaDevidOfUva(void *adr)
+/*
+ *
+ */
+int dscudaDevidOfUva( void *adr )
 {
 #if __LP64__
-    unsigned long adri = (unsigned long)adr;
+    DscudaUva_t adri = (DscudaUva_t)adr;
     int devid = adri >> 48;
     return devid;
 #else
     return 0;
 #endif
 }
-
-void *dscudaAdrOfUva(void *adr)
+/*
+ *
+ */
+void *dscudaAdrOfUva( void *adr )
 {
-    unsigned long adri = (unsigned long)adr;
+    DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
     adri &= 0x0000ffffffffffffLL;
 #endif

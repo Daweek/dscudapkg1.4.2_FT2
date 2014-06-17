@@ -25,6 +25,8 @@
 #include "dscudaverb.h"
 #include "libdscuda.h"
 
+typedef unsigned long DscudaUva_t; /* Global virtual address type */
+
 /*   */
 const char DELIM_VDEV[]  = " "; // Virtual device is seperated by space.
 const char DELIM_REDUN[] = ","; // Redundant device is seperated by comma.
