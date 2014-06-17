@@ -404,7 +404,7 @@ void RCeventArrayUnregister(cudaEvent_t event0)
     free(ev);
 }
 /*
- * 
+ * Compose UVA from GPU local address and its deviceID.
  */
 void* dscudaUvaOfAdr( void *adr, int devid )
 {
@@ -415,7 +415,7 @@ void* dscudaUvaOfAdr( void *adr, int devid )
     return (void *)adri;
 }
 /*
- *
+ * Get GPU deviceID from UVA.
  */
 int dscudaDevidOfUva( void *adr )
 {
@@ -428,7 +428,7 @@ int dscudaDevidOfUva( void *adr )
 #endif
 }
 /*
- *
+ * Get GPU local address from UVA.
  */
 void *dscudaAdrOfUva( void *adr )
 {

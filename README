@@ -33,10 +33,12 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	    I define new variable type for UVA as "DscudaUva_t" instead of original
 	    "unsigned long".
 	    *CAUTION* Therefore, 32bit OS is not allowed to use UVA.
-	    
-               void *dscudaAdrOfUva(void *adr);
+
+	       [UVA APIs]
+	       /* to UVA */
 	       void* dscudaUvaOfAdr(void *adr, int devid);
-	       int dscudaDevidOfUva(void *adr);
+	       /* from UVA */ 
+               void *dscudaAdrOfUva(void *adr);			
 	       int dscudaDevidOfUva(void *adr);
 	    
 [History]
