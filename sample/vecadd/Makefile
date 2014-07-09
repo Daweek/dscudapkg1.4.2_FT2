@@ -16,7 +16,7 @@ $(TARGET)_ibv: $(SRC) ../../lib/libdscuda.a
 	$(DSCUDACPP) -o $@ -I. -i $< -ldscuda -libverbs -lrdmacm -lpthread
 
 $(TARGET)_rpc: $(SRC) ../../lib/libdscuda_rpc.a
-	$(DSCUDACPP) -I. -ldscuda_rpc -i $< -o $@
+	$(DSCUDACPP) -I. -ldscuda_rpc -lpthread -i $< -o $@
 
 $(TARGET)_rpconly: $(SRC) ../../lib/libdscuda_rpc.a
 	$(DSCUDACPP) -DRPC_ONLY=1 -o $@ -I. -i $< -ldscuda_rpc

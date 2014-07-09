@@ -944,8 +944,8 @@ static void updateWarnLevel(void)
     WARN(1, "#(info.) DSCUDA_WARNLEVEL= %d\n", dscudaWarnLevel());
 }
 
-static void
-updateDscudaPath(void) {
+static
+void updateDscudaPath(void) {
     char *env = getenv("DSCUDA_PATH");
     if (env) {
 	strncpy(Dscudapath, env, sizeof(Dscudapath)); //"Dscudapath" has global scape.
@@ -1031,7 +1031,7 @@ void initEnv(void)
 static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
- * Client initialize.
+ * Client initializer.
  */
 void initClient( void )
 {
@@ -1061,6 +1061,7 @@ void initClient( void )
     get_myaddress(&addrin);
     St.setIpAddress(addrin.sin_addr.s_addr);
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
+    
     firstcall = 0;
     pthread_mutex_unlock( &InitClientMutex );
 }

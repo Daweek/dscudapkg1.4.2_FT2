@@ -10,6 +10,7 @@
 //------------------------------------------------------------------------------
 #ifndef __DSCUDAVERB_H__
 #define __DSCUDAVERB_H__
+#include <pthread.h>
 #include "libdscuda.h"
 #define DSCUDAVERB_HISTMAX_GROWSIZE (10)
 /*** ==========================================================================
@@ -27,11 +28,14 @@ typedef struct BkupMem_t {
 } BkupMem;
 
 typedef struct BkupMemList_t {
+private:
+    pthread_t tid;        /* thread ID of Checkpointing */
+public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
     int     length;       /* Counts of allocated memory region */
     long    total_size;   /* Total size of backuped memory in Byte */
-    //--- methods
+    //--- methods --------------------------------------------------------------
     int      isEmpty( void );
     int      getLen( void ) { return length; }
     long     getTotalSize( void ) { return total_size; }
@@ -45,8 +49,21 @@ typedef struct BkupMemList_t {
     void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
     void     restructDeviceRegion(void);              /* ReLoad backups */
     //---
-    BkupMemList_t( void ) { head = tail = NULL; length = 0; total_size = 0; }
+    static void* periodicCheckpoint( void *arg );
+    BkupMemList_t( void )
+    {
+	head = tail = NULL; length = 0; total_size = 0;
+	/*
+	 * Create a thread periodic snapshot of each GPU device.
+	 */
+	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
+    }
+    ~BkupMemList_t( void )
+    {
+	pthread_cancel( tid );
+    }
 } BkupMemList;
+
 /*** ==========================================================================
  *** Each argument types and lists for historical recall.
  *** If you need to memorize another function into history, add new one.
@@ -55,6 +72,7 @@ typedef struct HistCell_t {
     int   funcID;
     void *args;
 } HistCell;
+
 typedef struct HistRecord_t {
     HistCell *hist;
     int length;    /* # of recorded function calls to be recalled */

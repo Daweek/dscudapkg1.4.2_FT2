@@ -209,6 +209,38 @@ void BkupMemList_t::updateRegion( void *dst, void *src, int size )
     }
 }
 
+/* 
+ * Take the data backups of each virtualized GPU to client's host memory
+ * after verifying between redundant physical GPUs every specified wall clock
+ * time period. The period is defined in second.
+ */
+void*
+BkupMemList_t::periodicCheckpoint( void *arg ) {
+    int i, j;
+    for (;;) {
+	fprintf(stderr, "%s\n", __func__);
+	
+	for (;;) { /* All virtual GPUs */
+	    for ( i=0; i<vdev->nredundancy; i++ ) { /* Each redundant GPUs */
+		rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
+		checkResult(rp, sp);
+		err = (cudaError_t)rp->err;
+		if (rp->err != cudaSuccess) {
+		    err = (cudaError_t)rp->err;
+		}
+		/*
+		 * Check if all redundants has same data.
+		 */
+		//...
+		xdr_free((xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp);
+	    }
+	    // BKUPMEM.updateRegion( src, dst, count);
+	}
+	
+	sleep(2);
+	pthread_testcancel();/* cancelation available */
+    }
+}
 
 static int
 checkSum(void *targ, int size) {
@@ -221,8 +253,8 @@ checkSum(void *targ, int size) {
     }
     return sum;
 }
-void
-printRegionalCheckSum(void) {
+
+void printRegionalCheckSum(void) {
     BkupMem *pMem = BKUPMEM.head;
     int length = 0;
     while (pMem != NULL) {

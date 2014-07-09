@@ -42,6 +42,7 @@ int main(void) {
         vecAdd<<<N, 1>>>(d_a, d_b, d_c, FAULT_CONF);
         cudaMemcpy(c, d_c, sizeof(float) * N, cudaMemcpyDeviceToHost); /* verify */
 
+	sleep(10);
 	//dscudaRecordHistOff();
 
         for (i=0; i<N; i++) {
