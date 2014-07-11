@@ -30,8 +30,7 @@ int dscudaRemoteCallType(void)
     return RC_REMOTECALL_TYPE_RPC;
 }
 
-void setupConnection(int idev, RCServer_t *sp)
-{
+void setupConnection(int idev, RCServer_t *sp) {
     int id   = sp->id;
     int cid  = sp->cid;
     int pgid = DSCUDA_PROG;
@@ -70,8 +69,7 @@ void setupConnection(int idev, RCServer_t *sp)
     WARN(2, "(WARN-2) Established a socket connection to %s...\n", msg);
 }
 
-void checkResult(void *rp, RCServer_t *sp)
-{
+void checkResult(void *rp, RCServer_t *sp) {
     if (rp) {
 	return;
     } else {
@@ -481,8 +479,7 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
  * Memory Management
  */
 
-cudaError_t cudaMalloc(void **devAdrPtr, size_t size)
-{
+cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     dscudaMallocResult *rp;
     cudaError_t err = cudaSuccess;
     int vid = vdevidIndex();
@@ -520,18 +517,16 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size)
     return err;
 }
 
-cudaError_t cudaFree(void *mem)
-{
+cudaError_t cudaFree(void *mem) {
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
 
     initClient();
-    WARN(3, "(WARN-3) cudaFree(%p)...", (unsigned long)mem);
+    WARN(3, "(WARN-3) cudaFree(%p)...", mem);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++, sp++) {
-  //!!! rp = dscudafreeid_1((RCadr)mem,                 Clnt[Vdevid[vid]][sp->id]); // wrong?
 	rp = dscudafreeid_1((RCadr)dscudaAdrOfUva(mem), Clnt[Vdevid[vid]][sp->id]);
         checkResult(rp, sp);
         if (rp->err != cudaSuccess) {
@@ -547,7 +542,7 @@ cudaError_t cudaFree(void *mem)
     if (St.isAutoVerb()) {
 	BKUPMEM.removeRegion(mem);
     }
-    WARN(3, "(WARN-3) done.\n");
+    WARN(3, "(WARN-3) +--- done.\n");
     return err;
 }
 
@@ -587,7 +582,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 }
 
 static cudaError_t
-cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
+cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt ) {
     WARN(3, "(WARN-3) +--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
     int matched_count=0;
     int unmatched_count=0;
@@ -599,8 +594,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     //    int fail_flag[RC_NVDEVMAX]={0};
     cudaError_t err = cudaSuccess;
 
-
-    if (St.isAutoVerb()) { /* Register called history */
+    if ( St.isAutoVerb() ) { /* Register called history */
 	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
 	if (St.isRecordHist()) {
 	    if (St.isHistoCalling()==0) {
@@ -613,7 +607,7 @@ cudaMemcpyD2H(void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt) {
     sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++) {
 	WARN(3, "(WARN-3) +--- redun[%d] dst=%p, src=%p\n", i, dst, src);
-        rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]); /* Recieve data from server node */
+        rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
         checkResult(rp, sp);
         err = (cudaError_t)rp->err;
         if (rp->err != cudaSuccess) {

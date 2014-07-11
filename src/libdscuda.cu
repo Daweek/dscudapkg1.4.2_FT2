@@ -47,10 +47,10 @@ static RCcuarrayArray *RCcuarrayArrayListTail = NULL;
 static RCuva          *RCuvaListTop           = NULL;
 static RCuva          *RCuvaListTail          = NULL;
 
-int       Vdevid[RC_NPTHREADMAX] = { 0 };           // the virtual device currently in use.
+int    Vdevid[RC_NPTHREADMAX] = { 0 };   // the virtual device currently in use.
 
-static int Nvdev;                   /* # of virtual devices available. */
-Vdev_t     Vdev[RC_NVDEVMAX];       /* a list of virtual devices. */
+int    Nvdev;                   /* # of virtual devices available. */
+Vdev_t Vdev[RC_NVDEVMAX];       /* a list of virtual devices. */
 
 SvrList_t SvrCand;
 SvrList_t SvrSpare;
@@ -64,26 +64,21 @@ struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 struct ClientState_t St; // is Singleton
 
-void dscudaRecordHistOn(void)
-{
+void dscudaRecordHistOn(void) {
     St.setRecordHist();
 }
-void dscudaRecordHistOff(void)
-{
+void dscudaRecordHistOff(void) {
     St.unsetRecordHist();
 }
 
-void dscudaAutoVerbOn(void)
-{
+void dscudaAutoVerbOn(void) {
     St.setAutoVerb();
 }
-void dscudaAutoVerbOff(void)
-{
+void dscudaAutoVerbOff(void) {
     St.unsetAutoVerb();
 }
 
-int requestDaemonForDevice(char *ipaddr, int devid, int useibv)
-{
+int requestDaemonForDevice(char *ipaddr, int devid, int useibv) {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
@@ -137,8 +132,7 @@ int requestDaemonForDevice(char *ipaddr, int devid, int useibv)
  * Obtain a small integer unique for each thread.
  * The integer is used as an index to 'Vdevid[]'.
  */
-int vdevidIndex(void)
-{
+int vdevidIndex(void) {
     int i;
     pthread_t ptid = pthread_self();
 
@@ -162,8 +156,7 @@ int vdevidIndex(void)
     return i;
 }
 
-void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
-{
+void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
     RCmappedMem *mem = (RCmappedMem *)malloc(sizeof(RCmappedMem));
     if (!mem) {
         perror("RCmappedMemRegister");
@@ -181,8 +174,7 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
     RCmappedMemListTail = mem;
 }
 
-RCmappedMem* RCmappedMemQuery(void *pHost)
-{
+RCmappedMem* RCmappedMemQuery(void *pHost) {
     RCmappedMem *mem = RCmappedMemListTop;
     while (mem) {
         if (mem->pHost == pHost) {
@@ -193,8 +185,7 @@ RCmappedMem* RCmappedMemQuery(void *pHost)
     return NULL; // pHost not found in the list.
 }
 
-void RCmappedMemUnregister(void *pHost)
-{
+void RCmappedMemUnregister(void *pHost) {
     RCmappedMem *mem = RCmappedMemQuery(pHost);
     if (!mem) return;
 
@@ -219,8 +210,7 @@ void RCmappedMemUnregister(void *pHost)
  * to handle redundant calculation mechanism.
  */
 static
-void RCstreamArrayRegister(cudaStream_t *streams)
-{
+void RCstreamArrayRegister(cudaStream_t *streams) {
     RCstreamArray *st = (RCstreamArray *)malloc(sizeof(RCstreamArray));
     if (!st) {
         perror("RCstreamArrayRegister");
@@ -240,8 +230,7 @@ void RCstreamArrayRegister(cudaStream_t *streams)
 
 #if 0
 static
-void showsta(void)
-{
+void showsta(void) {
     RCstreamArray *st = RCstreamArrayListTop;
     while (st) {
         fprintf(stderr, ">>> 0x%08llx    prev:%p  next:%p\n", st, st->prev, st->next);
@@ -250,8 +239,7 @@ void showsta(void)
 }
 #endif
 
-RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0)
-{
+RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0) {
     static RCstreamArray default_stream = { 0,};
 
     if (stream0 == 0) {
@@ -269,8 +257,7 @@ RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0)
 }
 
 static
-void RCstreamArrayUnregister(cudaStream_t stream0)
-{
+void RCstreamArrayUnregister(cudaStream_t stream0) {
     RCstreamArray *st = RCstreamArrayQuery(stream0);
     if (!st) return;
 
@@ -406,19 +393,17 @@ void RCeventArrayUnregister(cudaEvent_t event0)
 /*
  * Compose UVA from GPU local address and its deviceID.
  */
-void* dscudaUvaOfAdr( void *adr, int devid )
-{
+void* dscudaUvaOfAdr( void *adr, int devid ) {
     DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
     adri |= ((DscudaUva_t)devid << 48);
 #endif
     return (void *)adri;
 }
-/*
+/*====================================================================
  * Get GPU deviceID from UVA.
  */
-int dscudaDevidOfUva( void *adr )
-{
+int dscudaDevidOfUva( void *adr ) {
 #if __LP64__
     DscudaUva_t adri = (DscudaUva_t)adr;
     int devid = adri >> 48;
@@ -430,8 +415,7 @@ int dscudaDevidOfUva( void *adr )
 /*
  * Get GPU local address from UVA.
  */
-void *dscudaAdrOfUva( void *adr )
-{
+void *dscudaAdrOfUva( void *adr ) {
     DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
     adri &= 0x0000ffffffffffffLL;
@@ -445,8 +429,7 @@ void *dscudaAdrOfUva( void *adr )
  * Others, i.e., Server[1..Nredunddancy-1], are hidden to the user,
  * and used by this library to handle redundant calculation mechanism.
  */
-void RCuvaRegister(int devid, void *adr[], size_t size)
-{
+void RCuvaRegister(int devid, void *adr[], size_t size) {
     int i;
     int nredundancy = dscudaNredundancy();
     RCuva *uva = (RCuva *)malloc(sizeof(RCuva));
@@ -770,8 +753,7 @@ void initCandServerList(const char *env)
 }
 
 static
-void initVirtualServerList(const char *env)
-{
+void initVirtualServerList(const char *env) {
     char *ip, *hostname, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
     RCServer_t *sp;
@@ -1033,8 +1015,7 @@ static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 /*
  * Client initializer.
  */
-void initClient( void )
-{
+void initClient( void ) {
     static int firstcall = 1;
     int idev;
     int ired;
@@ -1292,8 +1273,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
 
 cudaError_t
 dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
-                           size_t count, size_t offset, enum cudaMemcpyKind kind)
-{
+                           size_t count, size_t offset, enum cudaMemcpyKind kind) {
     cudaError_t err = cudaSuccess;
     int nredundancy;
 
@@ -1672,12 +1652,14 @@ cudaError_t cudaGetDevice(int *device) {
 
     return err;
 }
-/*
+
+/*********************************************************************
  * cudaSetDevice()
+ *    
  */
-cudaError_t cudaSetDevice(int device) {
-    cudaError_t err = cudaSuccess;
-    int         vi  = vdevidIndex();
+cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
+    cudaError_t cuerr = cudaSuccess;
+    int vi = vdevidIndex();
 
     initClient();
     WARN(3, "(WARN-3) %s(%d), verb=%d, history=%d...\n", __func__, device,
@@ -1686,7 +1668,11 @@ cudaError_t cudaSetDevice(int device) {
     if ( 0 <= device && device < Nvdev ) {
         Vdevid[vi] = device;
     } else {
-        err = cudaErrorInvalidDevice;
+        cuerr = cudaErrorInvalidDevice;
+	if ( errcheck != 0 ) {
+	    fprintf( stderr, "%s(): failed.\n", __func__);
+	    exit(1);
+	}
     }
 
     if (St.isAutoVerb() && St.isRecordHist()) {
@@ -1695,7 +1681,13 @@ cudaError_t cudaSetDevice(int device) {
         HISTREC.add(dscudaSetDeviceId, (void *)&args);
     }
     WARN(3, "(WARN-3) +--- done.\n");
-    return err;
+    return cuerr;
+}
+cudaError_t cudaSetDevice( int device ) {
+    cudaError_t cuerr = cudaSuccess;
+    int errcheck = 0; 
+    cuerr = cudaSetDevice_clnt( device, errcheck );
+    return cuerr;
 }
 
 cudaError_t

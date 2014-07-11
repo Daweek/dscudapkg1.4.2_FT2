@@ -189,7 +189,8 @@ struct ClientState_t {
 extern struct ClientState_t St;
 
 extern const char *DEFAULT_SVRIP;
-extern Vdev_t Vdev[RC_NVDEVMAX];
+extern Nvdev;                         // # of virtual devices available.
+extern Vdev_t Vdev[RC_NVDEVMAX];      // A list of virtual devices.
 //extern RCServer_t svrCand[RC_NVDEVMAX];
 //extern RCServer_t svrSpare[RC_NVDEVMAX];
 extern SvrList_t SvrSpare;

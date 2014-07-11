@@ -38,20 +38,7 @@ typedef enum {
     DSCVMethodEnd
 } DSCVMethod;
 
-int BkupMem_t::isHead( void )
-{
-    if ( prev==NULL ) return 1;
-    else              return 0;
-}
-
-int BkupMem_t::isTail( void )
-{
-    if ( next==NULL ) return 1;
-    else              return 0;
-}
-
-int BkupMemList_t::isEmpty( void )
-{
+int BkupMemList_t::isEmpty( void ) {
     if      ( head==NULL && tail==NULL ) return 1;
     else if ( head!=NULL && tail!=NULL ) return 0;
     else {
@@ -60,8 +47,7 @@ int BkupMemList_t::isEmpty( void )
     }
 }
 
-int BkupMemList_t::countRegion( void )
-{
+int BkupMemList_t::countRegion( void ) {
     BkupMem *mem = head;
     int count = 0;
     while ( mem != NULL ) {
@@ -81,22 +67,28 @@ int BkupMemList_t::checkSumRegion( void *targ, int size ) {
     }
     return sum;
 }
-
-BkupMem* BkupMemList_t::queryRegion( void *dst )
-{
+/* Class: "BkupMemList_t"
+ * Method: queryRegion()
+ *
+ */
+BkupMem* BkupMemList_t::queryRegion( void *dst ) {
     BkupMem *mem = head;
+    int i = 0;
     while ( mem != NULL ) { /* Search */
 	if ( mem->dst == dst ) { /* tagged by its address on GPU */
 	    WARN(10, "---> %s(%p): return %p\n", __func__, dst, mem);
 	    return mem;
 	}
+	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, dst, i, mem->dst);
 	mem = mem->next;
+	i++;
     }
     return NULL;
 }
-
-void BkupMemList_t::addRegion( void *dst, int size )
-{
+/*********************************************************************
+ *
+ */
+void BkupMemList_t::addRegion( void *dst, int size ) {
     BkupMem *mem;
     
     mem = (BkupMem *)malloc(sizeof(BkupMem));
@@ -128,9 +120,11 @@ void BkupMemList_t::addRegion( void *dst, int size )
 	exit(1);
     }
 }
-
-void BkupMemList_t::removeRegion(void *dst)
-{
+/*====================================================================
+ * Class: "BkupMemlist_t"
+ * Method: removeRegion()
+ */
+void BkupMemList_t::removeRegion(void *dst) {
     BkupMem *mem = queryRegion(dst);
     BkupMem *p_list = head;
     int i;
@@ -165,8 +159,7 @@ void BkupMemList_t::removeRegion(void *dst)
     }
 }
 
-void* BkupMemList_t::searchUpdateRegion(void *dst)
-{
+void* BkupMemList_t::searchUpdateRegion(void *dst) {
     BkupMem *mem = head;
     char *d_targ  = (char *)dst;
     char *d_begin;
@@ -189,10 +182,9 @@ void* BkupMemList_t::searchUpdateRegion(void *dst)
     return (void *)h_p;
 }
 
-void BkupMemList_t::updateRegion( void *dst, void *src, int size )
+void BkupMemList_t::updateRegion( void *dst, void *src, int size ) {
 // dst : GPU device memory region
 // src : HOST memory region
-{
     BkupMem *mem;
     void             *src_mirrored;
     
@@ -216,25 +208,49 @@ void BkupMemList_t::updateRegion( void *dst, void *src, int size )
  */
 void*
 BkupMemList_t::periodicCheckpoint( void *arg ) {
-    int i, j;
-    for (;;) {
+    int devid, j;
+    int errcheck = 1;
+    cudaError_t cuerr;
+    int pmem_devid;
+    BkupMem *pmem;
+    void *lsrc;
+    void *ldst;
+    RCServer_t *sp;
+
+    void *dst_cand[RC_NREDUNDANCYMAX];
+    dscudaMemcpyD2HResult *rp;
+    for (;;) { /* infinite loop */
 	fprintf(stderr, "%s\n", __func__);
-	
-	for (;;) { /* All virtual GPUs */
-	    for ( i=0; i<vdev->nredundancy; i++ ) { /* Each redundant GPUs */
-		rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
-		checkResult(rp, sp);
-		err = (cudaError_t)rp->err;
-		if (rp->err != cudaSuccess) {
-		    err = (cudaError_t)rp->err;
-		}
-		/*
-		 * Check if all redundants has same data.
-		 */
-		//...
-		xdr_free((xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp);
+	for ( devid = 0; devid < Nvdev; devid++ ) { /* All virtual GPUs */
+	    pmem = BKUPMEM.head;
+	    while ( pmem != NULL ) { /* sweep all registered regions */
+		pmem_devid = dscudaDevidOfUva( pmem->dst );
+		if ( devid == pmem_devid ) {
+		    cudaSetDevice_clnt( devid, errcheck );
+		    sp = vdev->server;
+		    for ( int redun=0; redun < Vdev[devid].nredundancy; redun++ ) {
+			
+			rp = dscudamemcpyd2hid_1((RCadr)pmem->dst, count, clnt[sp->id]);
+			checkResult(rp, sp);
+			err = (cudaError_t)rp->err;
+			if (rp->err != cudaSuccess) {
+			    err = (cudaError_t)rp->err;
+			}
+			dst_cand[redun] = malloc( pmem->size );
+			if (dst_cand[redun] == NULL) {
+			    fprintf( stderr, "malloc() failed.\n");
+			    exit(1);
+			}
+			memcpy( dst_cand[redun], rp->buf.RCbuf_val, rp->buf.RCbuf_len);
+
+			xdr_free((xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp);
+		    }
+		    for ( int redun=0; redun < Vdev[devid].nredundancy; redun++ ) {
+			free( dst_cand[redun] );
+		    }
+		} // if (
+		pmem = pmem->next;
 	    }
-	    // BKUPMEM.updateRegion( src, dst, count);
 	}
 	
 	sleep(2);
@@ -677,8 +693,7 @@ recallRpcLaunchKernel(void *argp) {
 }
 
 //initialize redundant unit
-void dscudaVerbInit(void)
-{
+void dscudaVerbInit(void) {
     memset(storeArgsStub,   0, sizeof(DSCVMethod) * DSCVMethodEnd);
     memset(releaseArgsStub, 0, sizeof(DSCVMethod) * DSCVMethodEnd);
     memset(recallStub,      0, sizeof(DSCVMethod) * DSCVMethodEnd);
@@ -712,8 +727,7 @@ void dscudaVerbInit(void)
     St.unsetRecordHist();
 }
 
-void HistRecord_t::add( int funcID, void *argp )
-{
+void HistRecord_t::add( int funcID, void *argp ) {
     int DSCVMethodId;
 
     if ( length == max_len ) { /* Extend the existing memory region. */
@@ -745,8 +759,7 @@ void HistRecord_t::add( int funcID, void *argp )
 /*
  *
  */
-void HistRecord_t::clear( void )
-{
+void HistRecord_t::clear( void ) {
    if ( hist != NULL ) {
       for (int i=0; i < length; i++) {
          (releaseArgsStub[funcID2DSCVMethod( hist[i].funcID)])(hist[i].args);
@@ -788,8 +801,7 @@ void HistRecord_t::print(void)
 /*
  * Rerun the recorded history of cuda function series.
  */
-int HistRecord_t::recall(void)
-{
+int HistRecord_t::recall(void) {
    static int called_depth = 0;
    int result;
    int verb = St.isAutoVerb();
@@ -828,8 +840,7 @@ int HistRecord_t::recall(void)
 /*
  *
  */
-void dscudaVerbMigrateModule()
-{
+void dscudaVerbMigrateModule() {
     // module not found in the module list.
     // really need to send it to the server.
     int vi = vdevidIndex();
@@ -849,8 +860,7 @@ void dscudaVerbMigrateModule()
 /*
  *
  */
-void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to)
-{
+void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
     WARN(1, "#**********************************************************************\n");
     WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
     WARN(1, "#**********************************************************************\n\n");

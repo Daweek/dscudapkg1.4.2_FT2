@@ -17,19 +17,26 @@
  *** Backup memory region of devices allocated by cudaMemcpy().
  ***/
 typedef struct BkupMem_t {
-    void *dst; /* device momeory space */
-    void *src; /* client memory space */
+    void *dst; /* server device momeory space */
+    void *src; /* client host memory space */
     int   size; /* Byte */
     struct BkupMem_t *next;
     struct BkupMem_t *prev;
     //--- methods
-    int isHead( void );
-    int isTail( void );
+    int isHead( void ) {
+	if ( prev==NULL ) return 1;
+	else              return 0;
+    }
+    int isTail( void ) {
+	if ( next==NULL ) return 1;
+	else              return 0;
+    }
 } BkupMem;
 
 typedef struct BkupMemList_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
+    static void* periodicCheckpoint( void *arg );
 public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
@@ -49,17 +56,15 @@ public:
     void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
     void     restructDeviceRegion(void);              /* ReLoad backups */
     //---
-    static void* periodicCheckpoint( void *arg );
-    BkupMemList_t( void )
-    {
+
+    BkupMemList_t( void ) {
 	head = tail = NULL; length = 0; total_size = 0;
 	/*
 	 * Create a thread periodic snapshot of each GPU device.
 	 */
 	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
     }
-    ~BkupMemList_t( void )
-    {
+    ~BkupMemList_t( void ) {
 	pthread_cancel( tid );
     }
 } BkupMemList;
