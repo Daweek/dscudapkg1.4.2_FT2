@@ -45,19 +45,22 @@ typedef struct SvrList {
     }
 } SvrList_t;
 
+/**********************************/
+/* Virtual GPU device Management. */
+/**********************************/
 typedef struct {
     int        nredundancy;
     RCServer_t server[RC_NREDUNDANCYMAX];
 } Vdev_t;
 
 typedef struct ClientModule_t {
-    int    valid;   // 1=>alive, 0=>cache out, -1=>init val.
+    int    valid;   /* 1=>alive, 0=>cache out, -1=>init val. */
     int    vdevid;  /* the virtual device the module is loaded into. */
-    int    id[RC_NREDUNDANCYMAX]; //  that consists of the virtual one, returned from server.
+    int    id[RC_NREDUNDANCYMAX]; /*  that consists of the virtual one, returned from server. */
     char   name[RC_KMODULENAMELEN];
-    char   ptx_image[RC_KMODULEIMAGELEN]; // needed for RecallHist().
+    char   ptx_image[RC_KMODULEIMAGELEN]; /* needed for RecallHist(). */
     time_t sent_time;
-    //
+
     void validate() { valid = 1; }
     void invalidate() { valid = 0; }
     int  isValid()  {
@@ -137,17 +140,24 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
-/***
- *** Control client's behavior
- ***/
+/******************************************/
+/* Client Application Status/Information. */
+/******************************************/
+enum ClntInitStat {
+    ORIGIN      = 0,
+    INITIALIZED
+};
+
 struct ClientState_t {
-    unsigned int ip_addr;          /* My IP address */
+    unsigned int ip_addr;    /* My IP address */
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int auto_verb;           /* 1:Redundant calculation */
     int record_hist;
     int migrate_device;
     int use_daemon;
     int historical_calling;
+    enum ClntInitStat init_stat;
+    
     void setIpAddress(unsigned int val) { ip_addr = val; }
     unsigned int getIpAddress() { return ip_addr; }
     
@@ -177,6 +187,7 @@ struct ClientState_t {
     int  getMigrateDevice() { return migrate_device; }
     
     ClientState_t() {
+	init_stat   = ORIGIN;
 	ip_addr     = 0;
 	use_ibv     = 0;
 	auto_verb   = 0;
@@ -189,7 +200,7 @@ struct ClientState_t {
 extern struct ClientState_t St;
 
 extern const char *DEFAULT_SVRIP;
-extern Nvdev;                         // # of virtual devices available.
+extern int    Nvdev;                  // # of virtual devices available.
 extern Vdev_t Vdev[RC_NVDEVMAX];      // A list of virtual devices.
 //extern RCServer_t svrCand[RC_NVDEVMAX];
 //extern RCServer_t svrSpare[RC_NVDEVMAX];
@@ -221,6 +232,9 @@ int  dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename,
 int *dscudaLoadModule(char *srcname, char *strdata);
 void
 checkResult(void *rp, RCServer_t *sp);
+cudaError_t cudaSetDevice_clnt( int device, int errcheck );
+cudaError_t cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant );
+
 cudaError_t
 dscudaMemcpyToSymbolH2D(int moduleid, char *symbol, const void *src,
 			size_t count, size_t offset, int vdevid, int raidid);
@@ -381,4 +395,7 @@ void
 ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
 			     int *gdim, int *bdim, RCsize smemsize, RCstream stream,
 			     int narg, IbvArg *arg);
+
+extern pthread_mutex_t cudaMemcpyD2H_mutex;
+
 #endif //__LIBDSCUDA_H__

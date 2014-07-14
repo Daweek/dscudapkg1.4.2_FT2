@@ -108,8 +108,7 @@ static cudaError_t setTextureParams(CUtexref texref, RCtexture texbuf, char *tex
     }
 
 #if 0
-inline void fatal_error(int exitcode)
-{
+inline void fatal_error(int exitcode) {
     fprintf(stderr,
             "%s(%i) : fatal_error().\n"
             "Probably you need to restart dscudasvr.\n",
@@ -117,8 +116,7 @@ inline void fatal_error(int exitcode)
     exit(exitcode);
 }
 
-inline void check_cuda_error(cudaError err)
-{
+inline void check_cuda_error(cudaError err) {
     if (cudaSuccess != err) {
         fprintf(stderr,
                 "%s(%i) : check_cuda_error() Runtime API error : %s.\n"

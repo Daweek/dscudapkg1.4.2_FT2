@@ -30,7 +30,9 @@ const  char *DEFAULT_SVRIP = "localhost";
 static char Dscudapath[512];
 
 static pthread_mutex_t VdevidMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX];   // convert an Vdevid index into pthread id.
+static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid index into pthread id.
+
+       pthread_mutex_t cudaMemcpyD2H_mutex = PTHREAD_MUTEX_INITIALIZER;
 
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
@@ -1010,11 +1012,12 @@ void initEnv(void)
 
 }
 
-static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
-
 /*
  * Client initializer.
+ * This function may be executed in parallel threads, so need mutex lock.    
  */
+static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
+
 void initClient( void ) {
     static int firstcall = 1;
     int idev;
@@ -1041,6 +1044,7 @@ void initClient( void ) {
     struct sockaddr_in addrin;
     get_myaddress(&addrin);
     St.setIpAddress(addrin.sin_addr.s_addr);
+    St.init_stat = INITIALIZED;
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
     
     firstcall = 0;
@@ -1662,7 +1666,7 @@ cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
     int vi = vdevidIndex();
 
     initClient();
-    WARN(3, "(WARN-3) %s(%d), verb=%d, history=%d...\n", __func__, device,
+    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device,
 	 St.isAutoVerb(), St.isRecordHist());
 
     if ( 0 <= device && device < Nvdev ) {
@@ -1680,7 +1684,7 @@ cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
         args.device = device;
         HISTREC.add(dscudaSetDeviceId, (void *)&args);
     }
-    WARN(3, "(WARN-3) +--- done.\n");
+    WARN(3, "+--- done.\n");
     return cuerr;
 }
 cudaError_t cudaSetDevice( int device ) {

@@ -19,8 +19,7 @@ static void setupRpc(void);
  * exit() immediately, if detected.
  */
 static void *
-rpcWatchDisconnection(void *arg)
-{
+rpcWatchDisconnection(void *arg) {
     int clientsock = *(int *)arg;
     int nrecvd;
     char buf[16];
@@ -822,8 +821,7 @@ dscudafuncgetattributesid_1_svc(int moduleid, char *kname, struct svc_req *sr)
  */
 
 dscudaMallocResult * 
-dscudamallocid_1_svc(RCsize size, struct svc_req *sr)
-{
+dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     static dscudaMallocResult res;
     cudaError_t err;
     int *devadr;
@@ -837,6 +835,10 @@ dscudamallocid_1_svc(RCsize size, struct svc_req *sr)
     res.devAdr = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
+#if 1 //fill with zero for CheckPointing function.
+    err = cudaMemset( devadr, 0, size );
+    check_cuda_error(err);
+#endif
     WARN(3, "0x%p, %d) done. devadr:0x%p\n", &devadr, size, devadr);
 
     return &res;

@@ -66,14 +66,14 @@ void setupConnection(int idev, RCServer_t *sp) {
         }
         exit(1);
     }
-    WARN(2, "(WARN-2) Established a socket connection to %s...\n", msg);
+    WARN(2, "Established a socket connection to %s...\n", msg);
 }
 
 void checkResult(void *rp, RCServer_t *sp) {
     if (rp) {
 	return;
     } else {
-	WARN(0, "(WARN-0) NULL pointer returned, %s(). exit.\n", __func__);
+	WARN(0, "NULL pointer returned, %s(). exit.\n", __func__);
 	clnt_perror(Clnt[Vdevid[vdevidIndex()]][sp->id], sp->ip);
 	exit(1);
     }
@@ -93,7 +93,7 @@ void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err
     case RPC_CANTRECV: //=4
 	break;
     case RPC_TIMEDOUT: //=5
-	WARN(1, "(WARN-1) Detected RPC:Timed Out in  %s().\n", __func__);
+	WARN(1, "Detected RPC:Timed Out in  %s().\n", __func__);
 	dscudaVerbMigrateDevice( failed, spare );
 	break;
     case RPC_UNKNOWNHOST: //=13
@@ -145,7 +145,7 @@ cudaError_t cudaThreadSynchronize(void)
     int vid = vdevidIndex();
 
     initClient();
-    WARN(3, "(WARN-3) cudaThreadSynchronize()...");
+    WARN(3, "cudaThreadSynchronize()...");
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -156,7 +156,7 @@ cudaError_t cudaThreadSynchronize(void)
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    WARN(3, "(WARN-3) done.\n");
+    WARN(3, "done.\n");
 
     return err;
 }
@@ -218,7 +218,7 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
     int vid = vdevidIndex();
 
     initClient();
-    WARN(3, "(WARN-3) cudaThreadSetCacheConfig(%d)...", cacheConfig);
+    WARN(3, "cudaThreadSetCacheConfig(%d)...", cacheConfig);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -229,7 +229,7 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    WARN(3, "(WARN-3) done.\n");
+    WARN(3, "done.\n");
 
     return err;
 }
@@ -487,7 +487,7 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     CLIENT *p_clnt;
 
     initClient();
-    WARN(3, "(WARN-3) cudaMalloc( %p, %d )...\n", devAdrPtr, size);
+    WARN(3, "cudaMalloc( %p, %d )...\n", devAdrPtr, size);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
@@ -499,7 +499,7 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
             err = (cudaError_t)rp->err;
         }
         adrs[i] = (void*)rp->devAdr;
-	WARN(3, "(WARN-3) +--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
+	WARN(3, "+--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
         xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
     }
 
@@ -512,7 +512,7 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
 	cudaMallocArgs args( *devAdrPtr, size );
 	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
-    WARN(3, "(WARN-3) +--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
+    WARN(3, "+--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
     return err;
 }
@@ -523,7 +523,7 @@ cudaError_t cudaFree(void *mem) {
     dscudaResult *rp;
 
     initClient();
-    WARN(3, "(WARN-3) cudaFree(%p)...", mem);
+    WARN(3, "cudaFree(%p)...", mem);
     Vdev_t *vdev = Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++, sp++) {
@@ -542,14 +542,14 @@ cudaError_t cudaFree(void *mem) {
     if (St.isAutoVerb()) {
 	BKUPMEM.removeRegion(mem);
     }
-    WARN(3, "(WARN-3) +--- done.\n");
+    WARN(3, "+--- done.\n");
     return err;
 }
 
 static cudaError_t
 cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 {
-    WARN(3, "(WARN-3) +------ %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
+    WARN(3, "+------ %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
 	 __func__, St.isAutoVerb(), St.isRecordHist(), St.isHistoCalling());
     dscudaResult *rp;
     RCServer_t *sp;
@@ -560,7 +560,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     srcbuf.RCbuf_val = (char *)src;
     sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
-	WARN(3, "(WARN-3) +--- redun[%d] dst=%p\n", i, dst);
+	WARN(3, "+--- redun[%d] dst=%p\n", i, dst);
         rp = dscudamemcpyh2did_1((RCadr)dst, srcbuf, count, clnt[sp->id]);
         checkResult(rp, sp);
         if (rp->err != cudaSuccess) {
@@ -577,13 +577,46 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
 	//     }
 	// }
     }
-    WARN(3, "(WARN-3) +------ Exiting  %s()\n", __func__);
+    WARN(3, "+------ Exiting  %s()\n", __func__);
+    return err;
+}
+
+/*
+ * cudaMemcpy(DeviceToHost)
+ */
+cudaError_t
+cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant ) {
+    WARN(3, "%s( dst=%p, src_uva=%p, count=%d redundant=%d ).\n",
+	 __func__, dst, src_uva, count, redundant );
+    int vdevid;
+    RCServer_t *sp;
+    CLIENT **clnt;
+    dscudaMemcpyD2HResult *rp;
+
+    cudaError_t err = cudaSuccess;
+    void *src = dscudaAdrOfUva( (void *)src_uva );
+    
+    //initClient();
+    vdevid = Vdevid[ vdevidIndex() ];  // Get active device ID#.
+    clnt   = Clnt[vdevid];
+    /* Get the data from remote GPU(s), then verify */
+    sp = &Vdev[vdevid].server[redundant];
+    rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
+    checkResult(rp, sp);
+    err = (cudaError_t)rp->err;
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+
+    memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
+    xdr_free((xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp);
+    WARN(3, "+--- done.\n");
     return err;
 }
 
 static cudaError_t
 cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt ) {
-    WARN(3, "(WARN-3) +--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
+    WARN(3, "+--- Entering %s(), autoVerb=%d\n", __func__, St.isAutoVerb());
     int matched_count=0;
     int unmatched_count=0;
     int recall_result;
@@ -606,7 +639,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
     /* Get the data from remote GPU(s), then verify */
     sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++) {
-	WARN(3, "(WARN-3) +--- redun[%d] dst=%p, src=%p\n", i, dst, src);
+	WARN(3, "+--- redun[%d] dst=%p, src=%p\n", i, dst, src);
         rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
         checkResult(rp, sp);
         err = (cudaError_t)rp->err;
@@ -683,7 +716,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 	exit(1);
     }
 
-    WARN(3, "(WARN-3) +--- Exiting  %s()\n", __func__);
+    WARN(3, "+--- Exiting  %s()\n", __func__);
     return err;
 }
 
@@ -754,7 +787,11 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
     return err;
 }
 
-cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
+
+
+
+cudaError_t
+cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
 {
     int         vdevid = Vdevid[ vdevidIndex() ];
     Vdev_t     *vdev   = Vdev + vdevid;
@@ -769,15 +806,20 @@ cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpy
     ldst = dscudaAdrOfUva(dst);
     switch ( kind ) {
     case cudaMemcpyDeviceToHost:
-	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n", ldst, lsrc, count, vdevid);
+	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n",
+	     ldst, lsrc, count, vdevid);
+	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+	WARN(3, "mutex_lock:cudaMemcpyD2H\n");
         err = cudaMemcpyD2H(ldst, lsrc, count, vdev, clnt);
+	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
+	WARN(3, "mutex_unlock:cudaMemcpyD2H\n");
         break;
     case cudaMemcpyHostToDevice:
-	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, HostToDevice)...\n", ldst, lsrc, count);
+	WARN(3, "cudaMemcpy(%p, %p, %d, HostToDevice)...\n", ldst, lsrc, count);
         err = cudaMemcpyH2D(ldst, lsrc, count, vdev, clnt);
         break;
     case cudaMemcpyDeviceToDevice:
-	WARN(3, "(WARN-3) cudaMemcpy(%p, %p, %d, DeviceToDevice)...\n", ldst, lsrc, count);
+	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToDevice)...\n", ldst, lsrc, count);
         err = cudaMemcpyD2D(ldst, lsrc, count, vdev, clnt);
         break;
     case cudaMemcpyDefault:
@@ -791,7 +833,7 @@ cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpy
         suva = RCuvaQuery((void *)src);
         duva = RCuvaQuery(dst);
         if ( !suva && !duva ) {
-            WARN(0, "(WARN-0) cudaMemcpy:invalid argument.\n");
+            WARN(0, "cudaMemcpy:invalid argument.\n");
             exit(1);
         } else if ( !suva ) { // sbuf resides in the client.
             if ( duva->devid != dev0 ) {
@@ -817,7 +859,7 @@ cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpy
         WARN(0, "Unsupported value for cudaMemcpyKind : %s\n", dscudaMemcpyKindName(kind));
         exit(1);
     }
-    WARN(3, "(WARN-3) +--- done %s().\n", __func__);
+    WARN(3, "+--- done %s().\n", __func__);
     return err;
 }
 
@@ -889,7 +931,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
                              RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
                              RCargs args)
 {
-    WARN(5, "(WARN-5) %s().\n", __func__)
+    WARN(5, "%s().\n", __func__)
     RCmappedMem *mem;
     RCstreamArray *st;
     CLIENT *p_clnt;
@@ -946,7 +988,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         cudaMemcpy(mem->pHost, mem->pDevice, mem->size, cudaMemcpyDeviceToHost);
         mem = mem->next;
     }
-    WARN(5, "(WARN-5) +--- done. %s().\n", __func__)
+    WARN(5, "+--- done. %s().\n", __func__)
 }
 
 void

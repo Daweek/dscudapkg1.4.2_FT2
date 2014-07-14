@@ -17,9 +17,11 @@
  *** Backup memory region of devices allocated by cudaMemcpy().
  ***/
 typedef struct BkupMem_t {
-    void *dst; /* server device momeory space */
-    void *src; /* client host memory space */
-    int   size; /* Byte */
+    void *dst;        /* server device momeory space (UVA)*/
+    void *src;        /* client host memory space */
+    void *src_golden;
+    int   size;       /* in Byte */
+    int   update_rdy; /* 1:"*dst" has valid data, 0:invalid */
     struct BkupMem_t *next;
     struct BkupMem_t *prev;
     //--- methods
@@ -30,6 +32,24 @@ typedef struct BkupMem_t {
     int isTail( void ) {
 	if ( next==NULL ) return 1;
 	else              return 0;
+    }
+    void init(void *idst, int isize ) {
+	dst = idst;
+	size = isize;
+	update_rdy = 0;
+	src = (void *)malloc( isize );
+	src_golden = (void *)malloc( isize );
+	if ( src == NULL || src_golden == NULL) {
+	    perror("BkupMem_t.init()");
+	}
+	prev = next = NULL;
+    }
+    void updateGolden(void) {
+	memcpy( src_golden, src, size );
+    }
+    BkupMem_t(void) {
+	dst = src = NULL;
+	size = update_rdy = 0;
     }
 } BkupMem;
 

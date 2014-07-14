@@ -1,7 +1,13 @@
 #ifndef DSCUDA_MACROS_H
 #define DSCUDA_MACROS_H
 
-#define WARN(lv, fmt, args...) if (lv <= dscudaWarnLevel()) {fprintf(stderr, fmt, ## args); fflush(stderr);};
+#define WARN(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
+	fprintf(stderr, "(WARN-%d) ", lv);		      \
+	fprintf(stderr, fmt, ## args); fflush(stderr);	      \
+    };
+#define WARN0(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
+	fprintf(stderr, fmt, ## args); fflush(stderr);	       \
+    };
 #define WARNONCE(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
         static int firstcall = 1;                                 \
         if (firstcall) {                                          \
