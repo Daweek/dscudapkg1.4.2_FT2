@@ -31,8 +31,10 @@ static char Dscudapath[512];
 
 static pthread_mutex_t VdevidMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid index into pthread id.
-
+// CheckPointing mutual exclusion
        pthread_mutex_t cudaMemcpyD2H_mutex = PTHREAD_MUTEX_INITIALIZER;
+       pthread_mutex_t cudaMemcpyH2D_mutex = PTHREAD_MUTEX_INITIALIZER;
+       pthread_mutex_t cudaKernelRun_mutex = PTHREAD_MUTEX_INITIALIZER;
 
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
@@ -49,10 +51,7 @@ static RCcuarrayArray *RCcuarrayArrayListTail = NULL;
 static RCuva          *RCuvaListTop           = NULL;
 static RCuva          *RCuvaListTail          = NULL;
 
-int    Vdevid[RC_NPTHREADMAX] = { 0 };   // the virtual device currently in use.
-
-int    Nvdev;                   /* # of virtual devices available. */
-Vdev_t Vdev[RC_NVDEVMAX];       /* a list of virtual devices. */
+int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
 
 SvrList_t SvrCand;
 SvrList_t SvrSpare;
@@ -64,13 +63,14 @@ CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX]; /* RPC clients */
 struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
+
 struct ClientState_t St; // is Singleton
 
 void dscudaRecordHistOn(void) {
-    St.setRecordHist();
+    HISTREC.rec_en = 1;
 }
 void dscudaRecordHistOff(void) {
-    St.unsetRecordHist();
+    HISTREC.rec_en = 0;
 }
 
 void dscudaAutoVerbOn(void) {
@@ -533,7 +533,7 @@ resetServerUniqID(void)
     int i,j;
     for (i=0; i<RC_NVDEVMAX; i++) { /* Vdev[*] */
 	for (j=0; j<RC_NREDUNDANCYMAX; j++) {
-	    Vdev[i].server[j].uniq = RC_UNIQ_INVALID;
+	    St.Vdev[i].server[j].uniq = RC_UNIQ_INVALID;
 	}
     }
     for (j=0; j<RC_NVDEVMAX; j++) { /* svrCand[*] */
@@ -549,8 +549,8 @@ void printVirtualDeviceList(void)
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
     int         i,j;
-    printf("#(info.) *** Virtual Device Info.(Nvdev=%d)\n", Nvdev);
-    for( i=0, pVdev=Vdev; i<Nvdev; i++, pVdev++ ){
+    printf("#(info.) *** Virtual Device Info.(Nvdev=%d)\n", St.Nvdev);
+    for( i=0, pVdev=St.Vdev; i<St.Nvdev; i++, pVdev++ ){
 	if (i >= RC_NVDEVMAX) {
 	    WARN(0, "(;_;) Too many virtual devices. %s().\nexit.", __func__);
 	    exit(1);
@@ -767,22 +767,22 @@ void initVirtualServerList(const char *env) {
 	    exit(1);
 	}
 	strncpy(buf, env, sizeof(buf));
-	Nvdev = 0;
+	St.Nvdev = 0;
 	ip = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
 	while (ip != NULL) {
-	    strcpy(ips[Nvdev], ip);
-	    Nvdev++; /* counts Nvdev */
-	    if (RC_NVDEVMAX < Nvdev) {
+	    strcpy(ips[St.Nvdev], ip);
+	    St.Nvdev++; /* counts Nvdev */
+	    if (RC_NVDEVMAX < St.Nvdev) {
 		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
 		     RC_NVDEVMAX);
 		exit(1);
 	    }
 	    ip = strtok(NULL, DELIM_VDEV);
 	}
-	for (int i=0; i<Nvdev; i++) {
+	for (int i=0; i<St.Nvdev; i++) {
 	    int nred=0;
 	    int uniq=0; // begin with 0.
-	    pvdev = Vdev + i;  /* vdev = &Vdev[i]  */
+	    pvdev = St.Vdev + i;  /* vdev = &Vdev[i]  */
 	    ip = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a colon) of
 	    // a single element of the vdev.
 	    while (ip != NULL) {
@@ -810,10 +810,10 @@ void initVirtualServerList(const char *env) {
 	char letter;
 	char *ip_ref;
 	struct hostent *hostent0;
-	for (int i=0; i<Nvdev; i++) {
-	    for (int j=0; j < Vdev[i].nredundancy; j++) {
-		ip = Vdev[i].server[j].ip;
-		hostname = Vdev[i].server[j].hostname;
+	for (int i=0; i<St.Nvdev; i++) {
+	    for (int j=0; j < St.Vdev[i].nredundancy; j++) {
+		ip = St.Vdev[i].server[j].ip;
+		hostname = St.Vdev[i].server[j].hostname;
 		det_abc=1;
 		for (int k=0; k < strlen(ip); k++) {
 		    letter = ip[k];
@@ -840,9 +840,9 @@ void initVirtualServerList(const char *env) {
 	    }
 	}
     } else {
-	Nvdev = 1;
-	Vdev[0].nredundancy = 1;
-	sp = Vdev[0].server;
+	St.Nvdev = 1;
+	St.Vdev[0].nredundancy = 1;
+	sp = St.Vdev[0].server;
 	sp->id = 0;
 	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
     }
@@ -856,8 +856,8 @@ void updateSpareServerList() //TODO: need more good algorithm.
 
     for ( int i=0; i < SvrCand.num; i++ ) {
 	int found = 0;
-	pVdev = Vdev;
-	for (int j=0; j<Nvdev; j++) {
+	pVdev = St.Vdev;
+	for (int j=0; j<St.Nvdev; j++) {
 	    pSvr = pVdev->server;
 	    for (int k=0; k < pVdev->nredundancy; k++) {
 		if (strcmp(SvrCand.svr[i].ip, pSvr->ip)==0) { /* check same IP */
@@ -940,19 +940,51 @@ void updateDscudaPath(void) {
     WARN(1, "#(info.) DSCUDA_PATH= %s\n", Dscudapath);
 }
 
-static
-void initEnv(void)
-{
-/*
- * set "int Ndev",  "Vdev_t     Vdev[RC_NVDEVMAX]",
- *     "int Ncand", "RCServer_t svrCand[RC_NVDEVMAX]
- *     "autoVerb", "UseDaemon"
- */
-    static int firstcall=1;
-    char *sconfname, *env;
+void ClientState_t::setUseDaemonByEnv(const char *env_name) {
+    char *env_val;
 
-    if (!firstcall) return;
-    firstcall = 0;
+    // DSCUDA_USEDAEMON
+    env_val = getenv(env_name);
+    use_daemon = atoi(env_val);
+    if (env_val != NULL && use_daemon > 0) {
+        WARN(3, "#(info.) Connect to the server via daemon.\n");
+    } else {
+	use_daemon = 0;
+        WARN(3, "#(info.) Do not use daemon. connect to the server directly.\n");
+
+    }
+}
+
+void ClientState_t::setAutoVerbByEnv(const char *env_name) {
+    char *env_val;
+    
+    WARN(2, "#(info) Automatic Data Recovery: ");
+    env_val = getenv(env_name);
+    auto_verb = atoi(env_val);
+    if (env_val != NULL && auto_verb > 0) {
+	dscudaVerbInit();
+	WARN0(2, "on.\n");
+    } else {
+	auto_verb = 0;
+	WARN0(2, "off.\n");
+    }
+}
+void ClientState_t::setMigrateByEnv(const char *env_name) {
+    char *env_val;
+
+    // MIGRATE_DEVICE
+    WARN(3, "#(info.) Device Migrataion is ");
+    env_val = getenv(env_name);
+    migrate_en = atoi(env_val);
+    if (env_val != NULL && migrate_en > 0) {
+        WARN0(3, "enabled.\n");
+    } else {
+	migrate_en = 0;
+        WARN0(3, "disabled.\n");
+    }
+}
+void ClientState_t::initEnv(void) {
+    char *sconfname, *env;
 
     printVersion();
     updateDscudaPath();      /* set "Dscudapath[]" from DSCUDA_PATH */
@@ -978,77 +1010,85 @@ void initEnv(void)
       case RC_REMOTECALL_TYPE_IBV: WARN(2, "InfiniBand Verbs\n"); break;
       default:                     WARN(0, "(Unkown)\n"); exit(1);
     }
+    
+    setAutoVerbByEnv(  DSCUDA_ENV_00 ); // set auto_verb.
+    setUseDaemonByEnv( DSCUDA_ENV_01 ); // set use_daemon.
+    setMigrateByEnv(   DSCUDA_ENV_02 ); // set migrate_en.
+}
 
-    // DSCUDA_AUTOVERB
-    env = getenv("DSCUDA_AUTOVERB");
 
-    if (env) {
-        St.setAutoVerb();
-        dscudaVerbInit();
-	WARN(2, "#(info.) Automatic data recovery: on.\n");
-    } else {
-	WARN(2, "#(info.) Automatic data recovery: off.\n");
+void ClientState_t::initProgress(enum ClntInitStat stat) {
+    switch(stat) {
+    case ORIGIN:
+	init_stat = ORIGIN;
+	break;
+    case INITIALIZED:
+	if (init_stat==ORIGIN) {
+	    WARN(5, "init_stat is set to INITIALIZED from ORIGIN.\n")
+	    init_stat = INITIALIZED;
+	} else {
+	    fprintf(stderr, "%s(): unexpected state transition to INITIALIZED.\n",
+		    __func__);
+	    exit(1);
+	}
+	break;
+    case CUDA_CALLED:
+	if (init_stat==INITIALIZED || init_stat==CUDA_CALLED) {
+	    WARN(5, "init_stat is set to CUDA_CALLED from %d.\n", init_stat)
+	    init_stat = CUDA_CALLED;
+	} else {
+	    fprintf(stderr, "%s(): unexpected state transition from %d to CUDA_CALLED.\n",
+		    __func__, init_stat);
+	    exit(1);
+	}
+	break;
+    default:
+	fprintf(stderr, "%s(): unexpected state transition to UNKNOWN.\n", __func__);
+	exit(1);
     }
-
-    // DSCUDA_USEDAEMON
-    env = getenv("DSCUDA_USEDAEMON");
-    if (env && atoi(env)) {
-        WARN(3, "#(info.) Connect to the server via daemon.\n");
-        St.setUseDaemon();
-    } else {
-        WARN(3, "#(info.) Do not use daemon. connect to the server directly.\n");
-        St.unsetUseDaemon();
-    }
-
-    // MIGRATE_DEVICE
-    env = getenv("DSCUDA_MIGRATION");
-    if (env && atoi(env)) {
-        WARN(3, "#(info.) Device Migrataion is enabled.\n");
-        St.setMigrateDevice();
-    } else {
-        WARN(3, "#(info.) Device Migration is disabled.\n");
-        St.unsetMigrateDevice();
-    }
-
 }
 
 /*
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.    
  */
-static pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
 
-void initClient( void ) {
-    static int firstcall = 1;
-    int idev;
-    int ired;
+ClientState_t::ClientState_t(void) {
+    pthread_mutex_lock( &InitClientMutex ); //<--- mutex_lock
+    initProgress( ORIGIN );
+	
+    fprintf(stderr, "(dscuda-info) The constructor %s() called.\n", __func__);
+
+    ip_addr     = 0;
+    use_ibv     = 0;
+    auto_verb   = 0;
+    migrate_en  = 0;
+    use_daemon  = 0;
+    historical_calling = 0;
+    
+    int i, k;
     Vdev_t *vdev;
     RCServer_t *sp;
-
-    pthread_mutex_lock( &InitClientMutex );
-
-    if ( !firstcall ) {
-        pthread_mutex_unlock( &InitClientMutex );
-        return;
-    }
-
+    
     initEnv();
-
-    for ( idev = 0; idev < Nvdev; idev++ ) {
-        vdev = Vdev + idev;
-        sp = vdev->server;
-        for ( ired = 0; ired < vdev->nredundancy; ired++, sp++ ) {
-            setupConnection(idev, sp);
+    
+    for (i=0; i<St.Nvdev; i++ ) {
+	vdev = St.Vdev + i;
+	sp = vdev->server;
+	for (k=0; k<vdev->nredundancy; k++, sp++ ) {
+            setupConnection(i, sp);
         }
     }
     struct sockaddr_in addrin;
     get_myaddress(&addrin);
-    St.setIpAddress(addrin.sin_addr.s_addr);
-    St.init_stat = INITIALIZED;
+    setIpAddress(addrin.sin_addr.s_addr);
+
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
     
-    firstcall = 0;
-    pthread_mutex_unlock( &InitClientMutex );
+    initProgress( INITIALIZED );    
+    fprintf(stderr, "(dscuda-info) The constructor %s() ends.\n", __func__);
+    pthread_mutex_unlock( &InitClientMutex ); //---> mutex_unlock
 }
 
 void invalidateModuleCache(void) {
@@ -1067,7 +1107,7 @@ void invalidateModuleCache(void) {
 
 int dscudaNredundancy(void)
 {
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     return vdev->nredundancy;
 }
 
@@ -1197,7 +1237,7 @@ int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL termi
     // module not found in the module list.
     // really need to send it to the server.
     idx = vdevidIndex();
-    Vdev_t *vdev = Vdev + Vdevid[idx];
+    Vdev_t *vdev = St.Vdev + Vdevid[idx];
 
     for (i=0; i < vdev->nredundancy; i++) {
 	// mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name, strdata, Vdevid[vi], i);
@@ -1236,10 +1276,9 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
     cudaError_t err = cudaSuccess;
     dscudaFuncGetAttributesResult *rp;
 
-    initClient();
     WARN(3, "dscudaFuncGetAttributesWrapper(%d, 0x%08llx, %s)...",
          moduleid, (unsigned long)attr, func);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
@@ -1281,14 +1320,12 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
     cudaError_t err = cudaSuccess;
     int nredundancy;
 
-    initClient();
-
     WARN(3, "dscudaMemcpyToSymbolWrapper(%d, 0x%08llx, 0x%08llx, %d, %d, %s)"
          "symbol:%s  ...",
          moduleid, (unsigned long)symbol, (unsigned long)src,
          count, offset, dscudaMemcpyKindName(kind), symbol);
 
-    nredundancy = (Vdev + Vdevid[vdevidIndex()])->nredundancy;
+    nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
     switch (kind) {
       case cudaMemcpyHostToDevice:
         for (int i = 0; i < nredundancy; i++) {
@@ -1306,8 +1343,8 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
     }
     WARN(3, "done.\n");
 
-    if (St.isAutoVerb() && St.isRecordHist() &&
-	(kind == cudaMemcpyHostToDevice || kind == cudaMemcpyDeviceToDevice)) {
+    if (St.isAutoVerb() &&
+	(kind==cudaMemcpyHostToDevice || kind==cudaMemcpyDeviceToDevice)) {
         cudaMemcpyToSymbolArgs args;
         args.moduleid = moduleid;
         args.symbol = (char *)symbol;
@@ -1330,14 +1367,12 @@ dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
     int nredundancy;
     void *dstbuf;
 
-    initClient();
-
     WARN(3, "dscudaMemcpyFromSymbolWrapper(0x%08llx, 0x%08llx, 0x%08llx, %d, %d, %s)"
          "symbol:%s  ...",
          moduleid, (unsigned long)dst, (unsigned long)symbol,
          count, offset, dscudaMemcpyKindName(kind), symbol);
 
-    nredundancy = (Vdev + Vdevid[vdevidIndex()])->nredundancy;
+    nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
     switch (kind) {
       case cudaMemcpyDeviceToHost:
         if (St.isIbv()) {
@@ -1386,8 +1421,6 @@ dscudaMemcpyToSymbolAsyncWrapper(int *moduleid, const char *symbol, const void *
     RCstreamArray *st;
     int nredundancy;
 
-    initClient();
-
     WARN(3, "sym:%s\n", symbol);
     WARN(3, "dscudaMemcpyToSymbolAsyncWrapper(%d, 0x%08lx, 0x%08lx, %d, %d, %s, 0x%08lx) "
          "symbol:%s  ...",
@@ -1398,7 +1431,7 @@ dscudaMemcpyToSymbolAsyncWrapper(int *moduleid, const char *symbol, const void *
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    nredundancy = (Vdev + Vdevid[vdevidIndex()])->nredundancy;
+    nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
     switch (kind) {
       case cudaMemcpyHostToDevice:
         for (int i = 0; i < nredundancy; i++) {
@@ -1431,8 +1464,6 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
     int nredundancy;
     void *dstbuf;
 
-    initClient();
-
     WARN(3, "dscudaMemcpyFromSymbolAsyncWrapper(%d, 0x%08lx, 0x%08lx, %d, %d, %s, 0x%08lx)"
          " symbol:%s  ...",
          moduleid, (unsigned long)dst, (unsigned long)symbol,
@@ -1442,7 +1473,7 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    nredundancy = (Vdev + Vdevid[vdevidIndex()])->nredundancy;
+    nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
     switch (kind) {
       case cudaMemcpyDeviceToHost:
         if (St.isIbv()) {
@@ -1519,15 +1550,13 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
     dscudaBindTextureResult *rp;
     RCtexture texbuf;
 
-    initClient();
-
     WARN(3, "dscudaBindTextureWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %d)...",
          moduleid, texname,
          offset, tex, devPtr, desc, size);
 
     setTextureParams(&texbuf, tex, desc);
 
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
@@ -1566,15 +1595,13 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
     dscudaBindTexture2DResult *rp;
     RCtexture texbuf;
 
-    initClient();
-
     WARN(3, "dscudaBindTexture2DWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %d, %d, %d)...",
          moduleid, texname,
          offset, tex, devPtr, desc, width, height, pitch);
 
     setTextureParams(&texbuf, tex, desc);
 
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
@@ -1612,8 +1639,6 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
     RCtexture texbuf;
     RCcuarrayArray *ca;
 
-    initClient();
-
     WARN(3, "dscudaBindTextureToArrayWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx)...",
          moduleid, texname, (unsigned long)array, (unsigned long)desc);
 
@@ -1625,7 +1650,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
         exit(1);
     }
 
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
@@ -1649,7 +1674,6 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
 cudaError_t cudaGetDevice(int *device) {
     cudaError_t err = cudaSuccess;
 
-    initClient();
     WARN(3, "cudaGetDevice(0x%08llx)...", (unsigned long)device);
     *device = Vdevid[vdevidIndex()];
     WARN(3, "done.\n");
@@ -1664,12 +1688,9 @@ cudaError_t cudaGetDevice(int *device) {
 cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
     cudaError_t cuerr = cudaSuccess;
     int vi = vdevidIndex();
-
-    initClient();
-    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device,
-	 St.isAutoVerb(), St.isRecordHist());
-
-    if ( 0 <= device && device < Nvdev ) {
+    
+    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device, St.isAutoVerb(), HISTREC.rec_en);
+    if ( 0 <= device && device < St.Nvdev ) {
         Vdevid[vi] = device;
     } else {
         cuerr = cudaErrorInvalidDevice;
@@ -1678,19 +1699,22 @@ cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
 	    exit(1);
 	}
     }
-
-    if (St.isAutoVerb() && St.isRecordHist()) {
-        cudaSetDeviceArgs args;
-        args.device = device;
-        HISTREC.add(dscudaSetDeviceId, (void *)&args);
-    }
     WARN(3, "+--- done.\n");
     return cuerr;
 }
 cudaError_t cudaSetDevice( int device ) {
     cudaError_t cuerr = cudaSuccess;
     int errcheck = 0; 
+
+    St.cudaCalled();
+    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device, St.isAutoVerb(), HISTREC.rec_en);
+    if ( HISTREC.rec_en > 0 ) {
+        cudaSetDeviceArgs args;
+        args.device = device;
+        HISTREC.add(dscudaSetDeviceId, (void *)&args);
+    }
     cuerr = cudaSetDevice_clnt( device, errcheck );
+    WARN(3, "+--- done.\n");
     return cuerr;
 }
 
@@ -1698,7 +1722,6 @@ cudaError_t
 cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     cudaError_t err = cudaSuccess;
 
-    initClient();
     WARN(3, "cudaChooseDevice(0x%08llx, 0x%08llx)...",
          (unsigned long)device, (unsigned long)prop);
     *device = 0;
@@ -1712,8 +1735,8 @@ cudaError_t cudaGetDeviceCount(int *count)
 {
     cudaError_t err = cudaSuccess;
 
-    initClient();
-    *count = Nvdev;
+    St.cudaCalled();
+    *count = St.Nvdev;
     WARN(3, "cudaGetDeviceCount(0x%08llx)  count:%d ...",
     (unsigned long)count, *count);
     WARN(3, "done.\n");
@@ -1727,10 +1750,10 @@ cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevi
 
     WARN(3, "cudaDeviceCanAccessPeer(0x%08lx, %d, %d)...",
          canAccessPeer, device, peerDevice);
-    if (device < 0 || Nvdev <= device) {
+    if (device < 0 || St.Nvdev <= device) {
         err = cudaErrorInvalidDevice;
     }
-    if (peerDevice < 0 || Nvdev <= peerDevice) {
+    if (peerDevice < 0 || St.Nvdev <= peerDevice) {
         err = cudaErrorInvalidDevice;
     }
     WARN(3, "done.\n");
@@ -1743,7 +1766,7 @@ cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceEnablePeer(%d, %d)...", peerDevice, flags);
-    if (peerDevice < 0 || Nvdev <= peerDevice) {
+    if (peerDevice < 0 || St.Nvdev <= peerDevice) {
         err = cudaErrorInvalidDevice;
     }
     WARN(3, "done.\n");
@@ -1756,7 +1779,7 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice)
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceDisablePeer(%d)...", peerDevice);
-    if (peerDevice < 0 || Nvdev <= peerDevice) {
+    if (peerDevice < 0 || St.Nvdev <= peerDevice) {
         err = cudaErrorInvalidDevice;
     }
     WARN(3, "done.\n");

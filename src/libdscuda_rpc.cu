@@ -121,9 +121,8 @@ cudaError_t cudaThreadExit(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaThreadExit()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadexitid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -144,9 +143,9 @@ cudaError_t cudaThreadSynchronize(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
+    St.cudaCalled();
     WARN(3, "cudaThreadSynchronize()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadsynchronizeid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -167,9 +166,8 @@ cudaError_t cudaThreadSetLimit(enum cudaLimit limit, size_t value)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaThreadSetLimit(%d, %d)...", limit, value);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadsetlimitid_1(limit, value, Clnt[Vdevid[vid]][sp->id]);
@@ -190,9 +188,8 @@ cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
     dscudaThreadGetLimitResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaThreadGetLimit(0x%08llx, %d)...", pValue, limit);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadgetlimitid_1(limit, Clnt[Vdevid[vid]][sp->id]);
@@ -217,9 +214,8 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaThreadSetCacheConfig(%d)...", cacheConfig);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadsetcacheconfigid_1(cacheConfig, Clnt[Vdevid[vid]][sp->id]);
@@ -241,9 +237,8 @@ cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
     dscudaThreadGetCacheConfigResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaThreadGetCacheConfig(0x%08llx)...", pCacheConfig);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudathreadgetcacheconfigid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -272,9 +267,8 @@ cudaError_t cudaGetLastError(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(5, "cudaGetLastError()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudagetlasterrorid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -295,9 +289,8 @@ cudaError_t cudaPeekAtLastError(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(5, "cudaPeekAtLastError()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudapeekatlasterrorid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -318,9 +311,8 @@ const char *cudaGetErrorString(cudaError_t error)
     static char str[4096];
     int vid = vdevidIndex();
 
-    initClient();
     WARN(5, "cudaGetErrorString()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudageterrorstringid_1(error, Clnt[Vdevid[vid]][sp->id]);
@@ -345,9 +337,8 @@ cudaError_t cudaSetDeviceFlags(unsigned int flags)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaSetDeviceFlags()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudasetdeviceflagsid_1(flags, Clnt[Vdevid[vid]][sp->id]);
@@ -370,9 +361,8 @@ cudaError_t cudaDriverGetVersion (int *driverVersion)
     dscudaDriverGetVersionResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaDriverGetVersionCount(0x%08llx)...", (unsigned long)driverVersion);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudadrivergetversionid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -394,9 +384,8 @@ cudaError_t cudaRuntimeGetVersion(int *runtimeVersion)
     dscudaRuntimeGetVersionResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaRuntimeGetVersion(0x%08llx)...", (unsigned long)runtimeVersion);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaruntimegetversionid_1(Clnt[Vdevid[vid]][sp->id]);
@@ -421,9 +410,8 @@ cudaError_t cudaDeviceSynchronize(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaDeviceSynchronize()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudadevicesynchronize_1(Clnt[Vdevid[vid]][sp->id]);
@@ -444,9 +432,8 @@ cudaError_t cudaDeviceReset(void)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    initClient();
     WARN(3, "cudaDeviceReset()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudadevicereset_1(Clnt[Vdevid[vid]][sp->id]);
@@ -486,9 +473,9 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     void *adrs[RC_NREDUNDANCYMAX];
     CLIENT *p_clnt;
 
-    initClient();
     WARN(3, "cudaMalloc( %p, %d )...\n", devAdrPtr, size);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    St.cudaCalled();
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
 	p_clnt = Clnt[Vdevid[vid]][sp->id]; 
@@ -522,9 +509,8 @@ cudaError_t cudaFree(void *mem) {
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
 
-    initClient();
     WARN(3, "cudaFree(%p)...", mem);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i=0; i < vdev->nredundancy; i++, sp++) {
 	rp = dscudafreeid_1((RCadr)dscudaAdrOfUva(mem), Clnt[Vdevid[vid]][sp->id]);
@@ -550,12 +536,13 @@ static cudaError_t
 cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 {
     WARN(3, "+------ %s(), autoVerb=%d, recordHist=%d, histoCalling=%d\n",
-	 __func__, St.isAutoVerb(), St.isRecordHist(), St.isHistoCalling());
+	 __func__, St.isAutoVerb(), HISTREC.rec_en, St.isHistoCalling());
     dscudaResult *rp;
     RCServer_t *sp;
     RCbuf srcbuf;
     cudaError_t err = cudaSuccess;
 
+    St.cudaCalled();
     srcbuf.RCbuf_len = count;
     srcbuf.RCbuf_val = (char *)src;
     sp = vdev->server;
@@ -570,12 +557,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     }
     if (St.isAutoVerb()) {
 	cudaMemcpyArgs args( dst, (void*)src, count, cudaMemcpyHostToDevice );
-	BKUPMEM.updateRegion(args.dst, args.src, args.count); /* update shadow copy.*/
-	// if (St.isRecordHist()) {
-	//     if (St.isHistoCalling()==0) {
-	// 	dscudaVerbAddHist(dscudaMemcpyH2DId, (void *)&args);
-	//     }
-	// }
+	HISTREC.add(dscudaMemcpyH2DId, (void *)&args);
     }
     WARN(3, "+------ Exiting  %s()\n", __func__);
     return err;
@@ -596,11 +578,10 @@ cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant )
     cudaError_t err = cudaSuccess;
     void *src = dscudaAdrOfUva( (void *)src_uva );
     
-    //initClient();
     vdevid = Vdevid[ vdevidIndex() ];  // Get active device ID#.
     clnt   = Clnt[vdevid];
     /* Get the data from remote GPU(s), then verify */
-    sp = &Vdev[vdevid].server[redundant];
+    sp = &St.Vdev[vdevid].server[redundant];
     rp = dscudamemcpyd2hid_1((RCadr)src, count, clnt[sp->id]);
     checkResult(rp, sp);
     err = (cudaError_t)rp->err;
@@ -620,20 +601,17 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
     int matched_count=0;
     int unmatched_count=0;
     int recall_result;
-    
+
     dscudaMemcpyD2HResult *rp;
     RCServer_t *sp;
     RCServer_t *failed_1st;
     //    int fail_flag[RC_NVDEVMAX]={0};
     cudaError_t err = cudaSuccess;
 
+    St.cudaCalled();
     if ( St.isAutoVerb() ) { /* Register called history */
 	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
-	if (St.isRecordHist()) {
-	    if (St.isHistoCalling()==0) {
-		HISTREC.add(dscudaMemcpyD2HId, (void *)&args); // not needed?
-	    }
-	}
+	HISTREC.add(dscudaMemcpyD2HId, (void *)&args); // not needed?
     }
     //--->
     /* Get the data from remote GPU(s), then verify */
@@ -694,12 +672,10 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 	    }
 	    
 	    St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
-	    St.unsetRecordHist();  // <--- Must not record Historical call list.
+	    HISTREC.rec_en = 0; // <--- Must not record Historical call list.
 
 	    BKUPMEM.restructDeviceRegion();
-	    St.setHistoCalling();
 	    recall_result = HISTREC.recall();
-	    St.unsetHistoCalling();
 
 	    if (recall_result != 0) {
 		printModuleList();
@@ -707,7 +683,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 		//dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
 		dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
 	    }
-	    St.setRecordHist();  // ---> restore recordHist enable.
+	    HISTREC.on();  // ---> restore recordHist enable.
 	    St.setAutoVerb();    // ===> restore autoVerb enabled. 
 	} // redundant failed.
     } else {
@@ -739,9 +715,7 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     //<--- oikawa moved to here from cudaMemcpy();
     if (St.isAutoVerb() > 0) {
 	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToDevice );
-	if (St.isRecordHist()) {
-	    HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
-	}
+	HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
     }
     //--->
     return err;
@@ -787,36 +761,37 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
     return err;
 }
 
-
-
-
 cudaError_t
-cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
-{
+cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     int         vdevid = Vdevid[ vdevidIndex() ];
-    Vdev_t     *vdev   = Vdev + vdevid;
+    Vdev_t     *vdev   = St.Vdev + vdevid;
     CLIENT    **clnt   = Clnt[vdevid];
     RCuva *suva, *duva;
     int dev0;
     void *lsrc, *ldst;
     cudaError_t err    = cudaSuccess;
 
-    initClient();
     lsrc = dscudaAdrOfUva((void *)src);
     ldst = dscudaAdrOfUva(dst);
     switch ( kind ) {
     case cudaMemcpyDeviceToHost:
 	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n",
 	     ldst, lsrc, count, vdevid);
+	//<--- Avoid conflict with CheckPointing.
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 	WARN(3, "mutex_lock:cudaMemcpyD2H\n");
         err = cudaMemcpyD2H(ldst, lsrc, count, vdev, clnt);
-	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
+	pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
+	//---> Avoid conflict with CheckPointing.
 	WARN(3, "mutex_unlock:cudaMemcpyD2H\n");
         break;
     case cudaMemcpyHostToDevice:
 	WARN(3, "cudaMemcpy(%p, %p, %d, HostToDevice)...\n", ldst, lsrc, count);
+	//<--- Avoid conflict with CheckPointing.	
+	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
         err = cudaMemcpyH2D(ldst, lsrc, count, vdev, clnt);
+	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+	//---> Avoid conflict with CheciPointing.
         break;
     case cudaMemcpyDeviceToDevice:
 	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToDevice)...\n", ldst, lsrc, count);
@@ -864,8 +839,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
 }
 
 cudaError_t
-cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count)
-{
+cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count) {
     WARN(3, "cudaMemcpyPeer(0x%08lx, %d, 0x%08lx, %d, %d)...",
          (unsigned long)dst, ddev, (unsigned long)src, sdev, count);
 
@@ -880,9 +854,8 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device)
     cudaError_t err = cudaSuccess;
     dscudaGetDevicePropertiesResult *rp;
 
-    initClient();
     WARN(3, "cudaGetDeviceProperties(0x%08lx, %d)...", (unsigned long)prop, device);
-    Vdev_t *vdev = Vdev + device;
+    Vdev_t *vdev = St.Vdev + device;
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudagetdevicepropertiesid_1(device, Clnt[device][sp->id]);
@@ -906,14 +879,14 @@ dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *mo
     //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
     
     int ret;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     /* send to virtual GPU */
     dscudaLoadModuleResult *rp = dscudaloadmoduleid_1(St.getIpAddress(), getpid(), modulename, modulebuf, Clnt[vdevid][sp->id]);
     checkResult(rp, sp);
     ret = rp->id;
     xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
     
-    if (St.isAutoVerb() && St.isRecordHist()) {
+    if (St.isAutoVerb() ) {
 	/*Nop*/
     }
 
@@ -935,10 +908,12 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     RCmappedMem *mem;
     RCstreamArray *st;
     CLIENT *p_clnt;
+    
+    pthread_mutex_lock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.p
     /*     
      * Automatic Recovery, Register to the called history.
      */
-    if (St.isAutoVerb() && St.isRecordHist()) {
+    if (St.isAutoVerb() ) {
         cudaRpcLaunchKernelArgs args2;
         args2.moduleid = moduleid;
         args2.kid      = kid;
@@ -963,7 +938,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         mem = mem->next;
     }
 
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     struct rpc_err rpc_error;
 
@@ -988,6 +963,8 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         cudaMemcpy(mem->pHost, mem->pDevice, mem->size, cudaMemcpyDeviceToHost);
         mem = mem->next;
     }
+    //---> Avoid conflict with CheckPointing.
+    pthread_mutex_unlock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.
     WARN(5, "+--- done. %s().\n", __func__)
 }
 
@@ -1008,7 +985,6 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     RCchanneldesc descbuf;
     cudaArray *ca[RC_NREDUNDANCYMAX];
 
-    initClient();
     WARN(3, "cudaMallocArray(0x%08llx, 0x%08llx, %d, %d, 0x%08x)...",
          (unsigned long)array, desc, width, height, flags);
 
@@ -1019,7 +995,7 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     descbuf.w = desc->w;
     descbuf.f = desc->f;
 
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudamallocarrayid_1(descbuf, width, height, flags, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1045,14 +1021,13 @@ cudaFreeArray(struct cudaArray *array)
     dscudaResult *rp;
     RCcuarrayArray *ca;
 
-    initClient();
     WARN(3, "cudaFreeArray(0x%08llx)...", (unsigned long)array);
     ca = RCcuarrayArrayQuery(array);
     if (!ca) {
         WARN(0, "invalid cudaArray : 0x%08llx\n", array);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudafreearrayid_1((RCadr)ca->ap[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1078,8 +1053,6 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    initClient();
-
     WARN(3, "cudaMemcpyToArray(0x%08llx, %d, %d, 0x%08llx, %d, %s)...",
          (unsigned long)dst, wOffset, hOffset, (unsigned long)src, count, dscudaMemcpyKindName(kind));
     ca = RCcuarrayArrayQuery(dst);
@@ -1092,7 +1065,7 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
         srcbuf.RCbuf_len = count;
         srcbuf.RCbuf_val = (char *)src;
 
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             h2drp = dscudamemcpytoarrayh2did_1((RCadr)ca->ap[i], wOffset, hOffset, srcbuf, count, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1104,7 +1077,7 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
         }
         break;
       case cudaMemcpyDeviceToDevice:
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2drp = dscudamemcpytoarrayd2did_1((RCadr)ca->ap[i], wOffset, hOffset, (RCadr)src, count, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1130,9 +1103,8 @@ cudaMemset(void *devPtr, int value, size_t count)
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
-    initClient();
     WARN(3, "cudaMemset()...");
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudamemsetid_1((RCadr)devPtr, value, count, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1153,10 +1125,9 @@ cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaMallocPitchResult *rp;
 
-    initClient();
     WARN(3, "cudaMallocPitch(0x%08llx, 0x%08llx, %d, %d)...",
          (unsigned long)devPtr, pitch, width, height);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudamallocpitchid_1(width, height, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1188,8 +1159,6 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    initClient();
-
     WARN(3, "cudaMemcpy2DToArray(0x%08llx, %d, %d, 0x%08llx, %d, %d, %d, %s)...",
          (unsigned long)dst, wOffset, hOffset,
          (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
@@ -1200,7 +1169,7 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
     }
     switch (kind) {
       case cudaMemcpyDeviceToHost:
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2hrp = dscudamemcpy2dtoarrayd2hid_1(wOffset, hOffset,
@@ -1224,7 +1193,7 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
       case cudaMemcpyHostToDevice:
         srcbuf.RCbuf_len = spitch * height;
         srcbuf.RCbuf_val = (char *)src;
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             h2drp = dscudamemcpy2dtoarrayh2did_1((RCadr)ca->ap[i], wOffset, hOffset,
@@ -1237,7 +1206,7 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
         }
         break;
       case cudaMemcpyDeviceToDevice:
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2drp = dscudamemcpy2dtoarrayd2did_1((RCadr)ca->ap[i], wOffset, hOffset,
@@ -1269,15 +1238,13 @@ cudaMemcpy2D(void *dst, size_t dpitch,
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    initClient();
-
     WARN(3, "cudaMemcpy2D(0x%08llx, %d, 0x%08llx, %d, %d, %d, %s)...",
          (unsigned long)dst, dpitch,
          (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
 
     switch (kind) {
       case cudaMemcpyDeviceToHost:
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2hrp = dscudamemcpy2dd2hid_1(dpitch,
@@ -1301,7 +1268,7 @@ cudaMemcpy2D(void *dst, size_t dpitch,
       case cudaMemcpyHostToDevice:
         srcbuf.RCbuf_len = spitch * height;
         srcbuf.RCbuf_val = (char *)src;
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             h2drp = dscudamemcpy2dh2did_1((RCadr)dst, dpitch,
@@ -1314,7 +1281,7 @@ cudaMemcpy2D(void *dst, size_t dpitch,
         }
         break;
       case cudaMemcpyDeviceToDevice:
-        vdev = Vdev + Vdevid[vdevidIndex()];
+        vdev = St.Vdev + Vdevid[vdevidIndex()];
         sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2drp = dscudamemcpy2dd2did_1((RCadr)dst, dpitch,
@@ -1341,10 +1308,9 @@ cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
-    initClient();
     WARN(3, "cudaMemset2D(0x%08llx, %d, %d, %d, %d)...",
          (unsigned long)devPtr, pitch, value, width, height);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudamemset2did_1((RCadr)devPtr, pitch, value, width, height, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1366,9 +1332,8 @@ cudaMallocHost(void **ptr, size_t size)
     cudaError_t err = cudaSuccess;
     dscudaMallocHostResult *rp;
 
-    initClient();
     WARN(3, "cudaMallocHost(%p, %d)...", ptr, size);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudamallochostid_1(size, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1403,9 +1368,8 @@ cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
     cudaError_t err = cudaSuccess;
     dscudaHostAllocResult *rp;
 
-    initClient();
     WARN(3, "cudaHostAlloc(0x%08llx, %d, 0x%08x)...", (unsigned long)pHost, size, flags);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudahostallocid_1(size, flags, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1429,7 +1393,6 @@ cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
     cudaError_t err = cudaSuccess;
     void *devmem;
 
-    initClient();
     WARN(3, "cudaHostAlloc(0x%08llx, %d, 0x%08x)...", (unsigned long)pHost, size, flags);
 
     *pHost = malloc(size);
@@ -1457,9 +1420,8 @@ cudaFreeHost(void *ptr)
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
-    initClient();
     WARN(3, "cudaFreeHost(0x%08llx)...", (unsigned long)ptr);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudafreehostid_1((RCadr)ptr, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1492,10 +1454,9 @@ cudaHostGetDevicePointer(void **pDevice, void*pHost, unsigned int flags) {
     cudaError_t err = cudaSuccess;
     dscudaHostGetDevicePointerResult *rp;
 
-    initClient();
     WARN(3, "cudaHostGetDevicePointer(0x%08llx, 0x%08llx, 0x%08x)...",
          (unsigned long)pDevice, (unsigned long)pHost, flags);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudahostgetdevicepointerid_1((RCadr)pHost, flags, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1525,10 +1486,9 @@ cudaHostGetFlags(unsigned int *pFlags, void *pHost)
     cudaError_t err = cudaSuccess;
     dscudaHostGetFlagsResult *rp;
 
-    initClient();
     WARN(3, "cudaHostGetFlags(0x%08x 0x%08llx)...",
          (unsigned long)pFlags, (unsigned long)pHost);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudahostgetflagsid_1((RCadr)pHost, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1557,8 +1517,6 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    initClient();
-
     WARN(3, "cudaMemcpyAsync(0x%08llx, 0x%08llx, %d, %s, 0x%08llx)...",
          (unsigned long)dst, (unsigned long)src, count, dscudaMemcpyKindName(kind), st->s[0]);
     st = RCstreamArrayQuery(stream);
@@ -1568,7 +1526,7 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
     }
     switch (kind) {
       case cudaMemcpyDeviceToHost:
-        Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
         RCServer_t *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2hrp = dscudamemcpyasyncd2hid_1((RCadr)src, count, (RCstream)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1585,7 +1543,7 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
       case cudaMemcpyHostToDevice:
         srcbuf.RCbuf_len = count;
         srcbuf.RCbuf_val = (char *)src;
-        Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
         RCServer_t *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             h2drp = dscudamemcpyasynch2did_1((RCadr)dst, srcbuf, count, (RCstream)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1597,7 +1555,7 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
         }
         break;
       case cudaMemcpyDeviceToDevice:
-        Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
         RCServer_t *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++, sp++) {
             d2drp = dscudamemcpyasyncd2did_1((RCadr)dst, (RCadr)src, count, (RCstream)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1628,7 +1586,7 @@ dscudaMemcpyToSymbolH2D(int moduleid, char *symbol, const void *src,
                         size_t count, size_t offset, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     RCbuf srcbuf;
     cudaError_t err;
 
@@ -1647,7 +1605,7 @@ dscudaMemcpyToSymbolD2D(int moduleid, char *symbol, const void *src,
                         size_t count, size_t offset, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpytosymbold2did_1(moduleid, symbol, (RCadr)src, count, offset, Clnt[vdevid][sp->id]);
@@ -1663,7 +1621,7 @@ dscudaMemcpyFromSymbolD2H(int moduleid, void **dstbuf, char *symbol,
                           size_t count, size_t offset, int vdevid, int raidid)
 {
     dscudaMemcpyFromSymbolD2HResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbold2hid_1(moduleid, (char *)symbol, count, offset, Clnt[vdevid][sp->id]);
@@ -1680,7 +1638,7 @@ dscudaMemcpyFromSymbolD2D(int moduleid, void *dstadr, char *symbol,
                           size_t count, size_t offset, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbold2did_1(moduleid, (RCadr)dstadr, (char *)symbol, count, offset, Clnt[vdevid][sp->id]);
@@ -1696,7 +1654,7 @@ dscudaMemcpyToSymbolAsyncH2D(int moduleid, char *symbol, const void *src,
                              size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     RCbuf srcbuf;
     cudaError_t err;
 
@@ -1715,7 +1673,7 @@ dscudaMemcpyToSymbolAsyncD2D(int moduleid, char *symbol, const void *src,
                              size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpytosymbolasyncd2did_1(moduleid, symbol, (RCadr)src, count, offset, stream,
@@ -1732,7 +1690,7 @@ dscudaMemcpyFromSymbolAsyncD2H(int moduleid, void **dstbuf, char *symbol,
                                size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
 {
     dscudaMemcpyFromSymbolAsyncD2HResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbolasyncd2hid_1(moduleid, (char *)symbol, count, offset,
@@ -1750,7 +1708,7 @@ dscudaMemcpyFromSymbolAsyncD2D(int moduleid, void *dstadr, char *symbol,
                                size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (Vdev + vdevid)->server + raidid;
+    RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbolasyncd2did_1(moduleid, (RCadr)dstadr, (char *)symbol, count, offset,
@@ -1775,9 +1733,8 @@ cudaStreamCreate(cudaStream_t *pStream)
     dscudaStreamCreateResult *rp;
     cudaStream_t st[RC_NREDUNDANCYMAX];
 
-    initClient();
     WARN(3, "cudaStreamCreate(0x%08llx)...", (unsigned long)pStream);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudastreamcreateid_1(Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1808,14 +1765,13 @@ cudaStreamDestroy(cudaStream_t stream)
     dscudaResult *rp;
     RCstreamArray *st;
 
-    initClient();
     WARN(3, "cudaStreamDestroy(0x%08llx)...", (unsigned long)stream);
     st = RCstreamArrayQuery(stream);
     if (!st) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudastreamdestroyid_1((RCadr)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1841,14 +1797,13 @@ cudaStreamSynchronize(cudaStream_t stream)
     dscudaResult *rp;
     RCstreamArray *st;
 
-    initClient();
     WARN(3, "cudaStreamSynchronize(0x%08llx)...", (unsigned long)stream);
     st = RCstreamArrayQuery(stream);
     if (!st) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudastreamsynchronizeid_1((RCadr)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1873,14 +1828,13 @@ cudaStreamQuery(cudaStream_t stream)
     dscudaResult *rp;
     RCstreamArray *st;
 
-    initClient();
     WARN(3, "cudaStreamQuery(0x%08llx)...", (unsigned long)stream);
     st = RCstreamArrayQuery(stream);
     if (!st) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudastreamqueryid_1((RCadr)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1908,9 +1862,8 @@ cudaEventCreate(cudaEvent_t *event)
     dscudaEventCreateResult *rp;
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
-    initClient();
     WARN(3, "cudaEventCreate(0x%08llx)...", (unsigned long)event);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventcreateid_1(Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1935,9 +1888,8 @@ cudaEventCreateWithFlags(cudaEvent_t *event, unsigned int flags)
     dscudaEventCreateResult *rp;
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
-    initClient();
     WARN(3, "cudaEventCreateWithFlags(0x%08llx, 0x%08x)...", (unsigned long)event, flags);
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventcreatewithflagsid_1(flags, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1962,14 +1914,13 @@ cudaEventDestroy(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    initClient();
     WARN(3, "cudaEventDestroy(0x%08llx)...", (unsigned long)event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
         WARN(0, "invalid event : 0x%08llx\n", event);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventdestroyid_1((RCadr)ev->e[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -1991,7 +1942,6 @@ cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end)
     dscudaEventElapsedTimeResult *rp;
     RCeventArray *es, *ee;
 
-    initClient();
     WARN(3, "cudaEventElapsedTime(0x%08llx, 0x%08llx, 0x%08llx)...",
          (unsigned long)ms, (unsigned long)start, (unsigned long)end);
     es = RCeventArrayQuery(start);
@@ -2004,7 +1954,7 @@ cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end)
         WARN(0, "invalid end event : 0x%08llx\n", end);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventelapsedtimeid_1((RCadr)es->e[i], (RCadr)ee->e[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2028,7 +1978,6 @@ cudaEventRecord(cudaEvent_t event, cudaStream_t stream)
     RCstreamArray *st;
     RCeventArray *ev;
 
-    initClient();
     WARN(3, "cudaEventRecord(0x%08llx, 0x%08llx)...", (unsigned long)event, (unsigned long)stream);
     st = RCstreamArrayQuery(stream);
     if (!st) {
@@ -2040,7 +1989,7 @@ cudaEventRecord(cudaEvent_t event, cudaStream_t stream)
         WARN(0, "invalid event : 0x%08llx\n", event);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventrecordid_1((RCadr)ev->e[i], (RCadr)st->s[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2062,14 +2011,13 @@ cudaEventSynchronize(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    initClient();
     WARN(3, "cudaEventSynchronize(0x%08llx)...", (unsigned long)event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
         WARN(0, "invalid event : 0x%08llx\n", event);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventsynchronizeid_1((RCadr)ev->e[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2090,14 +2038,13 @@ cudaEventQuery(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    initClient();
     WARN(3, "cudaEventQuery(0x%08llx)...", (unsigned long)event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
         WARN(0, "invalid event : 0x%08llx\n", event);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudaeventqueryid_1((RCadr)ev->e[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2120,7 +2067,6 @@ cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
     RCstreamArray *st;
     RCeventArray *ev;
 
-    initClient();
     WARN(3, "cudaStreamWaitEvent(0x%08llx, 0x%08llx, 0x%08x)...",
          (unsigned long)stream, (unsigned long)event, flags);
     st = RCstreamArrayQuery(stream);
@@ -2133,7 +2079,7 @@ cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
         WARN(0, "invalid event : 0x%08llx\n", event);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudastreamwaiteventid_1((RCadr)st->s[i], (RCadr)ev->e[i], flags, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2158,9 +2104,8 @@ cudaCreateChannelDesc(int x, int y, int z, int w, enum cudaChannelFormatKind f)
     dscudaCreateChannelDescResult *rp;
     cudaChannelFormatDesc desc;
 
-    initClient();
     WARN(3, "cudaCreateChannelDesc()...");
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudacreatechanneldescid_1(x, y, z, w, f, Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2186,14 +2131,13 @@ cudaGetChannelDesc(struct cudaChannelFormatDesc *desc, const struct cudaArray *a
     dscudaGetChannelDescResult *rp;
     RCcuarrayArray *ca;
 
-    initClient();
     WARN(3, "cudaGetChannelDesc()...");
     ca = RCcuarrayArrayQuery((cudaArray *)array);
     if (!ca) {
         WARN(0, "invalid cudaArray : 0x%08llx\n", array);
         exit(1);
     }
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscudagetchanneldescid_1((RCadr)ca->ap[i], Clnt[Vdevid[vdevidIndex()]][sp->id]);
@@ -2238,9 +2182,8 @@ cufftPlan3d(cufftHandle *plan, int nx, int ny, int nz, cufftType type)
     cufftResult res = CUFFT_SUCCESS;
     dscufftPlanResult *rp;
 
-    initClient();
     WARN(3, "cufftPlan3d()...");
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscufftplan3did_1(nx, ny, nz, (unsigned int)type, Clnt[0][sp->id]);
@@ -2265,9 +2208,8 @@ cufftDestroy(cufftHandle plan)
     cufftResult res = CUFFT_SUCCESS;
     dscufftResult *rp;
 
-    initClient();
     WARN(3, "cufftDestroy()...");
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscufftdestroyid_1((unsigned int)plan, Clnt[0][sp->id]);
@@ -2288,9 +2230,8 @@ cufftExecC2C(cufftHandle plan, cufftComplex *idata, cufftComplex *odata, int dir
     cufftResult res = CUFFT_SUCCESS;
     dscufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecC2C()...");
-    Vdev_t *vdev = Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         rp = dscufftexecc2cid_1((unsigned int)plan, (RCadr)idata, (RCadr)odata, direction, Clnt[0][sp->id]);
@@ -2320,7 +2261,6 @@ cufftPlan1d(cufftHandle *plan, int nx, cufftType type, int batch)
     cufftResult res = CUFFT_SUCCESS;
     rcufftPlanResult *rp;
 
-    initClient();
     WARN(3, "cufftPlan1d()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2343,7 +2283,6 @@ cufftPlan2d(cufftHandle *plan, int nx, int ny, cufftType type, int batch)
     cufftResult res = CUFFT_SUCCESS;
     rcufftPlanResult *rp;
 
-    initClient();
     WARN(3, "cufftPlan2d()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2367,7 +2306,6 @@ cufftPlan2d(cufftHandle *plan, int nx, int ny, cufftType type, int batch)
   cufftResult res = CUFFT_SUCCESS;
   rcufftPlanResult *rp;
 
-  initClient();
   WARN(3, "cufftPlan1d()...");
   Server *sp = Serverlist;
   for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2391,7 +2329,6 @@ cufftExecR2C(cufftHandle plan, cufftComplex *idata, cufftComplex *odata)
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecR2C()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2413,7 +2350,6 @@ cufftExecC2R(cufftHandle plan, cufftComplex *idata, cufftComplex *odata)
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecC2R()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2435,7 +2371,6 @@ cufftExecZ2Z(cufftHandle plan, cufftComplex *idata, cufftComplex *odata, int dir
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecZ2Z()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2457,7 +2392,6 @@ cufftExecD2Z(cufftHandle plan, cufftComplex *idata, cufftComplex *odata)
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecD2Z()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2479,7 +2413,6 @@ cufftExecZ2D(cufftHandle plan, cufftComplex *idata, cufftComplex *odata)
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftExecZ2D()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2508,7 +2441,6 @@ cufftSetCompatibilityMode(cufftHandle plan, cufftCompatibility mode)
     cufftResult res = CUFFT_SUCCESS;
     rcufftResult *rp;
 
-    initClient();
     WARN(3, "cufftSetCompatibilityMode()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2534,7 +2466,6 @@ cublasCreate_v2(cublasHandle_t *handle)
     cublasStatus_t res = CUBLAS_STATUS_SUCCESS;
     rcublasCreateResult *rp;
 
-    initClient();
     WARN(3, "cublasCreate()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2557,7 +2488,6 @@ cublasDestroy_v2(cublasHandle_t handle)
     cublasStatus_t res = CUBLAS_STATUS_SUCCESS;
     rcublasResult *rp;
 
-    initClient();
     WARN(3, "cublasDestroy()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2583,7 +2513,6 @@ cublasSetVector(int n, int elemSize, const void *x, int incx, void *devicePtr, i
     buf.RCbuf_len = n;
     memcpy(buf.RCbuf_val, x, n);
 
-    initClient();
     WARN(3, "cublasSetVector()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2604,7 +2533,6 @@ cublasGetVector(int n, int elemSize, const void *x, int incx, void *y, int incy)
     cublasStatus_t res = CUBLAS_STATUS_SUCCESS;
     rcublasGetVectorResult *rp;
 
-    initClient();
     WARN(3, "cublasGetVector()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {
@@ -2629,7 +2557,6 @@ cublasSgemm_v2(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_
     cublasStatus_t res = CUBLAS_STATUS_SUCCESS;
     rcublasResult *rp;
 
-    initClient();
     WARN(3, "cublasSgemm()...");
     Server *sp = Serverlist;
     for (int i = 0; i < Nredundancy; i++, sp++) {

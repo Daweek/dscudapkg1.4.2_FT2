@@ -47,6 +47,14 @@ typedef struct BkupMem_t {
     void updateGolden(void) {
 	memcpy( src_golden, src, size );
     }
+    void restoreGolden(void) {
+	cudaError_t cuerr = cudaSuccess;
+        cuerr = cudaMemcpy( dst, src_golden, size, cudaMemcpyHostToDevice);
+	if (cuerr != cudaSuccess) {
+	    fprintf(stderr, "%s():cudaMemcpy(H2D) failed.\n", __func__);
+	    exit(1);
+	}
+    }
     BkupMem_t(void) {
 	dst = src = NULL;
 	size = update_rdy = 0;
@@ -58,6 +66,7 @@ private:
     pthread_t tid;        /* thread ID of Checkpointing */
     static void* periodicCheckpoint( void *arg );
 public:
+    int     bkup_en;
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
     int     length;       /* Counts of allocated memory region */
@@ -76,17 +85,8 @@ public:
     void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
     void     restructDeviceRegion(void);              /* ReLoad backups */
     //---
-
-    BkupMemList_t( void ) {
-	head = tail = NULL; length = 0; total_size = 0;
-	/*
-	 * Create a thread periodic snapshot of each GPU device.
-	 */
-	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
-    }
-    ~BkupMemList_t( void ) {
-	pthread_cancel( tid );
-    }
+    BkupMemList_t( void );
+    ~BkupMemList_t( void );
 } BkupMemList;
 
 /*** ==========================================================================
@@ -100,15 +100,19 @@ typedef struct HistCell_t {
 
 typedef struct HistRecord_t {
     HistCell *hist;
+    int rec_en;    /* enable */
+    int recalling;
     int length;    /* # of recorded function calls to be recalled */
     int max_len;   /* Upper bound of "verbHistNum", extensible */
     //
+    void on(void) { rec_en = 1; }
+    void off(void) { rec_en = 0; }
     void add( int funcID, void *argp ); /* Add */
     void clear( void );           /* Clear */
     void print( void );           /* Print to stdout */
     int  recall( void );          /* Recall */
     //
-    HistRecord_t( void ) { hist = NULL; length = max_len = 0; }
+    HistRecord_t( void );
 } HistRecord;
 
 typedef struct {                        /* cudaSetDevice() */

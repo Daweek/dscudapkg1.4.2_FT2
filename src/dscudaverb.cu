@@ -18,8 +18,8 @@
 
 #define DEBUG
 
-HistRecord  HISTREC; /* CUDA calling history. */
 BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */
+HistRecord  HISTREC; /* CUDA calling history. */
 
 typedef enum {
     DSCVMethodNone = 0,
@@ -37,6 +37,40 @@ typedef enum {
     DSCVMethodIbvLaunchKernel,
     DSCVMethodEnd
 } DSCVMethod;
+
+/*==============================================================================
+ * 
+ */
+BkupMemList_t::BkupMemList_t( void ) {
+    char *env;
+    int autoverb;
+
+    head = NULL;
+    tail = NULL;
+    length = 0;
+    total_size = 0;
+    fprintf(stderr, "(dscuda-info) The constructor %s() called.\n", __func__);
+
+    pthread_mutex_lock( &InitClientMutex );
+    // Get autoverb enable flag from environmental variable.
+    env=getenv( DSCUDA_ENV_00 );
+    if ( env != NULL ) {
+	autoverb=atoi(env);
+	bkup_en = autoverb;
+	fprintf(stderr, "(dscuda-info)%s(): bkup_en=%d\n", __func__, bkup_en);
+	if (bkup_en > 0) {
+	    /*
+	     * Create a thread periodic snapshot of each GPU device.
+	     */
+	    pthread_create( &tid, NULL, periodicCheckpoint, NULL);
+	}
+    }
+    pthread_mutex_unlock( &InitClientMutex );
+}
+BkupMemList_t::~BkupMemList_t( void ) {
+    pthread_cancel( tid );
+}
+
 
 int BkupMemList_t::isEmpty( void ) {
     if      ( head==NULL && tail==NULL ) return 1;
@@ -195,7 +229,7 @@ void BkupMemList_t::updateRegion( void *dst, void *src, int size ) {
     }
 }
 
-/* 
+/* ============================================================================= 
  * Take the data backups of each virtualized GPU to client's host memory
  * after verifying between redundant physical GPUs every specified wall clock
  * time period. The period is defined in second.
@@ -228,7 +262,7 @@ BkupMemList_t::periodicCheckpoint( void *arg ) {
     WARN(10, "%s() thread starts.\n", __func__);
 
     int passflag = 0;
-    while ( St.init_stat != INITIALIZED ) {
+    while ( St.init_stat == ORIGIN ) {
 	if ( passflag == 0 ) {
 	    WARN(10, "%s() thread wait for INITIALIZED.\n", __func__);
 	}
@@ -239,15 +273,18 @@ BkupMemList_t::periodicCheckpoint( void *arg ) {
     
     for (;;) { /* infinite loop */
 	WARN(10, "%s\n", __func__);
-	for ( devid=0; devid < Nvdev; devid++ ) { /* All virtual GPUs */
+	for ( devid=0; devid < St.Nvdev; devid++ ) { /* All virtual GPUs */
 	    pmem = BKUPMEM.head;
 	    while ( pmem != NULL ) { /* sweep all registered regions */
 		pmem_devid = dscudaDevidOfUva( pmem->dst );
 		size = pmem->size;
 		if ( devid == pmem_devid ) {
 		    cudaSetDevice_clnt( devid, errcheck );
-		    redun = Vdev[devid].nredundancy;
-		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );/*mutex-lock*/
+		    redun = St.Vdev[devid].nredundancy;
+		    //<-- Mutex lock
+		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+		    pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+		    pthread_mutex_lock( &cudaKernelRun_mutex );
 		    WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
 		    for ( i=0; i < redun; i++ ) {
 			dst_cand[i] = malloc( size );
@@ -258,6 +295,9 @@ BkupMemList_t::periodicCheckpoint( void *arg ) {
 			cudaMemcpyD2H_redundant( dst_cand[i], pmem->dst, size, i );
 		    }
 		    pthread_mutex_unlock( &cudaMemcpyD2H_mutex );/*mutex-unlock*/
+		    pthread_mutex_unlock( &cudaMemcpyH2D_mutex );/*mutex-unlock*/
+		    pthread_mutex_unlock( &cudaKernelRun_mutex );/*mutex-unlock*/
+		    //--> Mutex lock
 		    WARN(3, "mutex_unlock:%s(),cudaMemcpyD2H\n", __func__);
 		    /**************************
 		     * compare redundant data.
@@ -312,7 +352,7 @@ BkupMemList_t::periodicCheckpoint( void *arg ) {
 	    }
 	}//for ( devid=0; ...
 	if (snapshot_match == 1) {
-	    /*
+	    /*****************************************
 	     * Update snapshot memories, and storage.
 	     */
 	    WARN(3, "***********************************\n");
@@ -326,7 +366,12 @@ BkupMemList_t::periodicCheckpoint( void *arg ) {
 		pmem = pmem->next;
 	    }
 	    WARN(3, "*** Made checkpointing of all %d regions.\n", pmem_count);
-	    snapshot_count++;
+	    WARN(3, "***********************************\n");
+	    WARN(3, "*** Clear following cuda API called history(%d).\n", snapshot_count);
+	    WARN(3, "***********************************\n");
+	    HISTREC.print();
+	    HISTREC.clear();
+	    snapshot_count++;	    
 	} else {
 	    /*
 	     * Rollback and retry cuda sequence.
@@ -424,7 +469,7 @@ void BkupMemList_t::restructDeviceRegion(void) {
     while (mem != NULL) {
 	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
 	     copy_count++, mem->dst, mem->src, mem->size, checkSum(mem->src, mem->size));
-	cudaMemcpy(mem->dst, mem->src, mem->size, cudaMemcpyHostToDevice);
+	mem->restoreGolden();
 	mem = mem->next;
     }
     St.setAutoVerb( verb );
@@ -804,12 +849,35 @@ void dscudaVerbInit(void) {
 	    exit(1);
 	}
     }
-    St.unsetRecordHist();
+    HISTREC.on();
+}
+/*==============================================================================
+ * 
+ */
+HistRecord_t::HistRecord_t( void ) {
+    char *env;
+    int autoverb;
+    
+    hist = NULL;
+    length = 0;
+    max_len = 0;
+    recalling = 0;
+    pthread_mutex_lock( &InitClientMutex );
+    fprintf(stderr, "(dscuda-info) The constructor %s() called.\n", __func__);
+    // Get autoverb enable flag from environmental variable.
+    env=getenv( DSCUDA_ENV_00 );
+    if ( env != NULL ) {
+	autoverb=atoi(env);
+	rec_en = autoverb;
+	fprintf(stderr, "(dscuda-info)%s(): %s=%d\n", __func__, DSCUDA_ENV_00, rec_en);
+    }
+    pthread_mutex_unlock( &InitClientMutex );
 }
 
 void HistRecord_t::add( int funcID, void *argp ) {
     int DSCVMethodId;
 
+    if (rec_en==0 || recalling==1) return;
     if ( length == max_len ) { /* Extend the existing memory region. */
 	max_len += DSCUDAVERB_HISTMAX_GROWSIZE;
 	hist = (HistCell *)realloc( hist, sizeof(HistCell) * max_len );
@@ -836,8 +904,8 @@ void HistRecord_t::add( int funcID, void *argp ) {
     }
     return;
 }
-/*
- *
+/*==============================================================================
+ * Clear all hisotry of calling cuda functions.
  */
 void HistRecord_t::clear( void ) {
    if ( hist != NULL ) {
@@ -850,13 +918,11 @@ void HistRecord_t::clear( void ) {
    length = 0;
 }
 
-void dscudaClearHist(void)
-{
+void dscudaClearHist(void) {
     HISTREC.clear();
 }
 
-void HistRecord_t::print(void)
-{
+void HistRecord_t::print(void) {
     WARN(1, "%s(): *************************************************\n", __func__);
     if ( length == 0 ) {
 	WARN(1, "%s(): Recall History[]> (Empty).\n", __func__);
@@ -878,16 +944,15 @@ void HistRecord_t::print(void)
     }
     WARN(1, "%s(): *************************************************\n", __func__);
 }
-/*
+/*==============================================================================
  * Rerun the recorded history of cuda function series.
  */
 int HistRecord_t::recall(void) {
    static int called_depth = 0;
+   recalling = 1;
    int result;
-   int verb = St.isAutoVerb();
+   int verb_curr = St.auto_verb;
 
-   St.unsetAutoVerb();
-   
    WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, length, __func__);
    WARN(1, "called_depth= %d.\n", called_depth);
    if (called_depth < 0) {       /* irregal error */
@@ -900,7 +965,7 @@ int HistRecord_t::recall(void) {
        this->print();
        called_depth++;       
        for (int i=0; i< length; i++) { /* Do recall history */
-	   (recallStub[funcID2DSCVMethod(HISTREC.hist[i].funcID)])(HISTREC.hist[i].args); /* partially recursive */
+	   (recallStub[funcID2DSCVMethod( HISTREC.hist[i].funcID )])(HISTREC.hist[i].args); /* partially recursive */
        }
        called_depth=0;
        result = 0;
@@ -913,8 +978,9 @@ int HistRecord_t::recall(void) {
        result = 1;
    }
 
-   St.setAutoVerb( verb );
    WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
+   St.auto_verb = verb_curr;
+   recalling = 0;
    return result;
 }
 /*
@@ -924,7 +990,7 @@ void dscudaVerbMigrateModule() {
     // module not found in the module list.
     // really need to send it to the server.
     int vi = vdevidIndex();
-    Vdev_t *vdev = Vdev + Vdevid[vi];
+    Vdev_t *vdev = St.Vdev + Vdevid[vi];
     int i, mid;
     char *ptx_path, *ptx_data;
 

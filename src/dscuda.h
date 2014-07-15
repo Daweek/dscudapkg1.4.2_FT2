@@ -25,6 +25,12 @@
 #include "dscudaverb.h"
 #include "libdscuda.h"
 
+/* Environmental variables */
+const char DSCUDA_ENV_00[] = "DSCUDA_AUTOVERB";
+const char DSCUDA_ENV_01[] = "DSCUDA_USEDAEMON";
+const char DSCUDA_ENV_02[] = "DSCUDA_MIGRATION";
+
+
 typedef unsigned long DscudaUva_t; /* Global virtual address type */
 
 /*   */

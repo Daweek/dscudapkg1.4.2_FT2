@@ -12,47 +12,6 @@
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
 
-typedef struct RCServer {
-    int  id;   // index for each redundant server.
-    int  cid;  // id of a server given by -c option to dscudasvr.
-               // clients specify the server using this num preceded
-               // by an IP address & colon, e.g.,
-               // export DSCUDA_SERVER="192.168.1.123:2"
-    char ip[512];      // ex. "192.168.0.92"
-    char hostname[64]; // ex. "titan01"
-    int  uniq; // unique number in all RCServer_t including svrCand[].
-    int  *d_faultconf;
-    RCServer() {
-	id = cid = uniq = 0xffff;
-	strcpy(ip, "empty");
-	strcpy(hostname, "empty");
-    }
-} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
-
-typedef struct SvrList {
-    int num;                      /* # of server candidates.         */
-    RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
-    /* methods */
-    void clear(void) { num = 0; }
-    int cat( const char *ip )
-    {
-	if ( num >= (RC_NVDEVMAX - 1) ) {
-	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
-	    exit(1);
-	}
-	strcpy( svr[num].ip, ip );
-	num++;
-    }
-} SvrList_t;
-
-/**********************************/
-/* Virtual GPU device Management. */
-/**********************************/
-typedef struct {
-    int        nredundancy;
-    RCServer_t server[RC_NREDUNDANCYMAX];
-} Vdev_t;
-
 typedef struct ClientModule_t {
     int    valid;   /* 1=>alive, 0=>cache out, -1=>init val. */
     int    vdevid;  /* the virtual device the module is loaded into. */
@@ -98,11 +57,13 @@ typedef struct ClientModule_t {
     }
     */
     ClientModule_t() {
+	fprintf(stderr, "The constructor %s() called.\n", __func__);
 	valid  = -1;
 	vdevid = -1;
 	for (int i=0; i<RC_NREDUNDANCYMAX; i++) id[i] = -1;
 	strncpy(name, "init", RC_KMODULENAMELEN);
 	strncpy(ptx_image, "init", RC_KMODULEIMAGELEN);
+
     }
 } ClientModule;
 
@@ -140,24 +101,75 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
+/**********************************/
+/* Virtual GPU device Management. */
+/**********************************/
+typedef struct RCServer {
+    int  id;   // index for each redundant server.
+    int  cid;  // id of a server given by -c option to dscudasvr.
+               // clients specify the server using this num preceded
+               // by an IP address & colon, e.g.,
+               // export DSCUDA_SERVER="192.168.1.123:2"
+    char ip[512];      // ex. "192.168.0.92"
+    char hostname[64]; // ex. "titan01"
+    int  uniq; // unique number in all RCServer_t including svrCand[].
+    int  *d_faultconf;
+    RCServer() {
+	id = cid = uniq = 0xffff;
+	strcpy(ip, "empty");
+	strcpy(hostname, "empty");
+    }
+} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
+
+typedef struct SvrList {
+    int num;                      /* # of server candidates.         */
+    RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
+    /* methods */
+    void clear(void) { num = 0; }
+    int cat( const char *ip ) {
+	if ( num >= (RC_NVDEVMAX - 1) ) {
+	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
+	    exit(1);
+	}
+	strcpy( svr[num].ip, ip );
+	num++;
+	return 0;
+    }
+} SvrList_t;
+
+typedef struct {
+    int        nredundancy;
+    RCServer_t server[RC_NREDUNDANCYMAX];
+} Vdev_t;
+
 /******************************************/
 /* Client Application Status/Information. */
 /******************************************/
 enum ClntInitStat {
     ORIGIN      = 0,
-    INITIALIZED
+    INITIALIZED,
+    CUDA_CALLED
 };
 
 struct ClientState_t {
+private:
+    void setUseDaemonByEnv(const char *env_name);
+    void setAutoVerbByEnv(const char *env_name);
+    void setMigrateByEnv(const char *env_name);
+    void initEnv(void);
+public:
+    enum ClntInitStat init_stat;
+    int    Nvdev;               // # of virtual devices available.
+    Vdev_t Vdev[RC_NVDEVMAX];   // a list of virtual devices.
+
     unsigned int ip_addr;    /* My IP address */
+    /* Mode */
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int auto_verb;           /* 1:Redundant calculation */
-    int record_hist;
-    int migrate_device;
+    int migrate_en;
     int use_daemon;
     int historical_calling;
-    enum ClntInitStat init_stat;
-    
+
     void setIpAddress(unsigned int val) { ip_addr = val; }
     unsigned int getIpAddress() { return ip_addr; }
     
@@ -174,34 +186,21 @@ struct ClientState_t {
     void unsetUseDaemon() { use_daemon = 0; }
     int  isUseDaemon(void)   { return use_daemon; }
 
-    void   setRecordHist(void) { record_hist = 1; }
-    void unsetRecordHist() { record_hist = 0; }
-    int  isRecordHist(void)  { return record_hist; }
-
     void   setHistoCalling() { historical_calling = 1; }
     void unsetHistoCalling() { historical_calling = 0; }
     int  isHistoCalling()   { return historical_calling; }
 
-    void setMigrateDevice(int val=1) { migrate_device = val; }
-    void unsetMigrateDevice() { migrate_device = 0; }
-    int  getMigrateDevice() { return migrate_device; }
-    
-    ClientState_t() {
-	init_stat   = ORIGIN;
-	ip_addr     = 0;
-	use_ibv     = 0;
-	auto_verb   = 0;
-	record_hist = 0;
-	migrate_device = 0;
-	use_daemon  = 0;
-	historical_calling = 0;
-    }
+    void setMigrateDevice(int val=1) { migrate_en = val; }
+    void unsetMigrateDevice() { migrate_en = 0; }
+    int  getMigrateDevice() { return migrate_en; }
+
+    void initProgress(enum ClntInitStat stat);
+    void cudaCalled(void) { initProgress( CUDA_CALLED ); }
+    ClientState_t(void);
 };
 extern struct ClientState_t St;
 
 extern const char *DEFAULT_SVRIP;
-extern int    Nvdev;                  // # of virtual devices available.
-extern Vdev_t Vdev[RC_NVDEVMAX];      // A list of virtual devices.
 //extern RCServer_t svrCand[RC_NVDEVMAX];
 //extern RCServer_t svrSpare[RC_NVDEVMAX];
 extern SvrList_t SvrSpare;
@@ -263,7 +262,6 @@ RCstreamArray *RCstreamArrayQuery(cudaStream_t stream0);
 void RCuvaRegister(int devid, void *adr[], size_t size);
 void RCuvaUnregister(void *adr);
 RCuva *RCuvaQuery(void *adr);
-void initClient(void);
 
 void RCcuarrayArrayRegister(cudaArray **cuarrays);
 void RCcuarrayArrayUnregister(cudaArray *cuarray0);
@@ -396,6 +394,9 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
 			     int *gdim, int *bdim, RCsize smemsize, RCstream stream,
 			     int narg, IbvArg *arg);
 
+extern pthread_mutex_t InitClientMutex;
 extern pthread_mutex_t cudaMemcpyD2H_mutex;
+extern pthread_mutex_t cudaMemcpyH2D_mutex;
+extern pthread_mutex_t cudaKernelRun_mutex;
 
 #endif //__LIBDSCUDA_H__

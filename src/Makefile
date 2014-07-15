@@ -16,7 +16,8 @@ CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64
 
-TARGET         = dscudad dscudasvr libdscuda_ibv.a libdscuda_rpc.a libcudart.so.3
+#TARGET         = dscudad dscudasvr libdscuda_ibv.a libdscuda_rpc.a libcudart.so.3
+TARGET         = dscudad dscudasvr libdscuda_rpc.a libcudart.so.3
 TARGET_RPCONLY = dscudad_rpc dscudasvr_rpc libdscuda_rpc.a libcudart.so.3
 DSCUDAIF       = dscudarpc
 CLIENTBASE     = libdscuda.o
