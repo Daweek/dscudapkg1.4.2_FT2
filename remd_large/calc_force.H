@@ -17,7 +17,7 @@ void calcForce_hst(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
 		   Real_t epsilon);
 
 __device__
-void calcForce_dev(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
+void calcForce(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
 		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon, Real3_t *shared_mem);
 
@@ -27,7 +27,7 @@ void zeroForce_hst(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
 		   Real_t epsilon);
 
 __device__
-void zeroForce_dev(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
+void zeroForce(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
 		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon, Real3_t *shared_mem);
 

@@ -52,8 +52,7 @@ enum {
     RC_REMOTECALL_TYPE_IBV = 2,
 };
 
-typedef struct FaultConf
-{
+typedef struct FaultConf {
     char tag[32];      /* <= "DSCUDA_FAULT_INJECTION" */
     int  overwrite_en; /* Overwrite by DS-CUDA server */
     int  fault_en;     /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
@@ -71,15 +70,16 @@ typedef struct FaultConf
 	dscudaRecordHistOff();
 #endif
 	cudaSetDevice(0); /* temporary */
-	err = cudaMalloc(&d_Nfault, sizeof(int));
+	err = cudaMalloc( &d_Nfault, sizeof(int) );
 	if (err != cudaSuccess) {
-	    fprintf(stderr, "#Error. cudaMalloc() failed in consructor %s().\n", __func__);
+	    fprintf(stderr, "#Error. cudaMalloc() failed in constructor %s().\n", __func__);
 	    exit(1);
 	}
 	/* set initial value on device */
 	err = cudaMemcpy(d_Nfault, &fault_count, sizeof(fault_count), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
-	    fprintf(stderr, "#Error. cudaMalloc() failed in consructor %s().\n", __func__);
+	    fprintf(stderr, "#Error. cudaMemcpy() failed in constructor %s().\n", __func__);
+	    printf("CUDA error: %s\n", cudaGetErrorString(err)); 
 	    exit(1);
 	}
 #if defined(__DSCUDA__)

@@ -118,6 +118,7 @@ void initSimConfig(int argc, char **argv) {
   sprintf(simu.ofile_init_velo,  "%s/init_velo.dat",  simu.odir);
   sprintf(simu.ofile_init_force, "%s/init_force.dat", simu.odir);
 
+#if 0
   for (int i = 2; i <= 8192; i*=2) {
     if (i > 2048) {
       if (SMEM_COUNT <= 2048) {
@@ -136,6 +137,7 @@ void initSimConfig(int argc, char **argv) {
   if (remd.Nmol > SMEM_COUNT) {
     die("(;_;)The size of shared memory is not enough.\nincrease SMEM_COUNT or decrease Nmol.\n");
   }
+#endif
 
   /* temp_min == 0.0 K is not permitted. */
   if (remd.temp_min < 9.9999) {

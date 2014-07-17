@@ -8,6 +8,7 @@
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //-----------------------------------------------------------------------------
+#include <pthread.h>
 #include "switch_float_double.H"
 #include "mytools.H"
 #include "remd_typedef.H"
@@ -21,11 +22,9 @@ Simu_t simu;  /* Only one instance of Simu_t in this program. */
 
 static void mallocHost(Remd_t &remd, Simu_t &simu);
 static void mallocDev(Remd_t &remd, Simu_t &simu);
-static void mallocHostDev(Remd_t &remd, Simu_t &simu);
 //
 static void freeHost(Remd_t &remd);
 static void freeDev(Simu_t &simu);
-static void freeHostDev(Remd_t &remd, Simu_t &simu);
 
 static void initTemp(Real_t *temp_ar, int Nrep, Real_t max_temp, Real_t min_temp);
 static void initVel(Remd_t &);
@@ -37,8 +36,7 @@ void testFuncCopyEne(Remd_t &remd, Simu_t &simu);
 void testFuncCopyExch(Remd_t &remd, Simu_t &simu);
 
 //===============================================================================
-int main(int argc, char **argv)
-{
+int main( int argc, char **argv ) {
   Stopwatch_t timer[3];
   int ndev;
   cudaError_t cu_err;
@@ -59,8 +57,9 @@ int main(int argc, char **argv)
 
   initSimConfig(argc, argv);                    // Read parameters from input file.
   echoSimConfig();                              // Print the parameter.
-
-  mallocHostDev(remd, simu);
+  /*malloc*/
+  mallocHost(remd, simu);
+  mallocDev(remd, simu);
 
   testFuncCopyEne(remd, simu);
   testFuncCopyExch(remd, simu);
@@ -92,9 +91,10 @@ int main(int argc, char **argv)
   timer[1].start();
   simRemd(remd, simu); 
   timer[1].stop();
-
-  freeHostDev(remd, simu);
-
+  /*free*/
+  freeDev(simu);
+  freeHost(remd);
+  
   timer[0].stop();
 
   printf("***********************\n");
@@ -118,16 +118,8 @@ int main(int argc, char **argv)
  * [Description] allocate memory in host.
  */
 //------------------------------------------------------------------------------
-static void
-mallocHostDev(Remd_t &remd, Simu_t &simu)
-{
-  mallocHost(remd, simu);
-  mallocDev(remd, simu);
-}		
-
-static void
-mallocHost(Remd_t &remd, Simu_t &simu)
-{
+static
+void mallocHost(Remd_t &remd, Simu_t &simu) {
   debug_print(2, "Entering %s().\n", __func__);
 
   const int Nrep      = remd.Nrep;
@@ -151,9 +143,6 @@ mallocHost(Remd_t &remd, Simu_t &simu)
   for (int i = 0; i < Nrep; i++ ) { remd.acc_ratio[i] = 0; } 
   
   /* for buffer of 1-copy. */
-  //if ((remd.h_pos_ar  = (Real3_t *)malloc(vec3_size)) == NULL) { die("returned NULL\n"); }
-  //if ((remd.h_vel_ar  = (Real3_t *)malloc(vec3_size)) == NULL) { die("returned NULL\n"); }
-  //if ((remd.h_foc_ar  = (Real3_t *)malloc(vec3_size)) == NULL) { die("returned NULL\n"); }
   if ((remd.h_pos_ar  = (Real3_t *)malloc(vec3_size*Nrep)) == NULL) { die("returned NULL\n"); }
   if ((remd.h_vel_ar  = (Real3_t *)malloc(vec3_size*Nrep)) == NULL) { die("returned NULL\n"); }
   if ((remd.h_foc_ar  = (Real3_t *)malloc(vec3_size*Nrep)) == NULL) { die("returned NULL\n"); }
@@ -168,6 +157,8 @@ mallocHost(Remd_t &remd, Simu_t &simu)
   if ((remd.d_pos_ar  = (Real3_t**)malloc(pvec3_size))== NULL) { die("returned NULL\n"); }
   if ((remd.d_vel_ar  = (Real3_t**)malloc(pvec3_size))== NULL) { die("returned NULL\n"); }
   if ((remd.d_foc_ar  = (Real3_t**)malloc(pvec3_size))== NULL) { die("returned NULL\n"); }
+  if ((remd.d_work_ar = (Real3_t**)malloc(pvec3_size))== NULL) { die("returned NULL\n"); }
+  if ((remd.d_poten_ar =(Real_t **)malloc(pvec1_size))== NULL) { die("returned NULL\n"); }
   if ((remd.d_energy  = (Real_t **)malloc(pvec1_size))== NULL) { die("returned NULL\n"); }
   if ((remd.d_temp_ar = (Real_t **)malloc(pvec1_size))== NULL) { die("returned NULL\n"); }
   if ((remd.d_exch_ar = (int    **)malloc(pint_size))== NULL) { die("returned NULL\n"); }
@@ -188,24 +179,27 @@ mallocHost(Remd_t &remd, Simu_t &simu)
   debug_print(2, "Exiting  %s().\n", __func__);
 } //mallocHost()
 //===============================================================================
-static void
-mallocDev(Remd_t &remd, Simu_t &simu)
-{
+static
+void mallocDev(Remd_t &remd, Simu_t &simu) {
   debug_print(2, "Entering %s().\n", __func__);
 
-  const int ar_size = sizeof(Real3_t) * remd.Nmol * simu.Nrep_1dev;
-  const int te_size = sizeof(Real_t)  * simu.Nrep_1dev;
-  const int en_size = sizeof(Real_t)  * simu.step_exch * simu.Nrep_1dev;
-  const int ch_size = sizeof(int)     * simu.Nrep_1dev;
+  const int extra = 0;
+  const int ar3_size = sizeof(Real3_t) * remd.Nmol * simu.Nrep_1dev + extra;
+  const int ar1_size = sizeof(Real_t)  * remd.Nmol * simu.Nrep_1dev + extra;
+  const int te_size  = sizeof(Real_t)  * simu.Nrep_1dev + extra;
+  const int en_size  = sizeof(Real_t)  * simu.step_exch * simu.Nrep_1dev + extra;
+  const int ch_size  = sizeof(int)     * simu.Nrep_1dev + extra;
 #if defined(HOST_RUN)
   /*
    * Pseudo HOST_RUN
    */
   printf("info: Try pseudo cudaMalloc() on %d HOST device(s) ...", simu.Ngpu);
   for (int i = 0; i < simu.Ngpu; i++) {
-    if ((remd.d_pos_ar[i]    = (Real3_t *)malloc(ar_size)) == NULL) { die("malloc()==NULL.\n"); }
-    if ((remd.d_vel_ar[i]    = (Real3_t *)malloc(ar_size)) == NULL) { die("malloc()==NULL.\n"); }
-    if ((remd.d_foc_ar[i]    = (Real3_t *)malloc(ar_size)) == NULL) { die("malloc()==NULL.\n"); }
+    if ((remd.d_pos_ar[i]    = (Real3_t *)malloc(ar3_size)) == NULL) { die("malloc()==NULL.\n"); }
+    if ((remd.d_vel_ar[i]    = (Real3_t *)malloc(ar3_size)) == NULL) { die("malloc()==NULL.\n"); }
+    if ((remd.d_foc_ar[i]    = (Real3_t *)malloc(ar3_size)) == NULL) { die("malloc()==NULL.\n"); }
+    if ((remd.d_work_ar[i]   = (Real3_t *)malloc(ar3_size)) == NULL) { die("malloc()==NULL.\n"); }
+    if ((remd.d_poten_ar[i]  = (Real_t  *)malloc(ar1_size)) == NULL) { die("malloc()==NULL.\n"); }
     if ((remd.d_temp_ar[i]   = (Real_t  *)malloc(te_size)) == NULL) { die("malloc()==NULL.\n"); } 
     if ((remd.d_exch_ar[i]   = (int     *)malloc(ch_size)) == NULL) { die("malloc()==NULL.\n"); }
     if ((remd.d_energy[i]    = (Real_t  *)malloc(en_size)) == NULL) { die("malloc()==NULL.\n"); }
@@ -226,15 +220,21 @@ mallocDev(Remd_t &remd, Simu_t &simu)
     err[0] = cudaSetDevice(gpu_i);
     if (err[0] != cudaSuccess) { die("cudaSetDevice(%d) failed.\n", gpu_i); }
 
-    err[1] = cudaMalloc((void **)&remd.d_pos_ar[gpu_i],  ar_size);
+    err[1] = cudaMalloc((void **)&remd.d_pos_ar[gpu_i],  ar3_size);
     if (err[1] != cudaSuccess) { die("dev(%d), cudaMalloc(pos) returned %d. %s\n",
 				     gpu_i, err[1], cudaGetErrorString(err[1])); }
 
-    err[2] = cudaMalloc((void **)&remd.d_vel_ar[gpu_i],  ar_size);
+    err[2] = cudaMalloc((void **)&remd.d_vel_ar[gpu_i],  ar3_size);
     if (err[2] != cudaSuccess) { die("dev#%d, cudaMalloc(vel) failed.\n", gpu_i); }
 
-    err[3] = cudaMalloc((void **)&remd.d_foc_ar[gpu_i],  ar_size);
+    err[3] = cudaMalloc((void **)&remd.d_foc_ar[gpu_i],  ar3_size);
     if (err[3] != cudaSuccess) { die("dev#%d, cudaMalloc(force) failed.\n", gpu_i); }
+
+    err[0] = cudaMalloc( (void **)&remd.d_work_ar[gpu_i], ar3_size );
+    if (err[0]!=cudaSuccess) { die("dev#%d, cudaMalloc(work) failed.\n", gpu_i); }
+
+    err[0] = cudaMalloc( (void **)&remd.d_poten_ar[gpu_i], ar1_size );
+    if (err[0]!=cudaSuccess) { die("dev#%d, cudaMalloc(work) failed.\n", gpu_i); }
 
     err[4] = cudaMalloc((void **)&remd.d_temp_ar[gpu_i],   te_size);
     err[5] = cudaMalloc((void **)&remd.d_exch_ar[gpu_i],     ch_size);
@@ -255,16 +255,7 @@ mallocDev(Remd_t &remd, Simu_t &simu)
   debug_print(2, "Exiting  %s().\n", __func__); fflush(stdout);
 }
 
-static void
-freeHostDev(Remd_t &remd, Simu_t &simu)
-{
-  freeDev(simu);
-  freeHost(remd);
-}
-
-static void
-freeHost(Remd_t &remd)
-{
+static void freeHost(Remd_t &remd) {
   debug_print(6, "Entering %s().\n", __func__);
 
   free(remd.sort_temper);
@@ -280,6 +271,8 @@ freeHost(Remd_t &remd)
   free(remd.d_pos_ar);
   free(remd.d_vel_ar);
   free(remd.d_foc_ar);
+  free(remd.d_poten_ar);
+  free(remd.d_work_ar);
   free(remd.d_energy);
   free(remd.d_temp_ar);
   free(remd.d_exch_ar);
@@ -307,6 +300,8 @@ void freeDev(Simu_t &simu)
 	cudaFree(remd.d_pos_ar[gpu_i]);
 	cudaFree(remd.d_vel_ar[gpu_i]);
 	cudaFree(remd.d_foc_ar[gpu_i]);
+	cudaFree(remd.d_work_ar[gpu_i]);
+	cudaFree(remd.d_poten_ar[gpu_i]);
 	cudaFree(remd.d_temp_ar[gpu_i]);
 	cudaFree(remd.d_exch_ar[gpu_i]);
 	cudaFree(remd.d_energy[gpu_i]);

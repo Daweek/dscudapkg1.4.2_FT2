@@ -653,9 +653,8 @@ int checkSum(void *targ, int size) {
     return sum;
 }
 
-static void
-copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir)
-{
+static inline void
+copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir) {
     int size = sizeof(Real3_t) * remd.Nmol;
 
 #if defined(HOST_RUN)

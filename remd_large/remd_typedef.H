@@ -33,6 +33,14 @@ const int MAX_NMOL = 2048;
 const int REDUCTION_SIZE = SMEM_COUNT;  // GPU reduction size. must be 2^N.
 const int MAX_NREP = 16384;  // upper bound of replica counts.
 
+// typedef struct Devptr {
+//    int  devid;
+//    void *adr;
+//    int  size;
+//    void malloc( int s ) {
+//       cudaSetDevice();
+//    }
+// } Devptr_t;
 
 typedef enum {
   H2D,
@@ -40,37 +48,39 @@ typedef enum {
 } CopyKind_t;
 
 typedef struct Remd {
-    int       Nmol;          // Number of atoms in a replica.
-    int       Nrep;          // Number of all replicas.
-    Real_t    dens;          // density
-    Real_t    mass;          // mass; common for all atoms.
-    int      *sort_temper;   // scrambled sequetial number.
-    int      *acc_ratio;     //
-    
-    Real3_t  *h_pos_ar;      // [Nmol]      , partial
-    Real3_t  *h_vel_ar;      // [Nmol]      , partial
-    Real3_t  *h_foc_ar;      // [Nmol]      , partial
-    Real_t   *h_mass_ar;     // [Nmol]      , partial
-    Real_t   *h_temp_ar;     // [Nrep]      , all
-    int      *h_exch_ar;     // [Nrep]      , all
-    Real_t   *h_energy;      // [Nrep][step_exch] , all
-    Real_t   *h_temp_meas;   // [step_exch], partial
+   int       Nmol;          // Number of atoms in a replica.
+   int       Nrep;          // Number of all replicas.
+   Real_t    dens;          // density
+   Real_t    mass;          // mass; common for all atoms.
+   int      *sort_temper;   // scrambled sequetial number.
+   int      *acc_ratio;     //
+   /* Host memory space */
+   Real3_t  *h_pos_ar;      // [Nmol]      , partial
+   Real3_t  *h_vel_ar;      // [Nmol]      , partial
+   Real3_t  *h_foc_ar;      // [Nmol]      , partial
+   Real_t   *h_mass_ar;     // [Nmol]      , partial
+   Real_t   *h_temp_ar;     // [Nrep]      , all
+   int      *h_exch_ar;     // [Nrep]      , all
+   Real_t   *h_energy;      // [Nrep][step_exch] , all
+   Real_t   *h_temp_meas;   // [step_exch], partial
+   /* Device memory space */
+   Real3_t **d_pos_ar;      // [Ngpu][Nrep_1dev * Nmol]
+   Real3_t **d_vel_ar;      // [Ngpu][Nrep_1dev * Nmol]
+   Real3_t **d_foc_ar;      // [Ngpu][Nrep_1dev * Nmol]
+   Real3_t **d_work_ar;     // [Ngpu][Nrep_1dev * Nmol]
+   Real_t  **d_poten_ar;    // [Ngpu][Nrep_1dev * Nmol]
+   Real_t  **d_temp_ar;     // [Ngpu][Nrep_1dev]
+   int     **d_exch_ar;
+   Real_t  **d_energy;      // [Ngpu][Nrep_1dev * step_exch]
+   Real_t  **d_temp_meas;   // [Ngpu][Nrep_1dev * step_exch]
   
-    Real3_t **d_pos_ar;      // [Ngpu][Nrep_1dev * Nmol]
-    Real3_t **d_vel_ar;      // [Ngpu][Nrep_1dev * Nmol]
-    Real3_t **d_foc_ar;      // [Ngpu][Nrep_1dev * Nmol]
-    Real_t  **d_temp_ar;     // [Ngpu][Nrep_1dev]
-    int     **d_exch_ar;
-    Real_t  **d_energy;      // [Ngpu][Nrep_1dev * step_exch]
-    Real_t  **d_temp_meas;   // [Ngpu][Nrep_1dev * step_exch]
-  
-    Real_t    cellsize;      // periodic boundary condition.
-    Real_t    rcut;          // cutoff distance.
-    Real_t    lj_sigma;      // "sigma"   in Lennard-Jones potential.
-    Real_t    lj_epsilon;    // "epsilon" in ...
-
-    Real_t    temp_max;      //
-    Real_t    temp_min;
+   Real_t    cellsize;      // periodic boundary condition.
+   Real_t    rcut;          // cutoff distance.
+   Real_t    lj_sigma;      // "sigma"   in Lennard-Jones potential.
+   Real_t    lj_epsilon;    // "epsilon" in ...
+   
+   Real_t    temp_max;      //
+   Real_t    temp_min;
 } Remd_t;
 //==============================================================================
 typedef struct Simu {

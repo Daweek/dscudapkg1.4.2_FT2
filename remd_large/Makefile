@@ -22,8 +22,8 @@ NVCC = $(CUDAPATH)/bin/nvcc
 DSCUDACPP ?= /bin/dscudacpp
 
 CPPFLAGS = 
-NVCCFLAGS = -O2 -g -I${CUDASDKPATH}/CUDALibraries/common/inc -I${HOME} \
-	    -arch=compute_20 -code=compute_20 \
+NVCCFLAGS = -O0 -g -I${CUDASDKPATH}/CUDALibraries/common/inc -I${HOME} \
+	    -arch=compute_20 -code=sm_20 \
    -I/usr/apps/free/NVIDIA_GPU_Computing_SDK/4.1/C/common/inc  --use_fast_math --ptxas-options=-v
 
 OUTPUT_FILE = histogram/histogram*.dat index_replica.dat energy_replica.dat input.txt acceptance_ratio.dat
@@ -62,7 +62,7 @@ remd_local : $(OBJS_DEV)
 	@echo "//"
 	@echo "// Generate remd_local"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 $^ $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 -lrt -lpthread $^ $(CCLIB) -o $@
 
 remd_local.fault : $(OBJS_DEV_FJ)
 	@echo "//"
@@ -78,7 +78,7 @@ remd_rpc : $(OBJS_DS)
 	@echo "//"
 	@echo "// Generate remd_ds_rpc"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lrt $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lrt -lpthread $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 #	$(CXX) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 
 remd_rpc_rcut : $(OBJS_DS_RCUT)
