@@ -59,15 +59,85 @@ probePosVelFoc( int t, int num_rep, Real3_t *posi, Real3_t *velo, Real3_t *forc,
    }
 }
 
-#if 0
 extern "C" __global__ void
-g_test01( Real3_t *d_work_ar, Real_t *d_poten_ar ) {
+g_test01( Real3_t *d_work_ar, Real_t *d_poten_ar, int Nmol ) {
    int i;
-   for (i=threadIdx.x; i<47; i+=blockDim.x) {
-      printf("i=%d, blockIdx.x==%d, threadIdx.x=%d\n", i, blockIdx.x, threadIdx.x);
+   Real3_t *shared    = d_work_ar + (Nmol * blockIdx.x);  // originally __shared__
+   Real_t  *poten_ar  = d_poten_ar + (Nmol * blockIdx.x); // originally __shared__
+
+   __shared__ Real_t sum;
+
+   //=================================================
+   if (threadIdx.x==0) {
+      for (i=0;i<1024;i++) {
+	 poten_ar[i]=(Real_t)i+1.0;
+      }
    }
+   __syncthreads();
+   
+   reductSum1D( &sum, poten_ar, 1 ); // Sum. to sum
+   __syncthreads();
+   if (threadIdx.x==0) {
+      printf("%s():sum=%f\n", __func__, sum);
+   }
+   //-------------------------------------------------
+   //=================================================
+   if (threadIdx.x==0) {
+      for (i=0;i<1024;i++) {
+	 poten_ar[i]=(Real_t)i+1.0;
+      }
+   }
+   __syncthreads();
+   
+   reductSum1D( &sum, poten_ar, 2 ); // Sum. to sum
+   __syncthreads();
+   if (threadIdx.x==0) {
+      printf("%s():sum=%f\n", __func__, sum);
+   }
+   //-------------------------------------------------
+   //=================================================
+   if (threadIdx.x==0) {
+      for (i=0;i<1024;i++) {
+	 poten_ar[i]=(Real_t)i+1.0;
+      }
+   }
+   __syncthreads();
+   
+   reductSum1D( &sum, poten_ar, 3 ); // Sum. to sum
+   __syncthreads();
+   if (threadIdx.x==0) {
+      printf("%s():sum=%f\n", __func__, sum);
+   }
+   //-------------------------------------------------
+
+   if (threadIdx.x==0) {
+      for (i=0;i<1024;i++) {
+	 poten_ar[i]=(Real_t)i+1.0;
+      }
+   }
+   __syncthreads();
+   
+   reductSum1D( &sum, poten_ar, 100 ); // Sum. to sum
+   __syncthreads();
+   if (threadIdx.x==0) {
+      printf("%s():sum=%f\n", __func__, sum);
+   }
+
+   if (threadIdx.x==0) {
+      for (i=0;i<1024;i++) {
+	 poten_ar[i]=(Real_t)i+1.0;
+      }
+   }
+   __syncthreads();
+
+   reductSum1D( &sum, poten_ar, 101 ); // Sum. to sum
+   __syncthreads();
+   if (threadIdx.x==0) {
+      printf("%s():sum=%f\n", __func__, sum);
+   }
+
 }
-#endif
+
 //===============================================================================
 extern "C" __global__ void
 fitVel( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
@@ -170,9 +240,10 @@ integTime(int t0,
    int      exch_flag = d_exch_ar[blockIdx.x];
    int    ret_code;
    __shared__ Real_t vel_scale;
+   __shared__ Real_t poten_mean;
 
    __syncthreads();
-#if 1
+#if 0
    //<--- checksum
    if (blockIdx.x==0 && threadIdx.x==0) printf("checksum -------------------------------\n");
    int checksum;
@@ -278,6 +349,10 @@ integTime(int t0,
       //    calcZeta(zeta, temp_meas[t], Q, temp_targ, dt, Nmol);
       if (threadIdx.x == 0) {
 	 zeta = (sqrt( temp_meas[t]) - sqrt(temp_targ)) * dt / Q;
+	 if ( !isfinite(zeta) ) {
+	    printf("t=%d: zeta=%f, blockIdx.x=%d, temp_meas[]=%f, temp_targ=%f\n",
+		   t, zeta, blockIdx.x, temp_meas[t], temp_targ);
+	 }
       }
       __syncthreads();
       killMomentum(t, vel_ar, mass, Nmol, shared);
@@ -287,14 +362,14 @@ integTime(int t0,
       calcForce( foc_ar, poten_ar, pos_ar, Nmol, rcut, cellsize, lj_sigma, lj_epsilon);
       __syncthreads();
 
-      meanPotential(poten_ar, Nmol, shared); // + (poten_LRC / Nmol);
+      meanPotential( &poten_mean, poten_ar, Nmol, shared); // + (poten_LRC / Nmol);
       __syncthreads();
 
       if (threadIdx.x == 0) {
 	 if (t > step_exch-10) {
-	    ene_ar[t] = shared[0].x / 2.0 + calc_err; // to global memory by specified one thread. 2.0;muguruma's paper.
+	    ene_ar[t] =  poten_mean / 2.0 + calc_err; // to global memory by specified one thread. 2.0;muguruma's paper.
 	 } else {
-	    ene_ar[t] = shared[0].x / 2.0; // to global memory by specified one thread. 2.0;muguruma's paper.
+	    ene_ar[t] = poten_mean / 2.0; // to global memory by specified one thread. 2.0;muguruma's paper.
 	 }
       }
       __syncthreads();
@@ -376,7 +451,11 @@ void simRemd( Remd_t &remd, Simu_t &simu ) {
    for (int rep_i=0; rep_i<Nrep; rep_i++) {
       remd.h_exch_ar[rep_i] = 1;
    }
-   
+#if 0 // function test
+   g_test01<<<4, 1>>> ( remd.d_work_ar[0], remd.d_poten_ar[0], Nmol);
+   return ;
+#endif
+
    copyTempTarg(H2D);
    copyExch(H2D, remd, simu);
    
@@ -500,7 +579,7 @@ void simRemd( Remd_t &remd, Simu_t &simu ) {
 //===============================================================================
 // Parallel Reduction Sum on DEVICE.
 //-------------------------------------------------------------------------------
-__device__ void reductionClear3D( Real3_t *ar, int size ) {
+__device__ void reductClear3D( Real3_t *ar, int size ) {
    for (int i = threadIdx.x; i < size; i += blockDim.x) {
       ar[i].x = ar[i].y = ar[i].z = 0.0;
    }
@@ -508,7 +587,7 @@ __device__ void reductionClear3D( Real3_t *ar, int size ) {
 }
 
 __device__ void
-reductionSet3D( Real3_t *dst, const Real3_t *src, int size ) {
+reductSet3D( Real3_t *dst, const Real3_t *src, int size ) {
    for (int i = threadIdx.x; i < size; i += blockDim.x) {
       dst[i].x = src[i].x; 
       dst[i].y = src[i].y; 
@@ -517,13 +596,12 @@ reductionSet3D( Real3_t *dst, const Real3_t *src, int size ) {
    __syncthreads();
 }
 __device__ void
-reductionSum1D( Real_t *sum, Real_t *ar, int size ) { // must be 2^N, and less than 2049.
-   Real_t buf;
-   int i;
-#if 0 //debug
+reductSum1D( Real_t *sum, Real_t *ar, int len ) { // must be 2^N, and less than 2049.
+   int i, j;
+#if 0 // original multi thread
    for (int reduce_num=1024; reduce_num>1; reduce_num /= 2) {
-      if (size > reduce_num) {
-	 for (int i=threadIdx.x; i<size; i+=blockDim.x) {
+      if (len > reduce_num) {
+	 for (int i=threadIdx.x; i<len; i+=blockDim.x) {
 	    if (i < reduce_num) {
 	       ar[i] += ar[i + reduce_num];
 	    }
@@ -531,13 +609,32 @@ reductionSum1D( Real_t *sum, Real_t *ar, int size ) { // must be 2^N, and less t
 	 __syncthreads();
       }
    }
-   if (threadIdx.x == 0) {                                             // 2 -> 1
+   if (threadIdx.x == 0) { // 2 -> 1
       sum = ar[0] + ar[1];
    }
-#else
+#elif 1  /*TODO*/
+   int jmax;
+   
+   for ( jmax = len; jmax > 1; jmax = (jmax/2) + (jmax%2)) {
+      /* reduct 1st to thread size, len->len/2 or len/2+1 */
+      for ( i=threadIdx.x; i<jmax; i+=blockDim.x ) {
+	 j = i + (jmax/2) + (jmax%2); //even:(len/2), odd:(len/2+1)
+	 if ( j < jmax ) {
+	    ar[i] += ar[j];
+	 }
+      }
+      __syncthreads();
+   }
+   __syncthreads();
+   if ( threadIdx.x == 0 ) {
+      *sum = ar[0];
+   }
+#else // single thread; expected slow.
+   Real_t buf;
+   
    if ( threadIdx.x == 0 ) {
       buf = 0.0;
-      for ( i=0; i<size; i++ ) {
+      for ( i=0; i<len; i++ ) {
 	 buf += ar[i];
       }
       *sum = buf;
@@ -546,20 +643,20 @@ reductionSum1D( Real_t *sum, Real_t *ar, int size ) { // must be 2^N, and less t
 }
 
 __device__ void
-reductionSum3D( Real3_t *sum, Real3_t *ar, int size ) {
-   int i;
-   Real3_t buf;
+reductSum3D( Real3_t *sum, Real3_t *ar, int len ) {
+   int i,j;
+
 #if 0 // debug
    for (int reduce_num=1024; reduce_num>1; reduce_num /= 2) {  // 2048 -> 2
-      if (size > reduce_num) {
-	 for ( i=threadIdx.x; i<size; i+=blockDim.x) {
+      if (len > reduce_num) {
+	 for ( i=threadIdx.x; i<len; i+=blockDim.x) {
 	    if ( i < reduce_num ) {
 	       ar[i].x += ar[i + reduce_num].x;
 	       ar[i].y += ar[i + reduce_num].y;
 	       ar[i].z += ar[i + reduce_num].z;
 	    }
 	 }
-	 __syncthreads();
+	 __Syncthreads();
       }
    }
    if (threadIdx.x == 0) {                                             // 2 -> 1
@@ -567,10 +664,32 @@ reductionSum3D( Real3_t *sum, Real3_t *ar, int size ) {
       sum.y = ar[0].y + ar[1].y;
       sum.z = ar[0].z + ar[1].z;
    }
+#elif 1
+   int jmax;
+   
+   for ( jmax = len; jmax > 1; jmax = (jmax/2) + (jmax%2)) {
+      for ( i=threadIdx.x; i<jmax; i+=blockDim.x ) {
+	 j = i + (jmax/2) + (jmax%2); //even:(len/2), odd:(len/2+1)
+	 if ( j < jmax ) {
+	    ar[i].x += ar[j].x;
+	    ar[i].y += ar[j].y;
+	    ar[i].z += ar[j].z;
+	 }
+      }
+      __syncthreads();
+   }
+   __syncthreads();
+   if ( threadIdx.x == 0 ) {
+      sum->x = ar[0].x;
+      sum->y = ar[0].y;
+      sum->z = ar[0].z;
+   }
 #else
+   Real3_t buf;
+
    if ( threadIdx.x == 0 ) {
       buf.x = buf.y = buf.z = 0.0; // Reset.
-      for ( i=0; i<size; i++ ){
+      for ( i=0; i<len; i++ ){
 	 buf.x += ar[i].x;
 	 buf.y += ar[i].y;
 	 buf.z += ar[i].z;
@@ -657,12 +776,12 @@ integPos( int t, Real3_t *pos_ar, Real3_t *vel_ar, int Nmol, Real_t dt, Real_t c
    return 0;
 }
 //===============================================================================
-// measTemper()  ! needs reduction !
+// measTemper()  ! needs reduct !
 // molKineticEne(const Real3_t &vel, Real_t mass)
 //
 __device__ Real_t
-molKineticEne( const Real3_t &vel, Real_t mass ) {
-   Real_t abs_sq = (vel.x * vel.x) + (vel.y * vel.y) + (vel.z * vel.z);
+molKineticEne( const Real3_t *vel, Real_t mass ) {
+   Real_t abs_sq = (vel->x * vel->x) + (vel->y * vel->y) + (vel->z * vel->z);
    Real_t kinetic_ene = 0.5 * mass * abs_sq;
    return kinetic_ene;
 }
@@ -680,11 +799,11 @@ measTemper( Real_t *temper, const Real3_t *vel_ar, Real_t mass, int Nmol,
    int i;
 
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
-      smem[i] = molKineticEne(vel_ar[i], mass);
+      smem[i] = molKineticEne(&vel_ar[i], mass);
    }
    __syncthreads();
 
-   reductionSum1D( &sum, smem, Nmol ); // shared[0].x <= sum_kinetic_energy.
+   reductSum1D( &sum, smem, Nmol );
    __syncthreads();
 
    if ( threadIdx.x == 0 ) {
@@ -713,7 +832,7 @@ calcVelScale( int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t ma
    Real_t sum, vel_scale;
 
    for ( int i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
-      smem[i] = molKineticEne(vel_ar[i], mass);
+      smem[i] = molKineticEne(&vel_ar[i], mass);
    }
    __syncthreads();
 #if 0 //Debug
@@ -724,7 +843,7 @@ calcVelScale( int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t ma
    }
    __syncthreads();
 #endif
-   reductionSum1D( &sum, smem, Nmol ); // shared[0].x <= sum_kinetic_ene
+   reductSum1D( &sum, smem, Nmol ); // shared[0].x <= sum_kinetic_ene
    __syncthreads();
 
    if ( threadIdx.x == 0 ) {
@@ -750,7 +869,7 @@ calcMomentum(Real3_t *mome, const Real3_t *velo_ar, Real_t mass, int Nmol, Real3
    }
    __syncthreads();
    
-   reductionSum3D(&sum, shared, Nmol);                      // shared[0] <= sum.
+   reductSum3D(&sum, shared, Nmol);                      // shared[0] <= sum.
 
    if (threadIdx.x == 0) {
       mome->x = sum.x / (Real_t)Nmol;
@@ -835,33 +954,38 @@ debugVel(const char *mes, const Real3_t *vel_ar, int Nmol) {
 
 //===============================================================================
 // meanPotential
+//     Calculate the mean value of each potentials of all atoms.
+//     output: 
+//         Real_t mean;
+//     inputs:
+//         Real_t poten_ar[Nmol]: potential values.
+//         Real3_t shared[Nmol] : reduct work area.
 //-------------------------------------------------------------------------------
-__device__ Real_t 
-meanPotential( Real_t *poten_ar, int Nmol, Real3_t *shared ) {
+__device__ void
+meanPotential( Real_t *mean, Real_t *poten_ar, int Nmol, Real3_t *shared ) {
+   //Memo: The "mean" must be __shared__ memory pointer.
    Real_t *smem = (Real_t *)shared;
-   Real_t sum, mean;
+   Real_t sum;
    int i;
    
-   __syncthreads();
    /* Clear space */
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
       smem[i] = 0.0;
    }
-   
    __syncthreads();
+   
    /* Set data */
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
       smem[i] = poten_ar[i];
    }
-   
    __syncthreads();
-   reductionSum1D( &sum, smem, Nmol); // Sum. to smem[0].
+   
+   reductSum1D( &sum, smem, Nmol ); // Sum. to sum
    __syncthreads();
 
    if (threadIdx.x == 0) {
-      mean = sum / (Real_t) Nmol;      // is mean_potential, [J/mol]
+      *mean = sum / (Real_t) Nmol;      // is mean_potential, [J/mol]
    }
-   return mean;
 }
 
 __device__ int

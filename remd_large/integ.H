@@ -11,12 +11,12 @@ __device__ void killMomentum(int t, Real3_t *velo_ar, Real_t mass, int Nmol, Rea
 
 __device__ void calcVelScale(Real_t targ_temp, const Real3_t *vel_ar, Real_t mass, int Nmol, Real3_t *shared);
 
-__device__ Real_t meanPotential(Real_t *potential, int Nmol, Real3_t *smem);
+__device__ void meanPotential(Real_t *mean, Real_t *poten_ar, int Nmol, Real3_t *shared);
 __device__ void calcZeta(Real_t&, Real_t, Real_t, Real_t, Real_t, int);
-__device__ void reductionClear3D(Real3_t *ar, int size);
-__device__ void reductionSet3D(Real3_t *dst, const Real3_t *src, int size); 
-__device__ void reductionSum1D(Real_t  *sum, Real_t  *ar, int size);
-__device__ void reductionSum3D(Real3_t *sum, Real3_t *ar, int size);
+__device__ void reductClear3D(Real3_t *ar, int size);
+__device__ void reductSet3D(Real3_t *dst, const Real3_t *src, int size); 
+__device__ void reductSum1D(Real_t  *sum, Real_t  *ar, int size);
+__device__ void reductSum3D(Real3_t *sum, Real3_t *ar, int size);
 __device__ void scaleVelo(int t, Real3_t *velo_ar, Real_t scale, int Nmol);
 __device__ void measTemper(Real_t *temper, const Real3_t *vel_ar, Real_t mass, int Nmol, Real3_t *shared);
 
