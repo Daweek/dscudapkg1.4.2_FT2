@@ -13,22 +13,22 @@
 
 __host__
 void calcForce_hst(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
-		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
+		   Nmol_t Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon);
 
 __device__
 void calcForce(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
-		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
+		   Nmol_t Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon, Real3_t *shared_mem);
 
 __host__
 void zeroForce_hst(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
-		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
+		   Nmol_t Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon);
 
 __device__
 void zeroForce(Real3_t *force_ar, Real_t *poten_ar, const Real3_t *posi_ar,
-		   int Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
+		   Nmol_t Nmol, Real_t rcut, Real_t cellsize, Real_t sigma,
 		   Real_t epsilon, Real3_t *shared_mem);
 
 

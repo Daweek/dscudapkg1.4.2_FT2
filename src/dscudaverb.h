@@ -94,8 +94,9 @@ public:
  *** If you need to memorize another function into history, add new one.
  ***/
 typedef struct HistCell_t {
-    int   funcID;
-    void *args;
+   int  funcID;   // Recorded cuda*() function.
+   void *args;    // And its arguments.
+   int  dev_id;   // The Device ID, set by last cudaSetDevice().
 } HistCell;
 
 typedef struct HistRecord_t {
@@ -115,11 +116,11 @@ typedef struct HistRecord_t {
     HistRecord_t( void );
 } HistRecord;
 
-typedef struct {                        /* cudaSetDevice() */
+typedef struct { /* cudaSetDevice() */
     int device;
 } cudaSetDeviceArgs;
 
-typedef struct CudaMallocArgs_t {                        /* cudaMalloc() */
+typedef struct CudaMallocArgs_t { /* cudaMalloc() */
     void *devPtr;
     size_t size;
     CudaMallocArgs_t( void ) { devPtr = NULL, size = 0; }

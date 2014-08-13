@@ -67,10 +67,10 @@ BkupMemList_t::BkupMemList_t( void ) {
     }
     pthread_mutex_unlock( &InitClientMutex );
 }
+
 BkupMemList_t::~BkupMemList_t( void ) {
     pthread_cancel( tid );
 }
-
 
 int BkupMemList_t::isEmpty( void ) {
     if      ( head==NULL && tail==NULL ) return 1;
@@ -874,10 +874,16 @@ HistRecord_t::HistRecord_t( void ) {
     pthread_mutex_unlock( &InitClientMutex );
 }
 
+/*==============================================================================
+ *
+ */
 void HistRecord_t::add( int funcID, void *argp ) {
     int DSCVMethodId;
 
-    if (rec_en==0 || recalling==1) return;
+    if ( rec_en==0 || recalling==1 ) {
+       /* record-enable-flag is disabled, or in recalling process. */
+       return;
+    }
     if ( length == max_len ) { /* Extend the existing memory region. */
 	max_len += DSCUDAVERB_HISTMAX_GROWSIZE;
 	hist = (HistCell *)realloc( hist, sizeof(HistCell) * max_len );

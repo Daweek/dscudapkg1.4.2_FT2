@@ -27,11 +27,16 @@ const double UNIT_ENERGY = 1.0 / Na;    // = mol[J]
 
 const int LEN_FILENAME = 256;
 
+typedef int  Nmol_t;       // type of # of atoms.
+typedef int  Nrep_t;       // type of # of replicas.
+typedef long MemSize_t;    // type of memory length. 
+
 #define SMEM_COUNT 2048    // shared memory array count 
 const int MAX_GPU = 2048;
-const int MAX_NMOL = 2048;
+const Nmol_t MAX_NMOL = 2048;
+const Nrep_t MAX_NREP = 16384;  // upper bound of replica counts.
 const int REDUCTION_SIZE = SMEM_COUNT;  // GPU reduction size. must be 2^N.
-const int MAX_NREP = 16384;  // upper bound of replica counts.
+
 
 // typedef struct Devptr {
 //    int  devid;
@@ -42,14 +47,15 @@ const int MAX_NREP = 16384;  // upper bound of replica counts.
 //    }
 // } Devptr_t;
 
+
 typedef enum {
   H2D,
   D2H
 } CopyKind_t;
 
 typedef struct Remd {
-   int       Nmol;          // Number of atoms in a replica.
-   int       Nrep;          // Number of all replicas.
+   Nmol_t    Nmol;          // Number of atoms in a replica.
+   Nrep_t    Nrep;          // Number of all replicas.
    Real_t    dens;          // density
    Real_t    mass;          // mass; common for all atoms.
    int      *sort_temper;   // scrambled sequetial number.
@@ -85,7 +91,7 @@ typedef struct Remd {
 //==============================================================================
 typedef struct Simu {
   int    Ngpu;          // Number of all GPUs.
-  int    Nrep_1dev;     // Number of replicas in each GPUs.
+  Nrep_t Nrep_1dev;     // Number of replicas in each GPUs.
   int   *which_dev;
   int   *offset_dev;
   long   step_max;      // simulation steps counts.

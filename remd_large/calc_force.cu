@@ -98,7 +98,7 @@ lj(Real3_t &f_ij, Real_t &p_ij, const Real3_t &pos_i, const Real3_t &pos_j,
 //------------------------------------------------------------------------------
 void
 zeroForce_hst(Real3_t *f_ar, Real_t *poten_ar,
-	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
+	      const Real3_t *pos_ar, Nmol_t Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
    Real3_t f_ij;
    Real_t  p_ij;
@@ -116,7 +116,7 @@ zeroForce_hst(Real3_t *f_ar, Real_t *poten_ar,
 
 void
 calcForce_hst(Real3_t *f_ar, Real_t *poten_ar,
-	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
+	      const Real3_t *pos_ar, Nmol_t Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
    Real3_t f_ij;
    Real_t  p_ij;
@@ -142,7 +142,7 @@ calcForce_hst(Real3_t *f_ar, Real_t *poten_ar,
 }
 __device__ void
 zeroForce_dev(Real3_t *f_ar, Real_t *poten_ar,
-	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
+	      const Real3_t *pos_ar, Nmol_t Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
    Real3_t force_i_j;
    Real3_t force_i_all;
@@ -168,7 +168,7 @@ zeroForce_dev(Real3_t *f_ar, Real_t *poten_ar,
 //==================================================================================
 __device__ void
 calcForce(Real3_t *f_ar, Real_t *poten_ar,
-	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
+	      const Real3_t *pos_ar, Nmol_t Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
    Real3_t force_i_j;
    Real3_t force_i_all;
@@ -180,7 +180,7 @@ calcForce(Real3_t *f_ar, Real_t *poten_ar,
    for ( int i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
       force_i_all.x = force_i_all.y = force_i_all.z = 0.0;
       poten_i_all = 0.0;
-      for (int j=0; j<Nmol; j++) {
+      for ( int j=0; j<Nmol; j++ ) {
 	 if (i != j) {
 	    lj(force_i_j, poten_i_j,
 	       pos_ar[i], pos_ar[j], rcut, cellsize, lj_sigma, lj_epsilon);

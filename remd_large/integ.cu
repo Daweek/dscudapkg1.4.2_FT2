@@ -22,14 +22,14 @@
 FaultConf_t FAULT_CONF(5); // fault 1 times.
 
 __device__
-void calcVelScale(int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t mass, int Nmol, Real3_t *shared);
+void calcVelScale(int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t mass, Nmol_t Nmol, Real3_t *shared);
 void checkEnergyVal( int t0, const Real_t *h_energy, int len);
 void calcHistogram( int *histo_ar, Remd_t &remd, Simu_t &simu);
 void saveHistogram( const int *histo_ar, Remd_t &remd, Simu_t &simu);
 void exchTemp( int t0, Remd_t &remd, Simu_t &simu);
 void saveAccRatio( Remd_t &remd, int step_numkernel);
 __device__
-int ctrlTemp( int, int, Real3_t *velo_ar, Real_t zeta, int Nmol, Real_t dt);
+int ctrlTemp( int, int, Real3_t *velo_ar, Real_t zeta, Nmol_t Nmol, Real_t dt);
 static void calcZetaSum( Real_t&, Real_t, Real_t);
 static Real_t hamiltonian( Real_t, Real_t, Real_t, Real_t, Real_t, Real_t, int);
 
@@ -46,10 +46,10 @@ __device__ int chksum( int *start, int count ) {
     return sum;
 }
 __device__ void
-probePosVelFoc( int t, int num_rep, Real3_t *posi, Real3_t *velo, Real3_t *forc, int Nmol ) {
+probePosVelFoc( int t, int num_rep, Real3_t *posi, Real3_t *velo, Real3_t *forc, Nmol_t Nmol ) {
    if ( blockIdx.x == num_rep ) { 
       if ( threadIdx.x==0 ) {
-	 for (int i=0; i<Nmol; i++) {
+	 for (Nmol_t i=0; i<Nmol; i++) {
 	    printf("t=%d, Rep=%d [%d]: p={%+6.3f, %+6.3f, %+6.3f}, v={%+6.3f, %+6.3f %+6.3f}, f={%+6.3f, %+6.3f %+6.3f}\n", t, num_rep, i,
 		   posi[i].x, posi[i].y, posi[i].z,
 		   velo[i].x, velo[i].y, velo[i].z,
@@ -59,8 +59,9 @@ probePosVelFoc( int t, int num_rep, Real3_t *posi, Real3_t *velo, Real3_t *forc,
    }
 }
 
+#if 0 //debug
 extern "C" __global__ void
-g_test01( Real3_t *d_work_ar, Real_t *d_poten_ar, int Nmol ) {
+g_test01( Real3_t *d_work_ar, Real_t *d_poten_ar, Nmol_t Nmol ) {
    int i;
    Real3_t *shared    = d_work_ar + (Nmol * blockIdx.x);  // originally __shared__
    Real_t  *poten_ar  = d_poten_ar + (Nmol * blockIdx.x); // originally __shared__
@@ -137,10 +138,10 @@ g_test01( Real3_t *d_work_ar, Real_t *d_poten_ar, int Nmol ) {
    }
 
 }
-
+#endif
 //===============================================================================
 extern "C" __global__ void
-fitVel( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
+fitVel( Nmol_t Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
 	Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
 	Real3_t *d_work_ar, Real_t *d_poten_ar,
@@ -157,7 +158,7 @@ fitVel( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
    __shared__ Real_t temp_meas;
    __shared__ Real_t vel_scale;
    
-   int      t_max = 1000;
+   int      t_max = 10; //1000;
    int      ret_code[8];
 
    if ( blockIdx.x==0 && threadIdx.x==0 ) {
@@ -202,6 +203,11 @@ fitVel( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
       __syncthreads();
       integVel( t, 11, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
       __syncthreads();
+
+      if ( threadIdx.x==0 && blockIdx.x==0 ) {
+	  printf("%s():t=%d/%d completed.\n", __func__, t+1, t_max);
+      }
+      __syncthreads();
    }
    return;
 }// fitVel(...)
@@ -211,7 +217,7 @@ fitVel( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
 //---------------------------------------------------------------
 extern "C" __global__ void
 integTime(int t0,
-	  int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
+	  Nmol_t Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
 	  Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	  Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
 	  Real3_t *d_work_ar, Real_t *d_poten_ar,
@@ -271,7 +277,166 @@ integTime(int t0,
    // <--- calc LRC
    Real_t   cellsize_pow3 = cellsize * cellsize * cellsize;
    Real_t   sigma_pow3 = lj_sigma * lj_sigma * lj_sigma;
-   Real_t   Nmol_pow2 = (Real_t)(Nmol * Nmol);
+   Real_t   Nmol_pow2 = (Real_t)Nmol * (Real_t)Nmol;
+   Real_t   sigma_rcut = lj_sigma / rcut;
+#if defined(REAL_AS_SINGLE)
+   Real_t   poten_LRC = (8.0 * M_PI) / (9.0 * cellsize_pow3) *
+     Nmol_pow2 * lj_epsilon * sigma_pow3 *
+     ( powf(sigma_rcut, 9.0) - 3.0 * powf(sigma_rcut, 3.0) );
+   Real_t poten0_LRC = 8.0 *3.1416 * Nmol * Nmol * (2.0 * powf(1.0 / rcut, 9.0)
+						    - 3.0*powf(1.0 / rcut, 3.0)) / (9.0 * cellsize_pow3);
+#elif defined(REAL_AS_DOUBLE)
+   Real_t   poten_LRC = (8.0 * M_PI) / (9.0 * cellsize_pow3) *
+     Nmol_pow2 * lj_epsilon * sigma_pow3 *
+     ( pow(sigma_rcut, 9.0) - 3.0 * pow(sigma_rcut, 3.0) );
+#endif
+  // ---> calc_LRC
+
+   __syncthreads();
+   if (blockIdx.x==0 && threadIdx.x==0) {
+       if (FAULT_CONF.fault_en==0 || fault_cnt==0) {  /* Normal calc */
+	   printf("[Normal calculation] (t0=%d)\n", t0);
+	   /* nop */
+       }
+       else { /* Fault calc */
+	   printf("[Fault  calculation] (t0=%d)\n", t0);
+
+       }
+   }
+
+   /***********************************************************************
+    *  <--- FAULT INJECTION
+    */
+   if (threadIdx.x==0) {
+       if (FAULT_CONF.fault_en==0 || fault_cnt==0) {
+	   calc_err = 0.0;
+       }
+       else {
+	   if (blockIdx.x==0) { calc_err = +500.0; }
+	   if (blockIdx.x==1) { calc_err = -500.0; }
+	   if (blockIdx.x==2) { calc_err = +500.0; }
+	   if (blockIdx.x==3) { calc_err = -500.0; }
+       }
+       printf("(%d,%d)calc_err[%d]:blockIdx.x=%d= %f\n", FAULT_CONF.fault_en, fault_cnt, t0, blockIdx.x, calc_err);
+   }
+   /*
+    *  ---> FAULT INJECTION 
+    ***********************************************************************/
+   
+   // if exchanged, scale velocity //
+   if (exch_flag == 1) {
+      calcVelScale( -1, &vel_scale, temp_targ, vel_ar, mass, Nmol, shared); // vel_scale = shared[0].x
+      __syncthreads();
+      scaleVelo(-1, vel_ar, vel_scale, Nmol);
+      __syncthreads();
+      killMomentum(-1, vel_ar, mass, Nmol, shared);
+      __syncthreads();
+   }
+
+   if (threadIdx.x == 0) zeta = 0.0;
+   __syncthreads();
+
+   int t;
+   for (t=0; t<step_exch; t++) {            // run "step_exch" steps.
+      integVel( 1000*(t0+1) + t, 21, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
+      __syncthreads();
+      
+      ctrlTemp( 1000*(t0+1) + t, 21, vel_ar, zeta,   Nmol, dt * 0.5);
+      __syncthreads();
+      
+      ret_code = integPos( 1000*(t0+1) + t, pos_ar, vel_ar, Nmol, dt, cellsize);
+      __syncthreads();
+      if (ret_code != 0) {
+	 printf("(;_;) serious error in function %s()\n timestep t = %d\n blockIdx.x = %d, threadIdx.x = %d\n", __func__, t, blockIdx.x, threadIdx.x);
+	 return;
+      }
+    
+      measTemper( &temp_meas[t], vel_ar, mass, Nmol, shared); // curr_temp => shared[0].x
+      __syncthreads();
+      //    calcZeta(zeta, temp_meas[t], Q, temp_targ, dt, Nmol);
+      if (threadIdx.x == 0) {
+	 zeta = (sqrt( temp_meas[t]) - sqrt(temp_targ)) * dt / Q;
+	 if ( !isfinite(zeta) ) {
+	    printf("t=%d: zeta=%f, blockIdx.x=%d, temp_meas[]=%f, temp_targ=%f\n",
+		   t, zeta, blockIdx.x, temp_meas[t], temp_targ);
+	 }
+      }
+      __syncthreads();
+      killMomentum(t, vel_ar, mass, Nmol, shared);
+      __syncthreads();
+
+      // calculate forces //
+      calcForce( foc_ar, poten_ar, pos_ar, Nmol, rcut, cellsize, lj_sigma, lj_epsilon ); 
+      __syncthreads();
+
+      meanPotential( &poten_mean, poten_ar, Nmol, shared); // + (poten_LRC / Nmol);
+      __syncthreads();
+
+      if (threadIdx.x == 0) {
+	 if (t > step_exch-10) {
+	    ene_ar[t] =  poten_mean / 2.0 + calc_err; // to global memory by specified one thread. 2.0;muguruma's paper.
+	 } else {
+	    ene_ar[t] = poten_mean / 2.0; // to global memory by specified one thread. 2.0;muguruma's paper.
+	 }
+      }
+      __syncthreads();
+      integVel( 1000*(t0+1) + t, 22, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
+      __syncthreads();
+      ctrlTemp( 1000*(t0+1) + t, 22, vel_ar, zeta,   Nmol, dt * 0.5);
+      __syncthreads();
+   } // for (int t=0; ...
+   
+   __syncthreads();
+   if (blockIdx.x==0 && threadIdx.x==0) {
+       if (FAULT_CONF.fault_en>0 && fault_cnt>0) {
+	   *FAULT_CONF.d_Nfault = fault_cnt - 1;
+       }
+   }
+	      
+} //integTime()
+
+//==============================================================================
+//
+//------------------------------------------------------------------------------
+extern "C" __global__ void
+integTimeUnit(int t0,
+	      Nmol_t Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
+	      Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
+	      Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
+	      Real3_t *d_work_ar, Real_t *d_poten_ar,
+	      Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar,
+	      FaultConf_t FAULT_CONF) {
+   Real_t calc_err;
+
+   
+   Real3_t *pos_ar    = d_pos_ar   + (Nmol * blockIdx.x);
+   Real3_t *vel_ar    = d_vel_ar   + (Nmol * blockIdx.x);
+   Real3_t *foc_ar    = d_foc_ar   + (Nmol * blockIdx.x);
+   Real3_t *shared    = d_work_ar  + (Nmol * blockIdx.x);
+   Real_t  *poten_ar  = d_poten_ar + (Nmol * blockIdx.x);
+   Real_t  *ene_ar    = d_ene_ar + (step_exch * blockIdx.x);
+   Real_t  *temp_meas = d_temp_meas + (step_exch * blockIdx.x);
+   Real_t   temp_targ = d_temp_ar[blockIdx.x];
+   int      exch_flag = d_exch_ar[blockIdx.x];
+   int      ret_code;
+   __shared__ Real_t zeta;
+   __shared__ Real_t vel_scale;
+   __shared__ Real_t poten_mean;
+   __shared__ int    fault_cnt;
+   
+   if (threadIdx.x==0) {
+      fault_cnt = *FAULT_CONF.d_Nfault;
+      printf("FAULT_CONF= %d/%d %s.\n", fault_cnt, FAULT_CONF.fault_en, FAULT_CONF.tag);
+   }
+   __syncthreads();
+
+   Real_t   zeta_sum = 0.0; // unused?
+   Real_t   Q        = 70.0;
+
+   // <--- calc LRC
+   Real_t   cellsize_pow3 = cellsize * cellsize * cellsize;
+   Real_t   sigma_pow3 = lj_sigma * lj_sigma * lj_sigma;
+   Real_t   Nmol_pow2 = (Real_t)Nmol * (Real_t)Nmol;
    Real_t   sigma_rcut = lj_sigma / rcut;
 #if defined(REAL_AS_SINGLE)
    Real_t   poten_LRC = (8.0 * M_PI) / (9.0 * cellsize_pow3) *
@@ -330,54 +495,49 @@ integTime(int t0,
    if (threadIdx.x == 0) zeta = 0.0;
 
    int t;
-   for (t=0; t<step_exch; t++) {            // run "step_exch" steps.
-      integVel( 1000*(t0+1) + t, 21, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
-      __syncthreads();
-      
-      ctrlTemp( 1000*(t0+1) + t, 21, vel_ar, zeta,   Nmol, dt * 0.5);
-      __syncthreads();
-      
-      ret_code = integPos( 1000*(t0+1) + t, pos_ar, vel_ar, Nmol, dt, cellsize);
-      __syncthreads();
-      if (ret_code != 0) {
-	 printf("(;_;) serious error in function %s()\n timestep t = %d\n blockIdx.x = %d, threadIdx.x = %d\n", __func__, t, blockIdx.x, threadIdx.x);
-	 return;
-      }
-    
-      measTemper( &temp_meas[t], vel_ar, mass, Nmol, shared); // curr_temp => shared[0].x
-      __syncthreads();
-      //    calcZeta(zeta, temp_meas[t], Q, temp_targ, dt, Nmol);
-      if (threadIdx.x == 0) {
-	 zeta = (sqrt( temp_meas[t]) - sqrt(temp_targ)) * dt / Q;
-	 if ( !isfinite(zeta) ) {
-	    printf("t=%d: zeta=%f, blockIdx.x=%d, temp_meas[]=%f, temp_targ=%f\n",
-		   t, zeta, blockIdx.x, temp_meas[t], temp_targ);
-	 }
-      }
-      __syncthreads();
-      killMomentum(t, vel_ar, mass, Nmol, shared);
-      __syncthreads();
 
-      // calculate forces //
-      calcForce( foc_ar, poten_ar, pos_ar, Nmol, rcut, cellsize, lj_sigma, lj_epsilon);
-      __syncthreads();
-
-      meanPotential( &poten_mean, poten_ar, Nmol, shared); // + (poten_LRC / Nmol);
-      __syncthreads();
-
-      if (threadIdx.x == 0) {
-	 if (t > step_exch-10) {
-	    ene_ar[t] =  poten_mean / 2.0 + calc_err; // to global memory by specified one thread. 2.0;muguruma's paper.
-	 } else {
-	    ene_ar[t] = poten_mean / 2.0; // to global memory by specified one thread. 2.0;muguruma's paper.
-	 }
+   // Integrate time
+   integVel( 1000*(t0+1) + t, 21, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
+   __syncthreads();
+   ctrlTemp( 1000*(t0+1) + t, 21, vel_ar, zeta,   Nmol, dt * 0.5);
+   __syncthreads();
+   ret_code = integPos( 1000*(t0+1) + t, pos_ar, vel_ar, Nmol, dt, cellsize);
+   __syncthreads();
+   if (ret_code != 0) {
+      printf("(;_;) serious error in function %s()\n timestep t = %d\n blockIdx.x = %d, threadIdx.x = %d\n", __func__, t, blockIdx.x, threadIdx.x);
+      return;
+   }
+   measTemper( &temp_meas[t], vel_ar, mass, Nmol, shared); // curr_temp => shared[0].x
+   __syncthreads();
+   //    calcZeta(zeta, temp_meas[t], Q, temp_targ, dt, Nmol);
+   if (threadIdx.x == 0) {
+      zeta = (sqrt( temp_meas[t]) - sqrt(temp_targ)) * dt / Q;
+      if ( !isfinite(zeta) ) {
+	 printf("t=%d: zeta=%f, blockIdx.x=%d, temp_meas[]=%f, temp_targ=%f\n",
+		t, zeta, blockIdx.x, temp_meas[t], temp_targ);
       }
-      __syncthreads();
-      integVel( 1000*(t0+1) + t, 22, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
-      __syncthreads();
-      ctrlTemp( 1000*(t0+1) + t, 22, vel_ar, zeta,   Nmol, dt * 0.5);
-      __syncthreads();
-   } // for (int t=0; ...
+   }
+   __syncthreads();
+   killMomentum(t, vel_ar, mass, Nmol, shared);
+   __syncthreads();
+   calcForce( foc_ar, poten_ar, pos_ar, Nmol, rcut, cellsize, lj_sigma, lj_epsilon);
+   __syncthreads();
+   meanPotential( &poten_mean, poten_ar, Nmol, shared); // + (poten_LRC / Nmol);
+   __syncthreads();
+
+   if (threadIdx.x == 0) {
+      if (t > step_exch-10) {
+	 ene_ar[t] =  poten_mean / 2.0 + calc_err; // to global memory by specified one thread. 2.0;muguruma's paper.
+      } else {
+	 ene_ar[t] = poten_mean / 2.0; // to global memory by specified one thread. 2.0;muguruma's paper.
+      }
+   }
+   __syncthreads();
+   integVel( 1000*(t0+1) + t, 22, vel_ar, foc_ar, Nmol, mass, dt * 0.5);
+   __syncthreads();
+   ctrlTemp( 1000*(t0+1) + t, 22, vel_ar, zeta,   Nmol, dt * 0.5);
+
+//////
    
    __syncthreads();
    if (blockIdx.x==0 && threadIdx.x==0) {
@@ -386,8 +546,8 @@ integTime(int t0,
        }
    }
 	      
-} //integTime()
-//==============================================================================
+} //integTimeUnit()
+
 static
 int checkSum(void *targ, int size) {
     int sum=0;
@@ -399,19 +559,20 @@ int checkSum(void *targ, int size) {
     }
     return sum;
 }
+//==============================================================================
 // simRemd()
 //------------------------------------------------------------------------------
 void simRemd( Remd_t &remd, Simu_t &simu ) {
    debug_print(2, "Entering %s().\n", __func__);
    const int MAX_THREADS_PER_BLOCK = 256; // 
-   const int MAX_NMOL = 32768;
+   const Nmol_t MAX_NMOL = 4 * (256 * 256 * 256);
    
 #if !defined(HOST_RUN) && !defined(DEVICE_RUN)
    die("undefined HOST_RUN or DEVICE_RUN.\n");
 #endif
 
    const int    Nrep      = remd.Nrep;
-   const int    Nmol      = remd.Nmol;
+   const Nmol_t Nmol      = remd.Nmol;
    const int    Ngpu      = simu.Ngpu;
    const int    Nrep_1dev = simu.Nrep_1dev;
    const int    step_exch = simu.step_exch;
@@ -500,10 +661,10 @@ void simRemd( Remd_t &remd, Simu_t &simu ) {
 	 next_progress += step_progress;
       }
       
-#if defined(__DSCUDA__)
-      dscudaClearHist();     /*** <--- Clear Recall List.        ***/
-      dscudaRecordHistOff();  /*** <--- Enable recording history. ***/ 
-#endif
+// #if defined(__DSCUDA__)
+//       dscudaClearHist();     /*** <--- Clear Recall List.        ***/
+//       dscudaRecordHistOff();  /*** <--- Enable recording history. ***/ 
+// #endif
       if (simu.report_posi >= 1)  { savePosAll(t0 * step_exch);      } // cudaMemcpyD2H * Nrep
       if (simu.report_velo >= 1)  { saveVelAll(t0 * step_exch);      } // cudaMemcpyD2H * Nrep
       if (simu.report_force >= 1) { saveFocAll(t0 * step_exch);      } // cudaMemcpyD2H * Nrep
@@ -523,45 +684,50 @@ void simRemd( Remd_t &remd, Simu_t &simu ) {
 	 FAULT_CONF.fault_en     = 0;
 	 FAULT_CONF.overwrite_en = 0;
       } else {
-#if defined( FAULT_ON )
-	 FAULT_CONF.fault_en     = 1;
-#endif
+// #if defined( FAULT_ON )
+// 	 FAULT_CONF.fault_en     = 1;
+// #endif
 	 FAULT_CONF.overwrite_en = 1;
       }
-      
-#if defined( __DSCUDA__ )
-      dscudaRecordHistOn();  /*** <--- Enable recording history. ***/ 
-#endif
-      
-      //	printf("checksum: Pos[t0=%d before]= %d\n",
-      //     t0, checkSum((void*)remd.h_pos_ar, sizeof(Real3_t)*Nmol*Nrep)); fflush(stdout);
 
+#if 1
       for ( i=0; i<Ngpu; i++ ) {                          // Sweep GPU.
 	 cu_err[0] = cudaSetDevice(i);
 	 if( cu_err[0] != cudaSuccess ) { die("cudaSetDevice() failed.\n"); }
-	 integTime <<< blocks, threads >>>                       // rpcLaunchKernel
-	    ( t0, Nmol, step_exch, dt, cellsize, rcut, lj_sigma, lj_epsilon, mass, 
-	      remd.d_pos_ar[i], remd.d_vel_ar[i], remd.d_foc_ar[i],
-	      remd.d_work_ar[i], remd.d_poten_ar[i],
-	      remd.d_energy[i], remd.d_temp_ar[i],remd.d_temp_meas[i],
-	      remd.d_exch_ar[i], FAULT_CONF );
+	 integTime <<< blocks, threads >>> (
+	    t0, Nmol, step_exch, dt, cellsize, rcut, lj_sigma, lj_epsilon, mass, 
+	    remd.d_pos_ar[i], remd.d_vel_ar[i], remd.d_foc_ar[i],
+	    remd.d_work_ar[i], remd.d_poten_ar[i],
+	    remd.d_energy[i], remd.d_temp_ar[i],remd.d_temp_meas[i],
+	    remd.d_exch_ar[i], FAULT_CONF );
       }
       cu_err[1] = cudaGetLastError();
       if (cu_err[1] != cudaSuccess) {
 	 printf("err: %s\n", cudaGetErrorString(cu_err[1]));
 	 exit(1);
       }
+#else
+      for ( t=0; t<step_exch; t++ ) {
+	 for ( i=0; i<Ngpu; i++ ) {                          // Sweep GPU.
+	    cu_err[0] = cudaSetDevice(i);
+	    if( cu_err[0] != cudaSuccess ) { die("cudaSetDevice() failed.\n"); }
+	    integTimeUnit <<< blocks, threads >>> (
+	       t0, Nmol, step_exch, dt, cellsize, rcut, lj_sigma, lj_epsilon, mass, 
+	       remd.d_pos_ar[i], remd.d_vel_ar[i], remd.d_foc_ar[i],
+	       remd.d_work_ar[i], remd.d_poten_ar[i],
+	       remd.d_energy[i], remd.d_temp_ar[i],remd.d_temp_meas[i],
+	       remd.d_exch_ar[i], FAULT_CONF );
 
+	    cu_err[1] = cudaGetLastError();
+	    if (cu_err[1] != cudaSuccess) {
+	       printf("err: %s\n", cudaGetErrorString(cu_err[1]));
+	       exit(1);
+	    }
+	 }
+      }
+#endif
       copyEnergy( D2H, remd, simu );       /* Correct data of potential energy. */
       
-#if defined( __DSCUDA__ )
-      dscudaRecordHistOff();
-#endif
-      //savePosAll(t0 * step_exch + 100000);
-#if defined( __DSCUDA__ )
-      dscudaAutoVerbOn();
-      dscudaClearHist();          /*** <--- Clear Recall List.        ***/
-#endif
       if( simu.report_ene >= 2)   { saveEne(remd, t0); }
 #if 0
       checkEnergyVal( t0, remd.h_energy, Nrep*step_exch);
@@ -598,21 +764,8 @@ reductSet3D( Real3_t *dst, const Real3_t *src, int size ) {
 __device__ void
 reductSum1D( Real_t *sum, Real_t *ar, int len ) { // must be 2^N, and less than 2049.
    int i, j;
-#if 0 // original multi thread
-   for (int reduce_num=1024; reduce_num>1; reduce_num /= 2) {
-      if (len > reduce_num) {
-	 for (int i=threadIdx.x; i<len; i+=blockDim.x) {
-	    if (i < reduce_num) {
-	       ar[i] += ar[i + reduce_num];
-	    }
-	 }
-	 __syncthreads();
-      }
-   }
-   if (threadIdx.x == 0) { // 2 -> 1
-      sum = ar[0] + ar[1];
-   }
-#elif 1  /*TODO*/
+
+#if 1 // parallel
    int jmax;
    
    for ( jmax = len; jmax > 1; jmax = (jmax/2) + (jmax%2)) {
@@ -646,25 +799,7 @@ __device__ void
 reductSum3D( Real3_t *sum, Real3_t *ar, int len ) {
    int i,j;
 
-#if 0 // debug
-   for (int reduce_num=1024; reduce_num>1; reduce_num /= 2) {  // 2048 -> 2
-      if (len > reduce_num) {
-	 for ( i=threadIdx.x; i<len; i+=blockDim.x) {
-	    if ( i < reduce_num ) {
-	       ar[i].x += ar[i + reduce_num].x;
-	       ar[i].y += ar[i + reduce_num].y;
-	       ar[i].z += ar[i + reduce_num].z;
-	    }
-	 }
-	 __Syncthreads();
-      }
-   }
-   if (threadIdx.x == 0) {                                             // 2 -> 1
-      sum.x = ar[0].x + ar[1].x;
-      sum.y = ar[0].y + ar[1].y;
-      sum.z = ar[0].z + ar[1].z;
-   }
-#elif 1
+#if 1 // parallel
    int jmax;
    
    for ( jmax = len; jmax > 1; jmax = (jmax/2) + (jmax%2)) {
@@ -704,7 +839,7 @@ reductSum3D( Real3_t *sum, Real3_t *ar, int len ) {
 // integVel(), for HOST and DEVICE.
 //-------------------------------------------------------------------------------
 __device__ int
-integVel( int t, int tag, Real3_t *vel_ar, Real3_t *foc_ar, int Nmol, Real_t mass, Real_t dt) {
+integVel( int t, int tag, Real3_t *vel_ar, Real3_t *foc_ar, Nmol_t Nmol, Real_t mass, Real_t dt) {
    int i;
    
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
@@ -728,8 +863,9 @@ integVel( int t, int tag, Real3_t *vel_ar, Real3_t *foc_ar, int Nmol, Real_t mas
 // integPos(), for HOST and DEVECE.
 //------------------------------------------------------------------------------
 __device__ int
-integPos( int t, Real3_t *pos_ar, Real3_t *vel_ar, int Nmol, Real_t dt, Real_t cellsize) {
+integPos( int t, Real3_t *pos_ar, Real3_t *vel_ar, Nmol_t Nmol, Real_t dt, Real_t cellsize) {
    Real3_t round;
+   Real3_t dr;
    int i;
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x) {
 #if 1 //debug
@@ -739,9 +875,23 @@ integPos( int t, Real3_t *pos_ar, Real3_t *vel_ar, int Nmol, Real_t dt, Real_t c
 	 return -1;
       }
 #endif
-      pos_ar[i].x += vel_ar[i].x * dt;
-      pos_ar[i].y += vel_ar[i].y * dt;
-      pos_ar[i].z += vel_ar[i].z * dt;
+      // delta positon
+      dr.x = ( vel_ar[i].x * dt );
+      dr.y = ( vel_ar[i].y * dt );
+      dr.z = ( vel_ar[i].z * dt );
+#if 1 //debug
+      if ( dr.x > 1.0 || dr.x < -1.0 ||
+	   dr.y > 1.0 || dr.y < -1.0 ||
+	   dr.z > 1.0 || dr.z < -1.0 ) {
+	 printf("ERROR: %s(%d), dr[%d] = {%f %f %f}, threadidx.x=%d\n",
+		__func__, t, i, dr.x, dr.y, dr.z, threadIdx.x);
+	 return -2;
+      }
+#endif
+      // integrate
+      pos_ar[i].x += dr.x;
+      pos_ar[i].y += dr.y;
+      pos_ar[i].z += dr.z;
 #if defined(REAL_AS_SINGLE)
       round.x = rintf(pos_ar[i].x / cellsize);
       round.y = rintf(pos_ar[i].y / cellsize);
@@ -764,11 +914,11 @@ integPos( int t, Real3_t *pos_ar, Real3_t *vel_ar, int Nmol, Real_t dt, Real_t c
       if (pos_ar[i].x < (-0.6)*cellsize || pos_ar[i].x > 0.6*cellsize ||
 	  pos_ar[i].y < (-0.6)*cellsize || pos_ar[i].y > 0.6*cellsize ||
 	  pos_ar[i].z < (-0.6)*cellsize || pos_ar[i].z > 0.6*cellsize) {
-	 printf("ERROR:<<<%d,%d>>> %s(%d), pos_ar[%d]= {%f %f %f}, vel_ar[%d]= {%f, %f, %f}, round= {%f %f %f}: threadIdx.x=%d\n",
+	 printf("ERROR:<<<%d,%d>>> %s(%d), pos_ar[%d]= {%f %f %f}, vel_ar[%d]= {%f, %f, %f}, round= {%f %f %f}: threadIdx.x=%d, cellsize= %f\n",
 		blockIdx.x, threadIdx.x, __func__, t,
 		i, pos_ar[i].x, pos_ar[i].y, pos_ar[i].z,
 		i, vel_ar[i].x, vel_ar[i].y, vel_ar[i].z,
-		round.x, round.y, round.z, threadIdx.x);
+		round.x, round.y, round.z, threadIdx.x, cellsize);
       return -3;
       }
 #endif
@@ -790,8 +940,7 @@ molKineticEne( const Real3_t *vel, Real_t mass ) {
 // **  DEVICE CODE  **/
 // *******************/
 __device__ void
-measTemper( Real_t *temper, const Real3_t *vel_ar, Real_t mass, int Nmol,
-	    Real3_t *shared ) {
+measTemper( Real_t *temper, const Real3_t *vel_ar, Real_t mass, Nmol_t Nmol, Real3_t *shared ) {
    Real_t *smem = (Real_t *)shared;
    Real_t meas;
    Real_t scale_factor = UNIT_MASS * (UNIT_LENGTH * UNIT_LENGTH) / (UNIT_TIME * UNIT_TIME);
@@ -812,7 +961,7 @@ measTemper( Real_t *temper, const Real3_t *vel_ar, Real_t mass, int Nmol,
       if (meas < 30.0 || meas > 400.0) {
 	 printf("%s(): temp_meas[Rep:%d] = %f\n", __func__, blockIdx.x, meas);
 	 for (i=0;i<Nmol;i++){
-	    printf("%s(): kinetic[%d]=%+6.2f\n", __func__, i, smem[i]);
+	    printf("%s(): kinetic[%ld]=%+6.2f\n", __func__, i, smem[i]);
 	 }
       }
 #endif
@@ -825,7 +974,7 @@ measTemper( Real_t *temper, const Real3_t *vel_ar, Real_t mass, int Nmol,
 //------------------------------------------------------------------------------
 __device__ void
 calcVelScale( int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t mass,
-	      int Nmol, Real3_t *shared ) {
+	      Nmol_t Nmol, Real3_t *shared ) {
    Real_t *smem = (Real_t *)shared;
    Real_t bunshi = 3.0 / 2.0 * (Real_t)Nmol * targ_temp;
    Real_t unit_scale = (UNIT_TIME / UNIT_LENGTH) * sqrt(Kb / UNIT_MASS);
@@ -838,7 +987,7 @@ calcVelScale( int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t ma
 #if 0 //Debug
    if (threadIdx.x==0) {
       for (int i=0; i<Nmol; i++) {
-	 printf("molkinet[%d]=%f\n", i, smem[i]);
+	 printf("molkinet[%ld]=%f\n", i, smem[i]);
       }
    }
    __syncthreads();
@@ -858,7 +1007,7 @@ calcVelScale( int t, Real_t *scale, Real_t targ_temp, Real3_t *vel_ar, Real_t ma
 // calcMomentum().
 //------------------------------------------------------------------------------
 __device__ void
-calcMomentum(Real3_t *mome, const Real3_t *velo_ar, Real_t mass, int Nmol, Real3_t *shared) {
+calcMomentum(Real3_t *mome, const Real3_t *velo_ar, Real_t mass, Nmol_t Nmol, Real3_t *shared) {
    Real3_t sum, vel_max, vel_min;
    int i;
 
@@ -887,7 +1036,7 @@ calcMomentum(Real3_t *mome, const Real3_t *velo_ar, Real_t mass, int Nmol, Real3
 	 if ( velo_ar[i].y < vel_min.y ) vel_min.y = velo_ar[i].y;  
 	 if ( velo_ar[i].z < vel_min.z ) vel_min.z = velo_ar[i].z;  
       }
-      printf("momentum= {%e, %e, %e}, Nmol=%d, mass=%f\n",
+      printf("momentum= {%e, %e, %e}, Nmol=%ld, mass=%f\n",
 	     mome->x, mome->y, mome->z, Nmol, mass );
       printf("vel-max= {%+12.6f, %+12.6f, %+12.6f}\n",
 	     vel_max.x, vel_max.y, vel_max.z );
@@ -901,7 +1050,7 @@ calcMomentum(Real3_t *mome, const Real3_t *velo_ar, Real_t mass, int Nmol, Real3
 // killMomentum(). 
 //------------------------------------------------------------------------------
 __device__ void
-killMomentum(int t, Real3_t *velo_ar, Real_t mass, int Nmol, Real3_t *shared) {
+killMomentum(int t, Real3_t *velo_ar, Real_t mass, Nmol_t Nmol, Real3_t *shared) {
    int i;
    Real3_t momentum;
    
@@ -921,7 +1070,7 @@ killMomentum(int t, Real3_t *velo_ar, Real_t mass, int Nmol, Real3_t *shared) {
 // scaleVelo()
 //------------------------------------------------------------------------------
 __device__ void
-scaleVelo(int t, Real3_t *velo_ar, Real_t scale, int Nmol) {
+scaleVelo(int t, Real3_t *velo_ar, Real_t scale, Nmol_t Nmol) {
    int i;
 #if 1 // debug: range check of float.
    for ( i=threadIdx.x; i<Nmol; i+=blockDim.x ) {
@@ -943,7 +1092,7 @@ scaleVelo(int t, Real3_t *velo_ar, Real_t scale, int Nmol) {
 
 //===============================================================================
 __device__ void
-debugVel(const char *mes, const Real3_t *vel_ar, int Nmol) {
+debugVel(const char *mes, const Real3_t *vel_ar, Nmol_t Nmol) {
    if (threadIdx.x == 0) {
       printf("%s(): %s\n", __func__, mes);
       for (int i=0; i<Nmol; i++) {
@@ -962,7 +1111,7 @@ debugVel(const char *mes, const Real3_t *vel_ar, int Nmol) {
 //         Real3_t shared[Nmol] : reduct work area.
 //-------------------------------------------------------------------------------
 __device__ void
-meanPotential( Real_t *mean, Real_t *poten_ar, int Nmol, Real3_t *shared ) {
+meanPotential( Real_t *mean, Real_t *poten_ar, Nmol_t Nmol, Real3_t *shared ) {
    //Memo: The "mean" must be __shared__ memory pointer.
    Real_t *smem = (Real_t *)shared;
    Real_t sum;
@@ -989,7 +1138,7 @@ meanPotential( Real_t *mean, Real_t *poten_ar, int Nmol, Real3_t *shared ) {
 }
 
 __device__ int
-ctrlTemp(int t, int tag, Real3_t *vel_ar, Real_t zeta, int Nmol, Real_t dt) {
+ctrlTemp(int t, int tag, Real3_t *vel_ar, Real_t zeta, Nmol_t Nmol, Real_t dt) {
 #if defined(REAL_AS_SINGLE)
    //Real_t temp_ctrl = 1.0 - dt * zeta;
    Real_t temp_ctrl = expf(-1.0 * dt * zeta);
@@ -1000,7 +1149,7 @@ ctrlTemp(int t, int tag, Real3_t *vel_ar, Real_t zeta, int Nmol, Real_t dt) {
    for (int i = threadIdx.x; i < Nmol; i += blockDim.x) {
 #if 1 //debug
       if (!isfinite(vel_ar[i].x) || !isfinite(vel_ar[i].y) || !isfinite(vel_ar[i].z)) {
-	 printf("ERROR: %s(%d) before, t= %d, vel_ar[%d] = %f %f %f, temp_ctrl= %f, zeta = %f\n",
+	 printf("ERROR: %s(%d) before, t= %d, vel_ar[%ld] = %f %f %f, temp_ctrl= %f, zeta = %f\n",
 		__func__, tag, t,
 		i, vel_ar[i].x, vel_ar[i].y, vel_ar[i].z, temp_ctrl, zeta);
 	 return -2;
@@ -1011,7 +1160,7 @@ ctrlTemp(int t, int tag, Real3_t *vel_ar, Real_t zeta, int Nmol, Real_t dt) {
       vel_ar[i].z *= temp_ctrl;
 #if 1 //debug
       if (!isfinite(vel_ar[i].x) || !isfinite(vel_ar[i].y) || !isfinite(vel_ar[i].z)) {
-	 printf("ERROR: %s(%d) after, t= %d, vel_ar[%d] = %f %f %f, temp_ctrl= %f, zeta = %f\n",
+	 printf("ERROR: %s(%d) after, t= %d, vel_ar[%ld] = %f %f %f, temp_ctrl= %f, zeta = %f\n",
 	     __func__, tag, t,
 		i, vel_ar[i].x, vel_ar[i].y, vel_ar[i].z, temp_ctrl, zeta);
 	 return -2;
@@ -1028,7 +1177,7 @@ calcZetaSum(Real_t &zeta_sum, Real_t zeta, Real_t dt) {
 }
 
 __device__ void
-calcZeta(Real_t &zeta, Real_t curr_temp, Real_t Q, Real_t targ_temp, Real_t dt, int Nmol) {
+calcZeta(Real_t &zeta, Real_t curr_temp, Real_t Q, Real_t targ_temp, Real_t dt, Nmol_t Nmol) {
    // Real_t g = 3.0 * (Real_t)Nmol;
    // zeta += (curr_temp - g * targ_temp) * dt / Q;
    // zeta = (curr_temp - targ_temp) * dt / Q;
@@ -1229,10 +1378,10 @@ void exchTemp(int t0, Remd_t &remd, Simu_t &simu) {
 //------------------------------------------------------------------------------
 static Real_t
 hamiltonian(Real_t kinetic, Real_t potential, Real_t mass_stat, Real_t zeta,
-	    Real_t zeta_sum, Real_t set_temp, int Nmol) {
+	    Real_t zeta_sum, Real_t set_temp, Nmol_t Nmol) {
    return (kinetic + potential +  
 	   0.5 * mass_stat * (zeta * zeta) +
-	   3.0 * Nmol * set_temp * zeta_sum);
+	   3.0 * (Real_t)Nmol * set_temp * zeta_sum);
 }
 
 //--- EOF ---

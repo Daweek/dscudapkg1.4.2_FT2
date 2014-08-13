@@ -17,8 +17,8 @@
 extern Remd_t remd;
 extern Simu_t simu;
 
-static Real_t calcRcut(Real_t, int);
-static Real_t calcCellsize(Real_t dens, Real_t mass, int Nmol);
+static Real_t calcRcut(Real_t, Nmol_t Nmol);
+static Real_t calcCellsize(Real_t dens, Real_t mass, Nmol_t Nmol);
 
 static const char delim[] = ":;#= \t\n"; // simulation input file delimiter.
 static const int  buflen  = 2048;        // byte length of line buffer.
@@ -118,27 +118,6 @@ void initSimConfig(int argc, char **argv) {
   sprintf(simu.ofile_init_velo,  "%s/init_velo.dat",  simu.odir);
   sprintf(simu.ofile_init_force, "%s/init_force.dat", simu.odir);
 
-#if 0
-  for (int i = 2; i <= 8192; i*=2) {
-    if (i > 2048) {
-      if (SMEM_COUNT <= 2048) {
-	die("(;_;)SMEM_COUNT must be 2^N  (N is integer).\n");
-      } else {
-	die("(;_;)The size of shared memory is too large. decrease SMEM_COUNT.\n");
-      }
-    }
-    if (SMEM_COUNT == i) {
-      printf("%s(): SMEM_COUNT is set to %d\n", __func__, SMEM_COUNT);
-      break;
-    }
-  }
-
-  /* Is shared memory enough? */
-  if (remd.Nmol > SMEM_COUNT) {
-    die("(;_;)The size of shared memory is not enough.\nincrease SMEM_COUNT or decrease Nmol.\n");
-  }
-#endif
-
   /* temp_min == 0.0 K is not permitted. */
   if (remd.temp_min < 9.9999) {
     die("(;_;)input error: minimum temperature less than 10.0[K] is not permitted.\n");
@@ -225,8 +204,7 @@ void initSimConfig(int argc, char **argv) {
 // description:
 //    get the "cutoff" distance where effect of force can be ignored.
 //------------------------------------------------------------------------------
-static Real_t
-calcRcut(Real_t cellsize, int Nmol) {
+static Real_t calcRcut( Real_t cellsize, Nmol_t Nmol ) {
    Real_t rcut;
    if      (Nmol < 4)   { die("Nmol is too small.\n"); }
    else if (Nmol < 256) { rcut = 0.5 * cellsize;       }
@@ -238,25 +216,24 @@ calcRcut(Real_t cellsize, int Nmol) {
 //    get the cell boundary size from the number of atoms and its density.
 //    cbrt() can be trapping...  2013.9.13
 //------------------------------------------------------------------------------
-static Real_t
-calcCellsize(Real_t dens, Real_t mass, int Nmol) {
+static Real_t calcCellsize( Real_t dens, Real_t mass, Nmol_t Nmol ) {
    const int mols_fcc = 4;
-   int    lattice_count = (Nmol + mols_fcc -1) / mols_fcc;
+   int   lattice_count = (Nmol + mols_fcc - 1) / mols_fcc;
    double lattice_size  = cbrt((double)mols_fcc * (mass / Na) / dens) 
                                                          / UNIT_LENGTH; // [nm]
-   int    edge_boxcnt = 0;
-   int    volume;
+   int   edge_boxcnt = 0;
+   int   volume;
    double cellsize;
    printf("info: Argon lattice size  = %f [nm]\n", lattice_size);
-   printf("info: Argon lattice count = %d \n", lattice_count);
+   printf("info: Argon lattice count = %ld \n", lattice_count);
 
    do {
       edge_boxcnt++;
-      if (edge_boxcnt >= 32) {
+      if ( edge_boxcnt >= 512 ) {
 	 die("too large cellsize.");
       }
       volume = edge_boxcnt * edge_boxcnt * edge_boxcnt;
-   } while(volume < lattice_count);
+   } while ( volume < lattice_count );
 
    cellsize = (double)edge_boxcnt * lattice_size;
    return (Real_t)cellsize; 
@@ -265,8 +242,7 @@ calcCellsize(Real_t dens, Real_t mass, int Nmol) {
 // description:
 //    Print the usage of this program.
 //------------------------------------------------------------------------------
-void
-printUsage(char **argv) {
+void printUsage(char **argv) {
   printf("\nUsage:\n");
   printf("    > %s -i [input-file]\n", argv[0]);
   printf("    input-file : a file including simulation parameters.\n\n");
@@ -277,8 +253,7 @@ printUsage(char **argv) {
 //     from specified by "filename".
 //------------------------------------------------------------------------------
 void
-getLineFromFile(char *line, const char *keyword, const char *filename)
-{
+getLineFromFile(char *line, const char *keyword, const char *filename) {
   char linebuf[buflen];
   char parsebuf[buflen];
   char *token;
@@ -314,8 +289,7 @@ getLineFromFile(char *line, const char *keyword, const char *filename)
 //     
 //------------------------------------------------------------------------------
 char *
-get2ndToken(char *linebuf, const char *paramname, const char *filename)
-{
+get2ndToken(char *linebuf, const char *paramname, const char *filename) {
   char *token;
   getLineFromFile(linebuf, paramname, filename);
   token = strtok(linebuf, delim);
@@ -332,8 +306,7 @@ get2ndToken(char *linebuf, const char *paramname, const char *filename)
 //     fixed 2013-08-30.
 //------------------------------------------------------------------------------
 void /* double */
-loadValFromFile(double &var, const char *paramname, const char *ifile)
-{
+loadValFromFile(double &var, const char *paramname, const char *ifile) {
   char linebuf[buflen];
   char *token = get2ndToken(linebuf, paramname, ifile);
   var = atof(token);
@@ -388,7 +361,7 @@ void echoSimConfig(void) {
   printf("\n#===========================================================\n");
   printf("# Basic MD condition.\n");
   printf("#-----------------------------------------------------------\n");
-  printf(" Nmol          = %d [atoms]\n", remd.Nmol);
+  printf(" Nmol          = %ld [atoms]\n", remd.Nmol);
   printf(" lj-sigma      = %+e [nm]\n", remd.lj_sigma);
   printf(" lj-epsilon    = %+e [J/mol]\n", remd.lj_epsilon);
   printf(" Mass of atom  = %f [kg/mol]\n", remd.mass);  
@@ -400,7 +373,7 @@ void echoSimConfig(void) {
   printf("\n#===========================================================\n");
   printf("# Replica MD condition.\n");
   printf("#-----------------------------------------------------------\n");
-  printf(" Nrep          = %d\n", remd.Nrep);
+  printf(" Nrep          = %ld\n", remd.Nrep);
   printf(" Nrep_1dev     = %d [rep(s)]\n", simu.Nrep_1dev);
   printf(" Max Temper.   = %7.3f [K]\n", remd.temp_max);
   printf(" Min Temper.   = %7.3f [K]\n", remd.temp_min);

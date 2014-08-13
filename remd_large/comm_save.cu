@@ -78,7 +78,7 @@ saveFormatPos(const char *filename, Real_t temp, long simstep)
   fprintf(fp, "# st0=\"time:%.3fps (%d steps)\", st0_pos=(-2.5, -2.5)\n", simclock, simstep);
   fprintf(fp, "# st1=\"temp: %7.3f [K]\", st1_pos=(-2.5, -2.1)\n", temp); 
   fprintf(fp, "#\n");
-  for (int i = 0; i < remd.Nmol; i++) {
+  for (long i=0; i<remd.Nmol; i++) {
     fprintf(fp, "%5d 0 %+7.6f %+7.6f %+7.6f\n", i, pos_ar[i].x, pos_ar[i].y, pos_ar[i].z);
   }    
   fprintf(fp, "# EOF\n");
@@ -94,7 +94,7 @@ saveFormatVel(const char *filename, long simstep)
   fprintf(fp, "# Velocity of molecular, UNIT_LENGTH is 1nm. UNIT_TIME is 1ps\n");
   fprintf(fp, "# snapshot at simulation time = %f ps\n", simclock);
   fprintf(fp, "#             simulation step = %d steps\n", simstep);
-  for (int i = 0; i < remd.Nmol; i++) {
+  for (long i=0; i<remd.Nmol; i++) {
     fprintf(fp, "%5d 0 %+7.6f %+7.6f %+7.6f\n", i, vel_ar[i].x, vel_ar[i].y, vel_ar[i].z);
   }    
   fclose(fp);
@@ -109,7 +109,7 @@ saveFormatForce(const char *filename, const Real_t *potential_ar, long simstep)
   fprintf(fp, "# Force of molecular, UNIT_LENGTH is 1nm. UNIT_TIME is 1ps\n");
   fprintf(fp, "# snapshot at simulation time = %f ps\n", simclock);
   fprintf(fp, "#             simulation step = %d steps\n", simstep);
-  for (int i = 0; i < remd.Nmol; i++) {
+  for (long i=0; i<remd.Nmol; i++) {
       fprintf(fp, "%5d 0 %+e %+e %+e", i, foc_ar[i].x, foc_ar[i].y, foc_ar[i].z);
       if (potential_ar==NULL) {
 	  fprintf(fp, " \n");
@@ -198,35 +198,30 @@ saveFormatSorted(const char *filename, int seq_num, long simstep)
 //===============================================================================
 // data copy for position of atoms.
 //-------------------------------------------------------------------------------
-void
-savePosAll(int t)
-{
+void savePosAll(int t) {
     debug_print(5, "Entering %s(int t=%d)\n", __func__, t);
-    for (int rep_i = 0; rep_i < remd.Nrep; rep_i++) {
+    for (int rep_i=0; rep_i < remd.Nrep; rep_i++) {
 	copyPos(rep_i, D2H);
 	savePos(rep_i, -999.9, t);
     }
     debug_print(5, "Entering %s(int t=%d)\n", __func__, t);
 }
-void
-saveVelAll(int t)
-{
+
+void saveVelAll(int t) {
     for (int i=0; i<remd.Nrep; i++) {
 	copyVel(i, D2H);
 	saveVel(i, t);
     }
 }
-void
-saveFocAll(int t)
-{
+
+void saveFocAll(int t) {
     for (int i=0; i<remd.Nrep; i++) {
 	copyFoc(i, D2H);
 	saveFoc(i, t);
     }
 }
-void
-saveTempMeasAll(int t)
-{
+
+void saveTempMeasAll(int t) {
   for (int rep_i = 0; rep_i < remd.Nrep; rep_i++) {
     copyTempMeas(rep_i, D2H);
     saveTempMeas(rep_i, t);
@@ -405,7 +400,7 @@ void saveLocalVel(Remd_t &remd, long simstep)
 //==============================================================================
 //
 //------------------------------------------------------------------------------
-void saveLocalFoc(Remd_t &remd, Real_t *potential_ar, int Nmol, long simstep)
+void saveLocalFoc(Remd_t &remd, Real_t *potential_ar, Nmol_t Nmol, long simstep)
 {
   static int seq_num = 0;
   char savepath[1024];
@@ -655,7 +650,7 @@ int checkSum(void *targ, int size) {
 
 static inline void
 copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir) {
-    int size = sizeof(Real3_t) * remd.Nmol;
+    long size = sizeof(Real3_t) * remd.Nmol;
 
 #if defined(HOST_RUN)
     switch (dir) {
@@ -682,7 +677,7 @@ copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir) {
       case D2H:
 	err = cudaMemcpy((void*)host, (void*)dev, size, cudaMemcpyDeviceToHost);
 #if 0
-	printf("memcpyD2H(ph=%p, size=%d, checksum(D2H)=0x%08x\n", host, size, checkSum(host, size));
+	printf("memcpyD2H(ph=%p, size=%ld, checksum(D2H)=0x%08x\n", host, size, checkSum(host, size));
 	fflush(stdout);
 #endif
 	if (err != cudaSuccess) {
