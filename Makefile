@@ -4,11 +4,11 @@ push2all: push2bithub push2bitbucket
 ###
 ### GitHub
 ###
-push_github:
+git-push:
 #	git push -u https://github.com/Daweek/dscudapkg1.4.2_FT2.git master
 	git push -u git@github.com:Daweek/dscudapkg1.4.2_FT2.git master
 
-pull_github:
+git-pull:
 	git pull -u git@github.com:Daweek/dscudapkg1.4.2_FT2.git master
 ###
 ### Bitbucket
