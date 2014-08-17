@@ -116,6 +116,16 @@ $(DSCUDAIF).x: dscudadefs.h
 ###
 ### Phony target
 ###
-.PHONY: clean
+.PHONY: clean install
+
+install:
+	ln -s ./dscuda.h       ../include/
+	ln -s ./dscudadefs.h   ../include/
+	ln -s ./dscudamacros.h ../include/
+	ln -s ./dscudarpc.h    ../include/
+	ln -s ./dscudaverb.h   ../include/
+	ln -s ./libdscuda.h    ../include/
+	ln -s ./sockutil.h     ../include/
+
 clean:
 	/bin/rm $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
