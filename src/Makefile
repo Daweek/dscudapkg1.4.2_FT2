@@ -7,16 +7,16 @@ else
 	LP64 = 0
 endif
 
+GCCVER = 4.4
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
-CC            = /usr/bin/gcc -O0 -g -ffast-math -funroll-loops
-CXX           = /usr/bin/g++ -O0 -g -ffast-math -funroll-loops
+CC            = /usr/bin/gcc-$(GCCVER) -O0 -g -ffast-math -funroll-loops
+CXX           = /usr/bin/g++-$(GCCVER) -O0 -g -ffast-math -funroll-loops
 CUDAPATH     ?= /usr/local/cuda
-NVCC          = $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_20
+NVCC          = $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_20 --compiler-bindir=g++-$(GCCVER)
 CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64
 
-#TARGET         = dscudad dscudasvr libdscuda_ibv.a libdscuda_rpc.a libcudart.so.3
 TARGET         = dscudad dscudasvr libdscuda_rpc.a libcudart.so.3
 TARGET_RPCONLY = dscudad_rpc dscudasvr_rpc libdscuda_rpc.a libcudart.so.3
 DSCUDAIF       = dscudarpc
@@ -26,29 +26,17 @@ default :	$(TARGET)
 
 rpconly:	$(TARGET_RPCONLY)
 
-libdscuda_ibv.so :	$(CLIENTBASE) libdscuda_ibv.o $(DSCUDAIF)_clnt.o \
-                        dscudautil.o ibv_rdma.o sockutil.o dscudaverb.o
-	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
-
 libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
                         $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o
 	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
-
-libdscuda_ibv.a :	$(CLIENTBASE) libdscuda_ibv.o $(DSCUDAIF)_clnt.o \
-                        dscudautil.o ibv_rdma.o sockutil.o dscudaverb.o
-	ar rvu $@ $^
-	ranlib $@
 
 libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
                         $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o
 	ar rvu $@ $^
 	ranlib $@
 
-libdscuda_ibv.o  : libdscuda_ibv.cu
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
-
 libdscuda_rpc.o  : libdscuda_rpc.cu
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
+	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -o $@ $<
 
 $(CLIENTBASE) : libdscuda.cu
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
@@ -70,16 +58,14 @@ dummysvr :	dummysvr.c
 
 dummyclient :	dummyclient.c
 
-dscudasvr :	dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o ibv_rdma.o sockutil.o
-	echo "# <--- Link object files."
-	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lrdmacm -libverbs -lpthread -o $@ $^
+dscudasvr :	dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
 dscudasvr_rpc :	dscudasvr_rpc_only.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
-dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscudasvr_ibv.cu dscuda.h \
-             ibv_rdma.h dscudarpc.h sockutil.h  
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
+dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
+	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
 dscudasvr_rpc_only.o: dscudasvr.cu dscudasvr_rpc.cu dscudasvr_ibv.cu dscuda.h \
                       ibv_rdma.h dscudarpc.h sockutil.h  
@@ -100,8 +86,8 @@ $(DSCUDAIF)_xdr.o:	$(DSCUDAIF)_xdr.c
 dscudautil.o:	dscudautil.cu dscudautil.h
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
 
-ibv_rdma.o:	ibv_rdma.cpp
-	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
+#ibv_rdma.o:	ibv_rdma.cpp
+#	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
 ###
 ### source file include dependancy.
 ###
