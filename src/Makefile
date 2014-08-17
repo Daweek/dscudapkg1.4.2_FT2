@@ -119,13 +119,14 @@ $(DSCUDAIF).x: dscudadefs.h
 .PHONY: clean install
 
 install:
-	ln -s ./dscuda.h       ../include/
-	ln -s ./dscudadefs.h   ../include/
-	ln -s ./dscudamacros.h ../include/
-	ln -s ./dscudarpc.h    ../include/
-	ln -s ./dscudaverb.h   ../include/
-	ln -s ./libdscuda.h    ../include/
-	ln -s ./sockutil.h     ../include/
-
+	ln -fs ./dscuda.h       ../include/
+	ln -fs ./dscudadefs.h   ../include/
+	ln -fs ./dscudamacros.h ../include/
+	ln -fs ./dscudarpc.h    ../include/
+	ln -fs ./dscudaverb.h   ../include/
+	ln -fs ./libdscuda.h    ../include/
+	ln -fs ./sockutil.h     ../include/
+	ln -fs ./dscudad        ../bin/
+	ln -fs ./dscudasvr      ../bin/
 clean:
 	/bin/rm $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
