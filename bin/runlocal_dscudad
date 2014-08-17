@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Define Variables
+readonly cuda_ver=4.2     # CUDA version
+readonly logpath="."
+
+cmdbase=${0##*/} # ex.) "runlocal_dscudad"
+logfile=${cmdbase}@$(hostname).$(date +%Y%m%d_%H%M) #ex.)"run_dscudad@ds01.20140530_1924"
+argc=$#
+#=======================================
+# Init_env()
+#---------------------------------------
+Init_env() {
+    export CUDAPATH=/usr/local/cuda-${cuda_ver}/cuda
+    export CUDASDKPATH=${CUDAPATH%cuda}NVIDIA_GPU_Computing_SDK
+    export DSCUDA_PATH=/home/m_oikawa/dscudapkg
+    export PATH=${DSCUDA_PATH}/bin:$CUDAPATH/bin:${PATH}
+    export DSCUDA_WARNLEVEL=10
+    export DSCUDA_REMOTECALL="rpc"
+    export LD_LIBRARY_PATH=${CUDAPATH}/lib64:${CUDAPATH}/lib
+#    export DSCUDA_FAULT_INJECTION=0
+    export OMP_NUM_THREADS=1
+}
+Print_env() {
+    printf "(info.) CUDAPATH=%s\n" $CUDAPATH
+    printf "(info.) DSCUDA_PATH=%s\n" $DSCUDA_PATH
+}
+#========================================
+# Usage()
+#---------------------------------------
+Usage() {
+    printf "Usage:\n"
+    printf "> %s [hostname]\n " $cmdbase
+    printf "(examples)\n"
+    printf "   > %s ds01\n" $cmdbase
+    printf "   > %s ds{01,02,04}\n" $cmdbase
+    printf "   > %s ds{01..04}\n" $cmdbase
+}
+#========================================
+# Check_args()
+#---------------------------------------
+Check_args() {
+    argc_exp=1
+    if [ $argc -ne $argc_exp ]; then
+	Usage
+	exit 1
+    else
+	printf "argc=%d\n" $argc
+    fi
+}
+#
+# main() 
+#
+Check_args;
+
+export DSCUDA_FAULT_INJECTION=${1}
+
+Init_env ${1}
+echo $LD_LIBRARY_PATH
+Print_env;
+#$DSCUDA_PATH/bin/dscudad 2>&1 | tee ${logpath}/${logfile} 
+$DSCUDA_PATH/bin/dscudad
+#$DSCUDA_PATH/bin/dscudasvr -s 0 -d 0
+
+
