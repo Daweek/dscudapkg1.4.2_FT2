@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 09:37:33
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -968,6 +968,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     WARN(5, "+--- done. %s().\n", __func__)
 }
 
+#if !defined(RPC_ONLY)
 void
 ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
                              int *gdim, int *bdim, RCsize smemsize, RCstream stream,
@@ -975,6 +976,7 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
 {
     // a dummy func.
 }
+#endif
 
 cudaError_t
 cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,

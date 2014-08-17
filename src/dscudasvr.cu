@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 09:14:19
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -34,7 +34,10 @@
 #include "dscudarpc.h"
 #include "dscuda.h"
 #include "sockutil.h"
+
+#if !defined(RPC_ONLY)
 #include "ibv_rdma.h"
+#endif
 
 //<-- oikawa
 #define FAULT_INJECTION_LEN (32)
@@ -146,7 +149,7 @@ inline void check_cuda_error(cudaError err) {
 }
 #endif
 
-#if !RPC_ONLY
+#if !defined(RPC_ONLY)
 #    include "dscudasvr_ibv.cu"
 #endif
 #    include "dscudasvr_rpc.cu"
@@ -191,7 +194,7 @@ int main(int argc, char **argv)
     UseIbv = receiveProtocolPreference();
 
     if (UseIbv) {
-#if !RPC_ONLY
+#if !defined(RPC_ONLY)
         setupIbv();
         notifyIamReady();
         ibvMainLoop(NULL);
@@ -407,7 +410,7 @@ static void initEnv(void)
 
     // DSCUDA_REMOTECALL
     env = getenv("DSCUDA_REMOTECALL");
-#if RPC_ONLY
+#if defined(RPC_ONLY)
     UseIbv = 0;
     WARN(2, "method of remote procedure call: RPC\n");
 #else
@@ -685,7 +688,7 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
     // a kernel function found.
     // now make it run.
     if (UseIbv) {
-#if !RPC_ONLY
+#if !defined(RPC_ONLY)
 	WARN(10, "ibvUnpackKernelParam()\n");
         paramsize = ibvUnpackKernelParam(&kfunc, args.RCargs_len, (IbvArg *)args.RCargs_val);
 #endif

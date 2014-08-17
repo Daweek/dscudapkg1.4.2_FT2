@@ -13,37 +13,31 @@ __global__
 void gpuerr( float *d_tiles, int num_tile, int tile_size ) {
     
 }
-
+#if 0
 //
 //
 //
-void initTiles( int Ngpu, float *h_tiles, int tile_size ) {
+void initTiles( int num_gpu, float **h_tiles, int tile_size ) {
     for (int i=0; i<tile_size; i++) {
-	h_tiles[NUM_TILES*d + i] = (float)i;
+	*h_tiles[NUM_TILES*d + i] = (float)i + ((float)num_gpu * NUM_TILES);
     }
 }
-
+#endif
 //
 //
 //
-void sendTiles( int Ngpu, float *h_tiles, float *d_tiles, int num_tiles ) {
+void sendTiles( float *h_tiles, float *d_tiles, int num_tiles ) {
     cudaError_t cuerr;
 
-    for (int d=0; d<Ngpu; d++) {
-	cuerr = cudaSetDevice(d);
-	if (cuerr != cudaSuccess) {
-	    fprintf( stderr, "cudaSetDevice() failed.\n");
-	    exit(1);
-	}
+    for (int i=0; i<num_tiles; i++) {
 	cuerr = cudaMemcpy( d_tiles, h_tiles, sizeof(float)*TILE_SIZE, cudaMemcpyHostToDevice );
 	if (cuerr != cudaSuccess) {
 	    fprintf( stderr, "cudaMemcpy() failed.\n");
 	    exit(1);
 	}
-
     }
 }
-
+#if 0
 //
 //
 //
@@ -52,16 +46,23 @@ void recvTiles( int Ngpu, float *h_tiles, float *d_tiles, int num_tiles ) {
 
     cuerr = cudaMemcpy(, cudaMemcpyDeviceToHost );
 }
+#endif
 
-int main( int argc, char *argv[] ) {
-    float *d_tiles[MAX_NGPU * MAX_TILES];
-    float *h_tiles[MAX_NGPU * MAX_TILES];
+//
+//
+//
+int main( int argc, char *argv[] )
+{
+    float *d_tiles[MAX_TILES * MAX_NGPU];
+    float *h_tiles[MAX_TILES * MAX_NGPU];
+
+    float *h_val;
     int i, j, k, d;
     cudaError_t cuerr;
 
     Ngpu = 1;
 
-    // malloc
+    // malloc@DEV
     for (d=0; d<Ngpu; d++) {
 	cuerr = cudaSetDevice(d);
 	if (cuerr!=cudaSuccess) {
@@ -76,9 +77,13 @@ int main( int argc, char *argv[] ) {
 	    } else {
 		printf(" d_tiles[%3d] = %p\n", NUM_TILES*d+i, d_tiles[i]);
 	    }
-
+	}
+    }
+    // malloc@HOST
+    for (d=0; d<Ngpu; d++) {
+	for (i=0; i<NUM_TILES; i++) {
 	    h_tiles[NUM_TILES*d + i] = (float *)malloc(sizeof(float)*TILE_SIZE);
-	    if (h_tiles[NUM_TILES*d + i]==NULL) {
+	    if (h_tiles[NUM_TILES*d + i] == NULL) {
 		fprintf(stderr, "malloc() failed.\n");
 		exit(1);
 	    }
@@ -86,14 +91,32 @@ int main( int argc, char *argv[] ) {
     }
 
     for (d=0; d<Ngpu; d++) {
-	initTiles( h_tiles, NUM_TILES );
-    }
-
-    for (d=0; d<Ngpu; d++) {
-	sendTiles( h_tiles, d_tiles, NUM_TILES);
+	h_val = h_tiles[NUM_TILES * d];
+	for (i=0; i<TILE_SIZE; i++) {
+	    h_val[i] = (float)i;
+	}
     }
 
 #if 0
+    for (d=0; d<Ngpu; d++) {
+	h_val = h_tiles[NUM_TILES * d];
+	for (i=0; i<TILE_SIZE; i++) {
+	    printf("h_val[%d] = %f\n", i, h_val[i]);
+	}
+    }
+#endif
+
+
+    for (d=0; d<Ngpu; d++) {
+	cuerr = cudaSetDevice(d);
+	if (cuerr!=cudaSuccess) {
+	    fprintf( stderr, "cudaSetDevice() failed.\n");
+	    exit(1);
+	}
+	sendTiles( h_tiles, d_tiles, NUM_TILES);
+    }
+    
+#if 0    
     //GPU kernel call
     for (d=0; d<Ngpu; d++) {
 	cuerr = cudaSetDevice(d);
@@ -105,6 +128,11 @@ int main( int argc, char *argv[] ) {
     }
 
     for (d=0; d<Ngpu; d++) {
+	cuerr = cudaSetDevice(d);
+	if (cuerr!=cudaSuccess) {
+	    fprintf( stderr, "cudaSetDevice() failed.\n");
+	    exit(1);
+	}
 	recvTiles( h_tiles, d_tiles, NUM_TILES);
     }
 #endif

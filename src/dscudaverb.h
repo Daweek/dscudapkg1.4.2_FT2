@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 09:07:17
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -168,6 +168,7 @@ typedef struct {                        /* cudaRpcLaunchKernel() */
     RCargs args;
 } cudaRpcLaunchKernelArgs;
 
+#if 0 // RPC_ONLY
 typedef struct {
     int      *moduleid;
     int      kid;
@@ -179,7 +180,7 @@ typedef struct {
     int      narg;
     IbvArg   *arg;
 } cudaIbvLaunchKernelArgs;
-
+#endif
 
 void dscudaVerbInit(void);                /* Initializer    */
 void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);

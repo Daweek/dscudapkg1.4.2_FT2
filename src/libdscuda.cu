@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 09:36:14
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -13,6 +13,7 @@
  *     -> "libdscuda_ibv.cu"
  *     -> "libdscuda_rpc.cu"
  */
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -21,6 +22,7 @@
 #include <net/if.h>
 #include <ctype.h>
 #include <pwd.h>
+#include <netdb.h>
 #include "dscuda.h"
 #include "libdscuda.h"
 #include "dscudaverb.h"
@@ -605,7 +607,7 @@ void printModuleList(void) {
 	    printf("# %s():    + name= %s\n", __func__, CltModulelist[i].name);
 	    //printf("    + send_time= \n", sent_time., sent_time.);
 	    strncpy(printbuf, CltModulelist[i].ptx_image, len - 1 );
-	    printbuf[256]='\0';
+	    printbuf[255]='\0';
 	    //printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
 	    valid_cnt++;
 	}

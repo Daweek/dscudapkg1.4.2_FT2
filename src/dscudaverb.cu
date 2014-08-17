@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 09:44:36
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -637,6 +637,7 @@ storeRpcLaunchKernel(void *argp) {
     return argdst;
 }
 
+#if !defined(RPC_ONLY)
 static void *
 storeIbvLaunchKernel(void *argp) {
     WARN(3, "add hist IbvLaunchKernel\n");
@@ -661,6 +662,7 @@ storeIbvLaunchKernel(void *argp) {
     
     return argdst;
 }
+#endif
 
 //stubs for release args
 static void
@@ -733,6 +735,7 @@ releaseRpcLaunchKernel(void *argp) {
     free(argsrc);
 }
 
+#if !defined(RPC_ONLY)
 static void
 releaseIbvLaunchKernel(void *argp) {
     DSCUDAVERB_SET_ARGS(IbvLaunchKernel);
@@ -743,6 +746,7 @@ releaseIbvLaunchKernel(void *argp) {
     free(argsrc->arg);
     free(argsrc);
 }
+#endif
 
 //stubs for recall
 static
@@ -802,12 +806,14 @@ recallLoadModule(void *argp) {
     DSCUDAVERB_SET_ARGS(LoadModule);
 }
 
+#if !defined(RPC_ONLY)
 static void
 recallIbvLaunchKernel(void *argp) {
     DSCUDAVERB_SET_ARGS(IbvLaunchKernel);
     WARN(3, "recall IbvLaunchKernel\n");
     ibvDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->narg, argsrc->arg);
 }
+#endif
 
 static void
 recallRpcLaunchKernel(void *argp) {
@@ -833,7 +839,7 @@ void dscudaVerbInit(void) {
     DSCUDAVERB_SET_STUBS(Free);
     //DSCUDAVERB_SET_STUBS(LoadModule);
     DSCUDAVERB_SET_STUBS(RpcLaunchKernel);
-    DSCUDAVERB_SET_STUBS(IbvLaunchKernel);
+    //DSCUDAVERB_SET_STUBS(IbvLaunchKernel); // in kaust debug, 17Aug2014
 
     for ( int i=1; i<DSCVMethodEnd; i++ ) {
 	if (!storeArgsStub[i]) {
