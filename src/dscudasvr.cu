@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:14:19
+// Last Modified On : 2014-08-17 12:09:38
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -556,13 +556,13 @@ getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
     mp = SvrModulelist + moduleid;
     cuerr = cuModuleGetGlobal(dptr, size, mp->handle, symbolname);
     if (cuerr == CUDA_SUCCESS) {
-	WARN(3, "cuModuleGetGlobal(0x%08lx, 0x%08lx, 0x%08lx, %s) done."
+	WARN(3, "cuModuleGetGlobal(%p, %p, 0x%08lx, %s) done."
 	 " modulename:%s  symbolname:%s  *dptr:0x%08lx\n",
 	 dptr, size, mp->handle, symbolname,
 	 mp->name, symbolname, *dptr);
     }
     else {
-        WARN(0, "cuModuleGetGlobal(0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx) failed."
+        WARN(0, "cuModuleGetGlobal(%p, %p, 0x%08llx, 0x%08llx) failed."
              " modulename:%s  symbolname:%s  %s\n",
              dptr, size, mp->handle, symbolname,
              mp->name, symbolname, cudaGetErrorString((cudaError_t)cuerr));

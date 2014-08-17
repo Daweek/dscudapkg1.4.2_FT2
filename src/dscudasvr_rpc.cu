@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-17 12:56:10
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -78,10 +78,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             pval = (void*)&(argp->val.RCargVal_u.address);
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
-                WARN(0, "(P)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) success.\n",
+                WARN(0, "(P)cuParamSetv(%p, %d, %p, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                WARN(0, "(P)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) failed. %s\n",
+                WARN(0, "(P)cuParamSetv(%p, %d, %p, %d) failed. %s\n",
                      kfunc, argp->offset, pval, argp->size,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -92,10 +92,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             ival = argp->val.RCargVal_u.valuei;
             cuerr = cuParamSeti(kfunc, argp->offset, ival);
 	    if (cuerr == CUDA_SUCCESS) {
-                WARN(0, "(I)cuParamSeti(0x%08llx, %d, %d) success.\n",
+                WARN(0, "(I)cuParamSeti(%p, %d, %d) success.\n",
                      kfunc, argp->offset, ival);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                WARN(0, "(I)cuParamSeti(0x%08llx, %d, %d) failed. %s\n",
+                WARN(0, "(I)cuParamSeti(%p, %d, %d) failed. %s\n",
                      kfunc, argp->offset, ival,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -106,10 +106,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             fval = argp->val.RCargVal_u.valuef;
             cuerr = cuParamSetf(kfunc, argp->offset, fval);
 	    if (cuerr == CUDA_SUCCESS) {
-                WARN(5, "(F)cuParamSetf(0x%08llx, %d, %f) success.\n",
+                WARN(5, "(F)cuParamSetf(%p, %d, %f) success.\n",
                      kfunc, argp->offset, fval);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                WARN(0, "(F)cuParamSetf(0x%08llx, %d, %f) failed. %s\n",
+                WARN(0, "(F)cuParamSetf(%p, %d, %f) failed. %s\n",
                      kfunc, argp->offset, fval,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -133,10 +133,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
-                WARN(0, "(V)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) success.\n",
+                WARN(0, "(V)cuParamSetv(%p, %d, %p, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                WARN(0, "(V)cuParamSetv(0x%08llx, %d, 0x%08llx, %d) failed. %s\n",
+                WARN(0, "(V)cuParamSetv(%p, %d, %p, %d) failed. %s\n",
                      kfunc, argp->offset, pval, argp->size,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -264,7 +264,7 @@ dscudathreadgetlimitid_1_svc(int limit, struct svc_req *sr)
     check_cuda_error(err);
     res.err = err;
     res.value = value;
-    WARN(3, "0x%08llx, %d) done.  value:%d\n", &value, limit, value);
+    WARN(3, "%p, %d) done.  value:%zu\n", &value, limit, value);
     return &res;
 }
 
@@ -298,7 +298,7 @@ dscudathreadgetcacheconfigid_1_svc(struct svc_req *sr)
     check_cuda_error(err);
     res.err = err;
     res.cacheConfig = cacheConfig;
-    WARN(3, "0x%08llx) done.  cacheConfig:%d\n", &cacheConfig, cacheConfig);
+    WARN(3, "%p) done.  cacheConfig:%d\n", &cacheConfig, cacheConfig);
     return &res;
 }
 
@@ -371,7 +371,7 @@ dscudagetdeviceid_1_svc(struct svc_req *sr)
     check_cuda_error(err);
     res.device = Devid2Vdevid[device];
     res.err = err;
-    WARN(3, "0x%08llx) done. device:%d  virtual device:%d\n",
+    WARN(3, "0x%08lx) done. device:%d  virtual device:%d\n",
          (unsigned long)&device, device, res.device);
     return &res;
 }
@@ -396,7 +396,7 @@ dscudagetdevicecountid_1_svc(struct svc_req *sr)
     res.count = count = Ndevice;
     res.err = cudaSuccess;
 #endif
-    WARN(3, "0x%08llx) done. count:%d\n", (unsigned long)&count, count);
+    WARN(3, "0x%08lx) done. count:%d\n", (unsigned long)&count, count);
     return &res;
 }
 
@@ -422,7 +422,7 @@ dscudagetdevicepropertiesid_1_svc(int device, struct svc_req *sr)
     err = cudaGetDeviceProperties((cudaDeviceProp *)res.prop.RCbuf_val, Devid[0]);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d) done.\n", (unsigned long)res.prop.RCbuf_val, Devid[0]);
+    WARN(3, "0x%08lx, %d) done.\n", (unsigned long)res.prop.RCbuf_val, Devid[0]);
     return &res;
 }
 
@@ -441,7 +441,7 @@ dscudadrivergetversionid_1_svc(struct svc_req *sr)
     check_cuda_error(err);
     res.ver = ver;
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", (unsigned long)&ver);
+    WARN(3, "0x%08lx) done.\n", (unsigned long)&ver);
     return &res;
 }
 
@@ -460,7 +460,7 @@ dscudaruntimegetversionid_1_svc(struct svc_req *sr)
     check_cuda_error(err);
     res.ver = ver;
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", (unsigned long)&ver);
+    WARN(3, "0x%08lx) done.\n", (unsigned long)&ver);
     return &res;
 }
 
@@ -517,7 +517,7 @@ dscudachoosedeviceid_1_svc(RCbuf prop, struct svc_req *sr)
     check_cuda_error(err);
     res.device = Devid2Vdevid[device];
     res.err = err;
-    WARN(3, "0x%08llx) done. device:%d  virtual device:%d\n",
+    WARN(3, "0x%08lx) done. device:%d  virtual device:%d\n",
          (unsigned long)&device, device, res.device);
     return &res;
 }
@@ -576,7 +576,7 @@ dscudastreamcreateid_1_svc(struct svc_req *sr)
     res.stream = (RCadr)stream;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done. stream:0x%08llx\n", &stream, stream);
+    WARN(3, "%p) done. stream:0x%08llx\n", &stream, stream);
 
     return &res;
 }
@@ -663,7 +663,7 @@ dscudaeventcreateid_1_svc(struct svc_req *sr)
     res.event = (RCadr)event;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done. event:0x%08llx\n", &event, event);
+    WARN(3, "%p) done. event:0x%08llx\n", &event, event);
 
     return &res;
 }
@@ -681,7 +681,7 @@ dscudaeventcreatewithflagsid_1_svc(unsigned int flags, struct svc_req *sr)
     res.event = (RCadr)event;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08x) done. event:0x%08llx\n", &event, flags, event);
+    WARN(3, "%p, 0x%08x) done. event:0x%08llx\n", &event, flags, event);
 
     return &res;
 }
@@ -785,31 +785,31 @@ dscudafuncgetattributesid_1_svc(int moduleid, char *kname, struct svc_req *sr)
     WARN(3, "cuFuncGetAttribute(");
     err = cuFuncGetAttribute(&res.attr.binaryVersion, CU_FUNC_ATTRIBUTE_BINARY_VERSION, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.binaryVersion, CU_FUNC_ATTRIBUTE_BINARY_VERSION, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.binaryVersion, CU_FUNC_ATTRIBUTE_BINARY_VERSION, kfunc);
 
     err = cuFuncGetAttribute((int *)&res.attr.constSizeBytes, CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.constSizeBytes, CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.constSizeBytes, CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES, kfunc);
 
     err = cuFuncGetAttribute((int *)&res.attr.localSizeBytes, CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.localSizeBytes, CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.localSizeBytes, CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, kfunc);
 
     err = cuFuncGetAttribute(&res.attr.maxThreadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.maxThreadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.maxThreadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kfunc);
 
     err = cuFuncGetAttribute(&res.attr.numRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.numRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.numRegs, CU_FUNC_ATTRIBUTE_NUM_REGS, kfunc);
 
     err = cuFuncGetAttribute(&res.attr.ptxVersion, CU_FUNC_ATTRIBUTE_PTX_VERSION, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.ptxVersion, CU_FUNC_ATTRIBUTE_PTX_VERSION, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.ptxVersion, CU_FUNC_ATTRIBUTE_PTX_VERSION, kfunc);
 
     err = cuFuncGetAttribute((int *)&res.attr.sharedSizeBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kfunc);
     check_cuda_error((cudaError_t)err);
-    WARN(3, "0x%08llx, %d, 0x%08llx) done.\n", &res.attr.sharedSizeBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kfunc);
+    WARN(3, "%p, %d, %p) done.\n", &res.attr.sharedSizeBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kfunc);
 
     res.err = err;
 
@@ -939,7 +939,7 @@ dscudamemcpyd2did_1_svc(RCadr dst, RCadr src, RCsize count, struct svc_req *sr)
     err = cudaMemcpy((void *)dst, (void *)src, count, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %s) done.\n",
+    WARN(3, "%p, %p, %d, %s) done.\n",
             dst, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
@@ -958,7 +958,7 @@ dscudamallocarrayid_1_svc(RCchanneldesc desc, RCsize width, RCsize height, unsig
     res.array = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %d, 0x%08x) done. devadr:0x%08llx\n",
+    WARN(3, "%p, %p, %d, %d, 0x%08x) done. devadr:0x%08llx\n",
          &devadr, &descbuf, width, height, flags, devadr)
 
     return &res;
@@ -999,7 +999,7 @@ dscudamemcpytoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf 
     err = cudaMemcpyToArray((cudaArray *)dst, wOffset, hOffset, src.RCbuf_val, count, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d, 0x%08llx, %d, %s) done.\n",
+    WARN(3, "%p, %d, %d, 0x%08llx, %d, %s) done.\n",
          dst, wOffset, hOffset, (unsigned long)src.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
@@ -1065,7 +1065,7 @@ dscudamemcpytosymbold2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize co
     err = cudaMemcpy((char *)gsptr + offset, (void*)src, count, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %d, %s) done.\n",
+    WARN(3, "0x%08llx, %p, %d, %d, %s) done.\n",
          gsptr, (unsigned long)src, count, offset,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 

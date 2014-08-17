@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:44:36
+// Last Modified On : 2014-08-17 12:07:10
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -415,7 +415,7 @@ dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
     dscudaMallocResult *rp;
     cudaError_t err = cudaSuccess;
     
-    WARN(3, "%s(%p, %d, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
+    WARN(3, "%s(%p, %zu, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
 	 __func__, devAdrPtr, size, pSvr->id, pSvr->cid, pSvr->uniq);
     //initClient();
     rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][pSvr->id]);

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:37:33
+// Last Modified On : 2014-08-17 12:06:46
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -166,7 +166,7 @@ cudaError_t cudaThreadSetLimit(enum cudaLimit limit, size_t value)
     dscudaResult *rp;
     int vid = vdevidIndex();
 
-    WARN(3, "cudaThreadSetLimit(%d, %d)...", limit, value);
+    WARN(3, "cudaThreadSetLimit(%d, %zu)...", limit, value);
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -188,7 +188,7 @@ cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
     dscudaThreadGetLimitResult *rp;
     int vid = vdevidIndex();
 
-    WARN(3, "cudaThreadGetLimit(0x%08llx, %d)...", pValue, limit);
+    WARN(3, "cudaThreadGetLimit(%p, %d)...", pValue, limit);
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -473,7 +473,7 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     void *adrs[RC_NREDUNDANCYMAX];
     CLIENT *p_clnt;
 
-    WARN(3, "cudaMalloc( %p, %d )...\n", devAdrPtr, size);
+    WARN(3, "cudaMalloc( %p, %zu )...\n", devAdrPtr, size);
     St.cudaCalled();
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
@@ -568,7 +568,7 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
  */
 cudaError_t
 cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant ) {
-    WARN(3, "%s( dst=%p, src_uva=%p, count=%d redundant=%d ).\n",
+    WARN(3, "%s( dst=%p, src_uva=%p, count=%zu redundant=%d ).\n",
 	 __func__, dst, src_uva, count, redundant );
     int vdevid;
     RCServer_t *sp;
@@ -775,7 +775,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     ldst = dscudaAdrOfUva(dst);
     switch ( kind ) {
     case cudaMemcpyDeviceToHost:
-	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToHost) vdevid=%d...\n",
+	WARN(3, "cudaMemcpy(%p, %p, %zu, DeviceToHost) vdevid=%d...\n",
 	     ldst, lsrc, count, vdevid);
 	//<--- Avoid conflict with CheckPointing.
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
@@ -786,7 +786,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 	WARN(3, "mutex_unlock:cudaMemcpyD2H\n");
         break;
     case cudaMemcpyHostToDevice:
-	WARN(3, "cudaMemcpy(%p, %p, %d, HostToDevice)...\n", ldst, lsrc, count);
+	WARN(3, "cudaMemcpy(%p, %p, %zu, HostToDevice)...\n", ldst, lsrc, count);
 	//<--- Avoid conflict with CheckPointing.	
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
         err = cudaMemcpyH2D(ldst, lsrc, count, vdev, clnt);
@@ -794,7 +794,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 	//---> Avoid conflict with CheciPointing.
         break;
     case cudaMemcpyDeviceToDevice:
-	WARN(3, "cudaMemcpy(%p, %p, %d, DeviceToDevice)...\n", ldst, lsrc, count);
+	WARN(3, "cudaMemcpy(%p, %p, %zu, DeviceToDevice)...\n", ldst, lsrc, count);
         err = cudaMemcpyD2D(ldst, lsrc, count, vdev, clnt);
         break;
     case cudaMemcpyDefault:
@@ -840,7 +840,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
 
 cudaError_t
 cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count) {
-    WARN(3, "cudaMemcpyPeer(0x%08lx, %d, 0x%08lx, %d, %d)...",
+    WARN(3, "cudaMemcpyPeer(0x%08lx, %d, 0x%08lx, %d, %zu)...",
          (unsigned long)dst, ddev, (unsigned long)src, sdev, count);
 
     cudaMemcpyP2P(dst, ddev, src, sdev, count);
@@ -987,7 +987,7 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     RCchanneldesc descbuf;
     cudaArray *ca[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaMallocArray(0x%08llx, 0x%08llx, %d, %d, 0x%08x)...",
+    WARN(3, "cudaMallocArray(0x%08llx, 0x%08llx, %zu, %zu, 0x%08x)...",
          (unsigned long)array, desc, width, height, flags);
 
 
@@ -1055,7 +1055,7 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    WARN(3, "cudaMemcpyToArray(0x%08llx, %d, %d, 0x%08llx, %d, %s)...",
+    WARN(3, "cudaMemcpyToArray(0x%08llx, %zu, %zu, 0x%08llx, %zu, %s)...",
          (unsigned long)dst, wOffset, hOffset, (unsigned long)src, count, dscudaMemcpyKindName(kind));
     ca = RCcuarrayArrayQuery(dst);
     if (!ca) {
@@ -1127,7 +1127,7 @@ cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaMallocPitchResult *rp;
 
-    WARN(3, "cudaMallocPitch(0x%08llx, 0x%08llx, %d, %d)...",
+    WARN(3, "cudaMallocPitch(0x%08llx, 0x%08llx, %zu, %zu)...",
          (unsigned long)devPtr, pitch, width, height);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
@@ -1161,7 +1161,7 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    WARN(3, "cudaMemcpy2DToArray(0x%08llx, %d, %d, 0x%08llx, %d, %d, %d, %s)...",
+    WARN(3, "cudaMemcpy2DToArray(0x%08llx, %zu, %zu, 0x%08llx, %zu, %zu, %zu, %s)...",
          (unsigned long)dst, wOffset, hOffset,
          (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
     ca = RCcuarrayArrayQuery(dst);
@@ -1240,7 +1240,7 @@ cudaMemcpy2D(void *dst, size_t dpitch,
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    WARN(3, "cudaMemcpy2D(0x%08llx, %d, 0x%08llx, %d, %d, %d, %s)...",
+    WARN(3, "cudaMemcpy2D(%p, %zu, %p, %zu, %zu, %zu, %s)...",
          (unsigned long)dst, dpitch,
          (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
 
@@ -1310,7 +1310,7 @@ cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
-    WARN(3, "cudaMemset2D(0x%08llx, %d, %d, %d, %d)...",
+    WARN(3, "cudaMemset2D(%p, %zu, %zu, %zu, %zu)...",
          (unsigned long)devPtr, pitch, value, width, height);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
@@ -1395,7 +1395,7 @@ cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
     cudaError_t err = cudaSuccess;
     void *devmem;
 
-    WARN(3, "cudaHostAlloc(0x%08llx, %d, 0x%08x)...", (unsigned long)pHost, size, flags);
+    WARN(3, "cudaHostAlloc(0x%08llx, %zu, 0x%08x)...", (unsigned long)pHost, size, flags);
 
     *pHost = malloc(size);
     if (!*pHost) return cudaErrorMemoryAllocation;

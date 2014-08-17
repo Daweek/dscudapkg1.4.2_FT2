@@ -719,8 +719,10 @@ void
 dscuda%kname%(dim3 _gdim, dim3 _bdim, size_t _smemsize, cudaStream_t _stream %kargs%)
 {
     int _narg = %kargc%;
+#if !defined(RPC_ONLY)
     int _ibvgdim[3], _ibvbdim[3];
     IbvArg _ibvarg[%kargc%], *_ibvargp;
+#endif
     RCargs _rcargs;
     RCarg _rcarg[%kargc%], *_rcargp;
     RCdim3 _gdimrc, _bdimrc;
@@ -808,9 +810,10 @@ END_OF_ARGVTMP
 
 
   posttmpibv = <<-'END_OF_POSTTMP_IBV'
+#if !RPC_ONLY
         _ibvgdim[0] = _gdim.x; _ibvgdim[1] = _gdim.y; _ibvgdim[2] = _gdim.z;
         _ibvbdim[0] = _bdim.x; _ibvbdim[1] = _bdim.y; _ibvbdim[2] = _gdim.z;
-#if !RPC_ONLY
+
         ibvDscudaLaunchKernelWrapper(dscudaLoadModule("%ptxfile%", Ptxdata), %kid%, mangledname_,
                                  _ibvgdim, _ibvbdim, _smemsize, (RCstream)_stream,
                                  _narg, _ibvarg);
@@ -820,7 +823,7 @@ END_OF_ARGVTMP
 END_OF_POSTTMP_IBV
 
   argptmpibv = <<-'END_OF_ARGPTMP_IBV'
-
+#if !defined(RPC_ONLY)
         // a pointer to a device-address '%argname%'.
         _ibvargp = _ibvarg + _rcargc;
         _rcargc++;
@@ -831,11 +834,11 @@ END_OF_POSTTMP_IBV
         _ibvargp->val.pointerval = (RCadr)_devptr;
         _ibvargp->size = sizeof(_devptr);
         _off += _ibvargp->size;
-
+#endif
 END_OF_ARGPTMP_IBV
 
   argftmpibv = <<-'END_OF_ARGFTMP_IBV'
-
+#if !defined(RPC_ONLY)
         // a float '%argname%'.
         _ibvargp = _ibvarg + _rcargc;
         _rcargc++;
@@ -845,11 +848,11 @@ END_OF_ARGPTMP_IBV
         _ibvargp->val.floatval = %argname%;
         _ibvargp->size = sizeof(float);
         _off += _ibvargp->size;
-
+#endif
 END_OF_ARGFTMP_IBV
 
   argitmpibv = <<-'END_OF_ARGITMP_IBV'
-
+#if !defined(RPC_ONLY)
         // an integer '%argname%'.
         _ibvargp = _ibvarg + _rcargc;
         _rcargc++;
@@ -859,11 +862,11 @@ END_OF_ARGFTMP_IBV
         _ibvargp->val.intval = %argname%;
         _ibvargp->size = sizeof(int);
         _off += _ibvargp->size;
-
+#endif
 END_OF_ARGITMP_IBV
 
   argvtmpibv = <<-'END_OF_ARGVTMP_IBV'
-
+#if !defined(RPC_ONLY)
         // a variable '%argname%' of type '%argtype%'.
         _ibvargp = _ibvarg + _rcargc;
         _rcargc++;
@@ -875,7 +878,7 @@ END_OF_ARGITMP_IBV
         memcpy(_ibvargp->val.customval, (char*)&%argname%, sizeof(%argtype%));
         _ibvargp->size = sizeof(%argtype%);
         _off += _ibvargp->size;
-
+#endif
 END_OF_ARGVTMP_IBV
 
   srcstr, dststr = skip_ptxdata(srcstr)

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:36:14
+// Last Modified On : 2014-08-17 17:52:12
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -628,6 +628,7 @@ int dscudaSearchDaemon(char *ips, int size)
     int sock, recvsock, val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
+    int ioctl_ret;
 
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
@@ -666,7 +667,12 @@ int dscudaSearchDaemon(char *ips, int size)
     svr.sin_family = AF_INET;
     svr.sin_port = htons(RC_DAEMON_IP_PORT - 2);
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
-    ioctl(recvsock, FIONBIO, &val);
+    
+    ioctl_ret = ioctl(recvsock, FIONBIO, &val);
+    if (ioctl_ret != 0) {
+	fprintf(stderr, "ioctl() failed, and return code %d\n", ioctl_ret);
+	exit(1);
+    }
 
     if( bind(recvsock, (struct sockaddr *)&svr, sizeof(svr)) != 0 ) {
 	perror("dscudaSearchDaemon: bind()");
@@ -1306,12 +1312,12 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
 
     WARN(3, "done.\n");
     WARN(3, "  attr->binaryVersion: %d\n", attr->binaryVersion);
-    WARN(3, "  attr->constSizeBytes: %d\n", attr->constSizeBytes);
-    WARN(3, "  attr->localSizeBytes: %d\n", attr->localSizeBytes);
+    WARN(3, "  attr->constSizeBytes: %zu\n", attr->constSizeBytes);
+    WARN(3, "  attr->localSizeBytes: %zu\n", attr->localSizeBytes);
     WARN(3, "  attr->maxThreadsPerBlock: %d\n", attr->maxThreadsPerBlock);
     WARN(3, "  attr->numRegs: %d\n", attr->numRegs);
     WARN(3, "  attr->ptxVersion: %d\n", attr->ptxVersion);
-    WARN(3, "  attr->sharedSizeBytes: %d\n", attr->sharedSizeBytes);
+    WARN(3, "  attr->sharedSizeBytes: %zu\n", attr->sharedSizeBytes);
 
     return err;
 }
@@ -1322,7 +1328,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
     cudaError_t err = cudaSuccess;
     int nredundancy;
 
-    WARN(3, "dscudaMemcpyToSymbolWrapper(%d, 0x%08llx, 0x%08llx, %d, %d, %s)"
+    WARN(3, "dscudaMemcpyToSymbolWrapper(%p, 0x%08lx, 0x%08lx, %zu, %zu, %s)"
          "symbol:%s  ...",
          moduleid, (unsigned long)symbol, (unsigned long)src,
          count, offset, dscudaMemcpyKindName(kind), symbol);
@@ -1369,7 +1375,7 @@ dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
     int nredundancy;
     void *dstbuf;
 
-    WARN(3, "dscudaMemcpyFromSymbolWrapper(0x%08llx, 0x%08llx, 0x%08llx, %d, %d, %s)"
+    WARN(3, "dscudaMemcpyFromSymbolWrapper(%p, 0x%08llx, 0x%08llx, %zu, %zu, %s)"
          "symbol:%s  ...",
          moduleid, (unsigned long)dst, (unsigned long)symbol,
          count, offset, dscudaMemcpyKindName(kind), symbol);
@@ -1424,7 +1430,7 @@ dscudaMemcpyToSymbolAsyncWrapper(int *moduleid, const char *symbol, const void *
     int nredundancy;
 
     WARN(3, "sym:%s\n", symbol);
-    WARN(3, "dscudaMemcpyToSymbolAsyncWrapper(%d, 0x%08lx, 0x%08lx, %d, %d, %s, 0x%08lx) "
+    WARN(3, "dscudaMemcpyToSymbolAsyncWrapper(%p, 0x%08lx, 0x%08lx, %zu, %zu, %s, 0x%08lx) "
          "symbol:%s  ...",
          moduleid, (unsigned long)symbol, (unsigned long)src,
          count, offset, dscudaMemcpyKindName(kind), (unsigned long)stream, symbol);
@@ -1466,7 +1472,7 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
     int nredundancy;
     void *dstbuf;
 
-    WARN(3, "dscudaMemcpyFromSymbolAsyncWrapper(%d, 0x%08lx, 0x%08lx, %d, %d, %s, 0x%08lx)"
+    WARN(3, "dscudaMemcpyFromSymbolAsyncWrapper(%d, 0x%08lx, 0x%08lx, %zu, %zu, %s, 0x%08lx)"
          " symbol:%s  ...",
          moduleid, (unsigned long)dst, (unsigned long)symbol,
          count, offset, dscudaMemcpyKindName(kind), (unsigned long)stream, symbol);
@@ -1552,7 +1558,7 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
     dscudaBindTextureResult *rp;
     RCtexture texbuf;
 
-    WARN(3, "dscudaBindTextureWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %d)...",
+    WARN(3, "dscudaBindTextureWrapper(%p, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %zu)...",
          moduleid, texname,
          offset, tex, devPtr, desc, size);
 
@@ -1597,7 +1603,7 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
     dscudaBindTexture2DResult *rp;
     RCtexture texbuf;
 
-    WARN(3, "dscudaBindTexture2DWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %d, %d, %d)...",
+    WARN(3, "dscudaBindTexture2DWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %zu, %zu, %zu)...",
          moduleid, texname,
          offset, tex, devPtr, desc, width, height, pitch);
 
