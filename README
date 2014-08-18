@@ -41,6 +41,7 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	       int dscudaDevidOfUva(void *adr);
 	    
 [History]
+	2014.08.17   (problem) dscuda-daemon searching function freezed.
 
 [etc]
 	日本語テスト for gitHub.
