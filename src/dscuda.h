@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 15:37:02
+// Last Modified On : 2014-08-18 15:44:16
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -47,7 +47,8 @@ const char IDTAG_0[]     = "DSCUDA_FAULT_INJECTION" ; //
 const char SEARCH_PING[] = "DSCUDA_DAEMON_PING" ;
 const char SEARCH_ACK[]  = "DSCUDA_DAEMON_ACK" ;
 const char SEARCH_DELIM[] = ":" ;
-const int  SEARCH_BUFLEN = 1024 ;    // length of buffer using for dscudad searching.
+const int  SEARCH_BUFLEN_TX = 64 ;    // length of buffer using for dscudad searching.
+const int  SEARCH_BUFLEN_RX = 1024 ;    // length of buffer using for dscudad searching.
 const int  SEARCH_NUM_TOKEN = 2 ;
 
 

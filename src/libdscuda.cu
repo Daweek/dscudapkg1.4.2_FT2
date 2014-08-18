@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 14:56:49
+// Last Modified On : 2014-08-18 15:48:25
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -623,8 +623,8 @@ int dscudaSearchDaemon(char *ips, int size)
     int sendsock;
     int recvsock;
 
-    char sendbuf[SEARCH_BUFLEN];
-    char recvbuf[SEARCH_BUFLEN];
+    char sendbuf[SEARCH_BUFLEN_TX];
+    char recvbuf[SEARCH_BUFLEN_RX];
     char *magic_word;
     char *user_name;
     int recvlen;
@@ -675,8 +675,8 @@ int dscudaSearchDaemon(char *ips, int size)
     addr.sin_port        = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = adr | ~mask;
 
-    strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN - 1 );
-    sendto(sendsock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&addr, sizeof(addr));
+    strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN_TX - 1 );
+    sendto(sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
     WARN(2, "#(info) +--- Sent message \"%s\"...\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
@@ -703,8 +703,8 @@ int dscudaSearchDaemon(char *ips, int size)
     
     sleep(RC_SEARCH_DAEMON_TIMEOUT);
     
-    memset( recvbuf, 0, SEARCH_BUFLEN );
-    while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
+    memset( recvbuf, 0, SEARCH_BUFLEN_RX );
+    while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN_RX - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
 	WARN(2, "#(info) +--- recvfrom() returned %d.\n", recvlen );
 	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok( recvbuf, SEARCH_DELIM );
@@ -725,7 +725,7 @@ int dscudaSearchDaemon(char *ips, int size)
 		num_ignore++;
 	    }
 	}
-	memset( recvbuf, 0, SEARCH_BUFLEN );
+	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
 	WARN(2, "#(info) +--- cleared the recvbuf[].\n");
     }
     WARN(2, "exit recvfrom() loop.\n");

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-18 15:46:48
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -284,8 +284,8 @@ void signal_from_child( int sig )
 static void*
 response_to_search(void *arg)  /* call by pthread_create() */
 {
-    char sendbuf[SEARCH_BUFLEN];
-    char recvbuf[SEARCH_BUFLEN];
+    char sendbuf[SEARCH_BUFLEN_TX];
+    char recvbuf[SEARCH_BUFLEN_RX];
 
     int sock;
     socklen_t sin_size;
@@ -315,19 +315,19 @@ response_to_search(void *arg)  /* call by pthread_create() */
 	sprintf( sendbuf, "%s%s%s", SEARCH_ACK, SEARCH_DELIM, pwd->pw_name);	
     }
 
-    memset( recvbuf, 0, SEARCH_BUFLEN );
+    memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     for(;;) {
 	sin_size = (sizeof(struct sockaddr_in));
-	recvfrom(sock, recvbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, &sin_size);
+	recvfrom(sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size);
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
 	WARN(2, "#(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	clt.sin_family = AF_INET;
 	clt.sin_port = htons( RC_DAEMON_IP_PORT - 2 );
 	inet_aton( inet_ntoa(clt.sin_addr), &(clt.sin_addr) );
-	sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
+	sendto(sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
 	WARN(2, "#(info) +-- Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
-	memset( recvbuf, 0, SEARCH_BUFLEN );
+	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
 
   /* statement unreachable
