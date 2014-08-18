@@ -15,7 +15,14 @@ setupSockaddr(char *ipaddr, int tcpport)
 {
     struct sockaddr_in sockaddr;
     struct hostent *hent;
-    hent = gethostbyname(ipaddr);
+    
+    //hent = gethostbyname(ipaddr);
+    hent = gethostbyaddr(&ipaddr, sizeof(unsigned int), AF_INET);
+    if ( !hent ) {
+	herror("setupSockaddr:gethostbyaddr");
+	exit(1);
+    }
+    
     memset((char *)&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
     memcpy((caddr_t)&sockaddr.sin_addr, hent->h_addr, hent->h_length);

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 17:52:12
+// Last Modified On : 2014-08-17 19:48:41
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -622,36 +622,41 @@ int dscudaSearchDaemon(char *ips, int size)
 {
     char sendbuf[SEARCH_BUFLEN];
     char recvbuf[SEARCH_BUFLEN];
-    char *magic_word, *user_name;
+    char *magic_word;
+    char *user_name;
     int num_svr = 0; // # of dscuda daemons found.
     int num_ignore = 0;
-    int sock, recvsock, val = 1;
+    int sendsock;
+    int recvsock;
+    int val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
     int ioctl_ret;
+    int bind_ret;
 
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
     struct ifconf ifc;
     struct passwd *pwd;
-
+    
+    WARN(2, "#(info) RC_DAEMON_IP_PORT = %d\n", RC_DAEMON_IP_PORT);
     WARN(2, "#(info) Searching DSCUDA daemons.\n");
-    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sendsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if( sock == -1 || recvsock == -1 ) {
+    if( sendsock == -1 || recvsock == -1 ) {
 	perror("dscudaSearchDaemon: socket()");
 	return -1;
     }
-    setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
+    setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
 
     ifc.ifc_len = sizeof(ifr) * 2;
     ifc.ifc_ifcu.ifcu_buf = (char *)ifr;
-    ioctl(sock, SIOCGIFCONF, &ifc);
+    ioctl(sendsock, SIOCGIFCONF, &ifc);
 
     ifr[1].ifr_addr.sa_family = AF_INET;
-    ioctl(sock, SIOCGIFADDR, &ifr[1]);
+    ioctl(sendsock, SIOCGIFADDR, &ifr[1]);
     adr = ((struct sockaddr_in *)(&ifr[1].ifr_addr))->sin_addr.s_addr;
-    ioctl(sock, SIOCGIFNETMASK, &ifr[1]);
+    ioctl(sendsock, SIOCGIFNETMASK, &ifr[1]);
     mask = ((struct sockaddr_in *)(&ifr[1].ifr_netmask))->sin_addr.s_addr;
 
     addr.sin_family = AF_INET;
@@ -659,13 +664,13 @@ int dscudaSearchDaemon(char *ips, int size)
     addr.sin_addr.s_addr = adr | ~mask;
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN - 1 );
-    sendto(sock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&addr, sizeof(addr));
+    sendto(sendsock, sendbuf, SEARCH_BUFLEN, 0, (struct sockaddr *)&addr, sizeof(addr));
     WARN(2, "#(info) +--- Sent message \"%s\"...\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
 
-    svr.sin_family = AF_INET;
-    svr.sin_port = htons(RC_DAEMON_IP_PORT - 2);
+    svr.sin_family      = AF_INET;
+    svr.sin_port        = htons(RC_DAEMON_IP_PORT - 2);
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
     
     ioctl_ret = ioctl(recvsock, FIONBIO, &val);
@@ -674,7 +679,10 @@ int dscudaSearchDaemon(char *ips, int size)
 	exit(1);
     }
 
-    if( bind(recvsock, (struct sockaddr *)&svr, sizeof(svr)) != 0 ) {
+    bind_ret = bind(recvsock, (struct sockaddr *)&svr, sizeof(svr));
+    if( bind_ret != 0 ) {
+	fprintf(stderr, "Error: bind() returned %d. recvsock=%d, port=%d\n",
+		bind_ret, recvsock, svr.sin_port); //port:38655
 	perror("dscudaSearchDaemon: bind()");
 	return -1;
     }
@@ -705,7 +713,7 @@ int dscudaSearchDaemon(char *ips, int size)
 	}
 	memset( recvbuf, 0, SEARCH_BUFLEN );
     }
-    close( sock );
+    close( sendsock );
     close( recvsock );
 
     if ( num_svr < 0 ) {
