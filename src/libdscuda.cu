@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 16:49:02
+// Last Modified On : 2014-08-18 17:21:00
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -94,7 +94,8 @@ int requestDaemonForDevice(char *ipaddr, int devid, int useibv) {
         perror("socket");
         exit(1);
     }
-    if (connect(dsock, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1) {
+    
+    if ( connect(dsock, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1 ) {
         perror("(;_;) Connect");
 	fprintf( stderr, "(;_;) Program terminated at %s:L%d\n", __FILE__, __LINE__ );
 	fprintf( stderr, "(;_;) Maybe DS-CUDA daemon is not running...\n" );
@@ -677,7 +678,7 @@ int dscudaSearchDaemon(char *ips, int size)
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN_TX - 1 );
     sendto( sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
-    WARN(2, "#(info) +--- Sent message \"%s\"...\n", SEARCH_PING);
+    WARN(2, "#(info) +--- Broadcast message \"%s\"...\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
 
@@ -685,7 +686,7 @@ int dscudaSearchDaemon(char *ips, int size)
     svr.sin_port        = htons(RC_DAEMON_IP_PORT - 2);
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
     
-    //ioctl_ret = ioctl(recvsock, FIONBIO, &val); // replaced by following, because not work in KAUST.
+    // Set timeout for recvsock.
     struct timeval tout;
     tout.tv_sec  = RC_SEARCH_DAEMON_TIMEOUT ;
     tout.tv_usec = 0;
@@ -710,11 +711,8 @@ int dscudaSearchDaemon(char *ips, int size)
     
     pwd = getpwuid( getuid() );
     
-    //sleep(RC_SEARCH_DAEMON_TIMEOUT); // can be removed by using setsockopt() on recvsock.
-    
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN_RX - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
-	WARN(2, "#(info) +--- recvfrom() returned %d.\n", recvlen );
 	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok( recvbuf, SEARCH_DELIM );
 	user_name  = strtok( NULL,    SEARCH_DELIM );
@@ -735,9 +733,7 @@ int dscudaSearchDaemon(char *ips, int size)
 	    }
 	}
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
-	WARN(2, "#(info) +--- cleared the recvbuf[].\n");
     }
-    WARN(2, "exit recvfrom() loop.\n");
     
     close_ret = close( sendsock );
     if ( close_ret != 0 ) {
@@ -750,7 +746,6 @@ int dscudaSearchDaemon(char *ips, int size)
 	WARN(0, "close(recvsock) failed.\n");
 	exit(1);
     }
-    WARN(2, "UDP sockets was closed.\n");
 
     if ( num_svr < 0 ) {
 	WARN(0, "#(ERROR) Unexpected trouble occur in %s(), num_svr=%d\n", __func__, num_svr );
@@ -760,7 +755,7 @@ int dscudaSearchDaemon(char *ips, int size)
 	WARN(0, "#(info) Program terminated.\n");
 	exit(-1);
     } else {
-	WARN( 2, "#(info) +--- %d valid DSCUDA daemon%s found. (%d ignored).\n",
+	WARN( 2, "#(info) +--- Found %d valid DSCUDA daemon%s. (%d ignored).\n",
 	      num_svr, (num_svr>1)? "s":"", num_ignore );
     }
     return num_svr;
@@ -878,11 +873,11 @@ void initVirtualServerList(const char *env) {
 		    }
 		    printf("\n");
 		}
-		if (det_abc==1) {
+		if ( det_abc == 1 ) {
 		    strcpy(hostname, ip);
 		    hostent0 = gethostbyname(hostname);
 		    if (hostent0==NULL) {
-			fprintf(stderr, "gethostbyname() returned NULL.\n");
+			fprintf(stderr, "%s():gethostbyname() returned NULL.\n", __func__);
 			exit(1);
 		    } else {
 			ip_ref = inet_ntoa(*(struct in_addr*)hostent0->h_addr_list[0]);

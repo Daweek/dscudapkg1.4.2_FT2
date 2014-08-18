@@ -13,7 +13,7 @@
 struct sockaddr_in
 setupSockaddr( char *ipaddr, int tcpport )
 {
-#if 1 // referenced from Mr.Edgar's customized code, thank you.
+#if 0 // referenced from Mr.Edgar's customized code, thank you.
     
     struct sockaddr_in sockaddr;
     static char buf[128];
