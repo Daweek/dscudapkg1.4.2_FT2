@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 19:48:41
+// Last Modified On : 2014-08-18 13:53:20
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -620,17 +620,20 @@ void printModuleList(void) {
 static
 int dscudaSearchDaemon(char *ips, int size)
 {
+    int sendsock;
+    int recvsock;
+
     char sendbuf[SEARCH_BUFLEN];
     char recvbuf[SEARCH_BUFLEN];
     char *magic_word;
     char *user_name;
     int num_svr = 0; // # of dscuda daemons found.
     int num_ignore = 0;
-    int sendsock;
-    int recvsock;
+
     int val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
+    int setsockopt_ret;
     int ioctl_ret;
     int bind_ret;
 
@@ -643,11 +646,17 @@ int dscudaSearchDaemon(char *ips, int size)
     WARN(2, "#(info) Searching DSCUDA daemons.\n");
     sendsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if( sendsock == -1 || recvsock == -1 ) {
+    if ( sendsock == -1 || recvsock == -1 ) {
 	perror("dscudaSearchDaemon: socket()");
-	return -1;
+	//return -1;
+	exit(1);
     }
-    setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
+    
+    setsockopt_ret = setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
+    if ( setsockopt_ret != 0 ) {
+	perror("dscudaSearchDaemon: setsockopt()");
+	exit(1);
+    }
 
     ifc.ifc_len = sizeof(ifr) * 2;
     ifc.ifc_ifcu.ifcu_buf = (char *)ifr;
@@ -659,8 +668,8 @@ int dscudaSearchDaemon(char *ips, int size)
     ioctl(sendsock, SIOCGIFNETMASK, &ifr[1]);
     mask = ((struct sockaddr_in *)(&ifr[1].ifr_netmask))->sin_addr.s_addr;
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(RC_DAEMON_IP_PORT - 1);
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = adr | ~mask;
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN - 1 );
@@ -690,24 +699,25 @@ int dscudaSearchDaemon(char *ips, int size)
     pwd = getpwuid( getuid() );
     
     sleep(RC_SEARCH_DAEMON_TIMEOUT);
+    
     memset( recvbuf, 0, SEARCH_BUFLEN );
     while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
 	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok(recvbuf, SEARCH_DELIM);
 	user_name  = strtok(NULL,    SEARCH_DELIM);
-	if ( magic_word==NULL ) {
+	if ( magic_word == NULL ) {
 	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
 	    exit(1);
 	} else {
-	    WARN(2, "from server \"%s\" ", inet_ntoa(svr.sin_addr));
+	    WARN0(2, "from server \"%s\" ", inet_ntoa(svr.sin_addr));
 	    if ( strcmp( magic_word, SEARCH_ACK   )==0 &&
 		 strcmp( user_name,  pwd->pw_name )==0 ) { /* Found */
-		WARN(2, "valid.\n");
+		WARN0(2, "valid.\n");
 		strcat(ips, inet_ntoa(svr.sin_addr));
 		strcat(ips, " ");
 		num_svr++;
 	    } else {
-		WARN(2, "ignored.\n");
+		WARN0(2, "ignored.\n");
 		num_ignore++;
 	    }
 	}
@@ -822,11 +832,11 @@ void initVirtualServerList(const char *env) {
 	    }
 	}
 	/* convert hostname to ip address. */
-	int det_abc;
+	int  det_abc;
 	char letter;
 	char *ip_ref;
 	struct hostent *hostent0;
-	for (int i=0; i<St.Nvdev; i++) {
+	for ( int i=0; i<St.Nvdev; i++ ) {
 	    for (int j=0; j < St.Vdev[i].nredundancy; j++) {
 		ip = St.Vdev[i].server[j].ip;
 		hostname = St.Vdev[i].server[j].hostname;

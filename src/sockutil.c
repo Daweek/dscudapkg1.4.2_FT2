@@ -11,7 +11,7 @@
  */
 
 struct sockaddr_in
-setupSockaddr(char *ipaddr, int tcpport)
+setupSockaddr( char *ipaddr, int tcpport )
 {
 #if 1 // referenced from Mr.Edgar's customized code, thank you.
     
