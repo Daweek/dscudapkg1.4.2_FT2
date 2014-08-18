@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 13:53:20
+// Last Modified On : 2014-08-18 14:56:49
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -627,15 +627,18 @@ int dscudaSearchDaemon(char *ips, int size)
     char recvbuf[SEARCH_BUFLEN];
     char *magic_word;
     char *user_name;
+    int recvlen;
     int num_svr = 0; // # of dscuda daemons found.
     int num_ignore = 0;
 
     int val = 1;
     unsigned int adr, mask;
     socklen_t sin_size;
+    
     int setsockopt_ret;
     int ioctl_ret;
     int bind_ret;
+    int close_ret;
 
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
@@ -701,10 +704,11 @@ int dscudaSearchDaemon(char *ips, int size)
     sleep(RC_SEARCH_DAEMON_TIMEOUT);
     
     memset( recvbuf, 0, SEARCH_BUFLEN );
-    while( 0 < recvfrom(recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size) ) {
+    while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
+	WARN(2, "#(info) +--- recvfrom() returned %d.\n", recvlen );
 	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
-	magic_word = strtok(recvbuf, SEARCH_DELIM);
-	user_name  = strtok(NULL,    SEARCH_DELIM);
+	magic_word = strtok( recvbuf, SEARCH_DELIM );
+	user_name  = strtok( NULL,    SEARCH_DELIM );
 	if ( magic_word == NULL ) {
 	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
 	    exit(1);
@@ -722,9 +726,22 @@ int dscudaSearchDaemon(char *ips, int size)
 	    }
 	}
 	memset( recvbuf, 0, SEARCH_BUFLEN );
+	WARN(2, "#(info) +--- cleared the recvbuf[].\n");
     }
-    close( sendsock );
-    close( recvsock );
+    WARN(2, "exit recvfrom() loop.\n");
+    
+    close_ret = close( sendsock );
+    if ( close_ret != 0 ) {
+	WARN(0, "close(sendsock) failed.\n");
+	exit(1);
+    }
+    
+    close_ret = close( recvsock );
+    if ( close_ret != 0 ) {
+	WARN(0, "close(recvsock) failed.\n");
+	exit(1);
+    }
+    WARN(2, "UDP sockets was closed.\n");
 
     if ( num_svr < 0 ) {
 	WARN(0, "#(ERROR) Unexpected trouble occur in %s(), num_svr=%d\n", __func__, num_svr );
