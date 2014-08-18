@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 17:21:00
+// Last Modified On : 2014-08-18 17:51:41
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -82,13 +82,14 @@ void dscudaAutoVerbOff(void) {
     St.unsetAutoVerb();
 }
 
-int requestDaemonForDevice(char *ipaddr, int devid, int useibv) {
+int requestDaemonForDevice(char *ipaddr,  // ex.)"192.168.0.101"
+			   int devid, int useibv) {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
     struct sockaddr_in sockaddr;
 
-    sockaddr = setupSockaddr(ipaddr, RC_DAEMON_IP_PORT);
+    sockaddr = setupSockaddr( ipaddr, RC_DAEMON_IP_PORT );
     dsock = socket(AF_INET, SOCK_STREAM, 0);
     if (dsock < 0) {
         perror("socket");
@@ -97,8 +98,8 @@ int requestDaemonForDevice(char *ipaddr, int devid, int useibv) {
     
     if ( connect(dsock, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1 ) {
         perror("(;_;) Connect");
-	fprintf( stderr, "(;_;) Program terminated at %s:L%d\n", __FILE__, __LINE__ );
-	fprintf( stderr, "(;_;) Maybe DS-CUDA daemon is not running...\n" );
+	WARN(0, "+--- Program terminated at %s:L%d\n", __FILE__, __LINE__ );
+	WARN(0, "+--- Maybe DS-CUDA daemon is not running...\n" );
         exit(1);
     }
     sprintf(msg, "deviceid:%d", devid);

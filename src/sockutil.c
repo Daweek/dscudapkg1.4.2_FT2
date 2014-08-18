@@ -11,41 +11,15 @@
  */
 
 struct sockaddr_in
-setupSockaddr( char *ipaddr, int tcpport )
-{
-#if 0 // referenced from Mr.Edgar's customized code, thank you.
-    
+setupSockaddr( char *ipaddr, int   tcpport ) {
     struct sockaddr_in sockaddr;
-    static char buf[128];
-    char *p = (char *)&ipaddr;
-
-    sprintf( buf, "%hhu.%hhu.%hhu.%hhu", p[0], p[1], p[2], p[3] );
+    
     memset((char *)&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family      = AF_INET;
-    sockaddr.sin_addr.s_addr = inet_addr( buf );
-    sockaddr.sin_port        = htons(tcpport);
-
+    sockaddr.sin_port        = htons( tcpport );
+    sockaddr.sin_addr.s_addr = inet_addr( ipaddr ); 
+							
     return sockaddr;
-
-#else // original implimentation by AK. remove when the code above is tested enough.
-    
-    struct sockaddr_in sockaddr;
-    struct hostent *hent;
-    
-    //hent = gethostbyname(ipaddr);
-    hent = gethostbyaddr(&ipaddr, sizeof(unsigned int), AF_INET);
-    if ( !hent ) {
-	herror("setupSockaddr:gethostbyaddr");
-	exit(1);
-    }
-    
-    memset((char *)&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sin_family = AF_INET;
-    memcpy((caddr_t)&sockaddr.sin_addr, hent->h_addr, hent->h_length);
-    sockaddr.sin_port = htons(tcpport);
-    return sockaddr;
-    
-#endif
 }
 
 void
