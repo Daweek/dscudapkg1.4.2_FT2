@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 15:48:25
+// Last Modified On : 2014-08-18 16:49:02
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -676,7 +676,7 @@ int dscudaSearchDaemon(char *ips, int size)
     addr.sin_addr.s_addr = adr | ~mask;
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN_TX - 1 );
-    sendto(sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
+    sendto( sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
     WARN(2, "#(info) +--- Sent message \"%s\"...\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
     memset(ips, 0, size);
@@ -685,13 +685,22 @@ int dscudaSearchDaemon(char *ips, int size)
     svr.sin_port        = htons(RC_DAEMON_IP_PORT - 2);
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
     
-    ioctl_ret = ioctl(recvsock, FIONBIO, &val);
+    //ioctl_ret = ioctl(recvsock, FIONBIO, &val); // replaced by following, because not work in KAUST.
+    struct timeval tout;
+    tout.tv_sec  = RC_SEARCH_DAEMON_TIMEOUT ;
+    tout.tv_usec = 0;
+    setsockopt_ret = setsockopt(recvsock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tout, sizeof(tout));
+    if ( setsockopt_ret != 0 ) {
+	perror("dscudaSearchDaemon: setsockopt(recvsock)");
+	exit(1);
+    }
+    
     if (ioctl_ret != 0) {
 	fprintf(stderr, "ioctl() failed, and return code %d\n", ioctl_ret);
 	exit(1);
     }
 
-    bind_ret = bind(recvsock, (struct sockaddr *)&svr, sizeof(svr));
+    bind_ret = bind( recvsock, (struct sockaddr *)&svr, sizeof(svr) );
     if( bind_ret != 0 ) {
 	fprintf(stderr, "Error: bind() returned %d. recvsock=%d, port=%d\n",
 		bind_ret, recvsock, svr.sin_port); //port:38655
@@ -701,7 +710,7 @@ int dscudaSearchDaemon(char *ips, int size)
     
     pwd = getpwuid( getuid() );
     
-    sleep(RC_SEARCH_DAEMON_TIMEOUT);
+    //sleep(RC_SEARCH_DAEMON_TIMEOUT); // can be removed by using setsockopt() on recvsock.
     
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN_RX - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {

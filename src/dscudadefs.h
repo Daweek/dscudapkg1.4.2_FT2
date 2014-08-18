@@ -27,7 +27,7 @@
 
 #define RC_DAEMON_IP_PORT  (65432)
 #define RC_SERVER_IP_PORT  (RC_DAEMON_IP_PORT+1)
-#define RC_SEARCH_DAEMON_TIMEOUT (3) // How long clnt wait for response from dscudad(in second).
+#define RC_SEARCH_DAEMON_TIMEOUT (2) // How long clnt wait for response from dscudad(in second).
 
 #define RC_WARNLEVEL_DEFAULT (5)
 #define RC_DSCUDA_VER "1.4.2.branch"
