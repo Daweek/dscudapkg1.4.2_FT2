@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 14:24:42
+// Last Modified On : 2014-08-19 14:32:26
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -855,7 +855,7 @@ dscudafreeid_1_svc(RCadr mem, struct svc_req *)
     err = cudaFree((void*)mem);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p) done.\n", mem);
+    WARN(3, "0x%08llx) done.\n", (long long)mem);
 
     return &res;
 }
@@ -879,8 +879,8 @@ dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *s
     err = cudaMemcpy((void*)dst, srcbuf.RCbuf_val, count, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, 0x%08lx, %d, %s) done.\n",
-            dst, (unsigned long)srcbuf.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
+    WARN(3, "0x%08llx, 0x%08lx, %d, %s) done.\n",
+	 (long long)dst, (unsigned long)srcbuf.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
 
@@ -903,7 +903,7 @@ dscudamemcpyd2hid_1_svc(RCadr src, RCsize count, struct svc_req *sr)
     res.buf.RCbuf_len = count;
     err = cudaMemcpy(res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost);
     WARN(3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
-         (unsigned long)res.buf.RCbuf_val, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost));
+         (unsigned long)res.buf.RCbuf_val, (long long)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost));
     check_cuda_error(err);
     res.err = err;
 
@@ -939,8 +939,8 @@ dscudamemcpyd2did_1_svc(RCadr dst, RCadr src, RCsize count, struct svc_req *sr)
     err = cudaMemcpy((void *)dst, (void *)src, count, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, %p, %d, %s) done.\n",
-            dst, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
+    WARN(3, "0x%08llx, 0x%08llx, %d, %s) done.\n",
+	 (long long)dst, (long long)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
 
@@ -958,7 +958,7 @@ dscudamallocarrayid_1_svc(RCchanneldesc desc, RCsize width, RCsize height, unsig
     res.array = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, %p, %d, %d, 0x%08x) done. devadr:0x%08llx\n",
+    WARN(3, "%p, %p, %d, %d, 0x%08x) done. devadr:%p\n",
          &devadr, &descbuf, width, height, flags, devadr)
 
     return &res;
@@ -975,7 +975,7 @@ dscudafreearrayid_1_svc(RCadr array, struct svc_req *sr)
     err = cudaFreeArray((cudaArray*)array);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", array);
+    WARN(3, "0x%08llx) done.\n", (long long)array);
 
     return &res;
 }
@@ -999,8 +999,8 @@ dscudamemcpytoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf 
     err = cudaMemcpyToArray((cudaArray *)dst, wOffset, hOffset, src.RCbuf_val, count, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, %d, %d, 0x%08llx, %d, %s) done.\n",
-         dst, wOffset, hOffset, (unsigned long)src.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
+    WARN(3, "0x%08llx, %d, %d, 0x%08lx, %d, %s) done.\n",
+         (long long)dst, wOffset, hOffset, (unsigned long)src.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
 
@@ -1021,8 +1021,8 @@ dscudamemcpytoarrayd2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCadr 
     err = cudaMemcpyToArray((cudaArray *)dst, wOffset, hOffset, (void *)src, count, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d, 0x%08llx, %d, %s) done.\n",
-         dst, wOffset, hOffset, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
+    WARN(3, "%p, %d, %d, %p, %d, %s) done.\n",
+         (void *)dst, wOffset, hOffset, (void *)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
 
