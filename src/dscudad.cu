@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 10:34:50
+// Last Modified On : 2014-08-19 14:36:52
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -322,7 +322,7 @@ response_to_search( void *arg )  /* call by pthread_create() */
     if ( pwd == NULL ) {
 	sprintf( sendbuf, "%s:NULL@%s", SEARCH_ACK, host);	
     } else {
-	sprintf( sendbuf, "%s%s%s@%s", SEARCH_ACK, SEARCH_DELIM, pwd->pw_name, host);	
+	sprintf( sendbuf, "%s:%s@%s", SEARCH_ACK, pwd->pw_name, host);	
     }
 
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
