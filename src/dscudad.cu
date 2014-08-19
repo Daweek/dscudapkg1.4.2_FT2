@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 15:46:48
+// Last Modified On : 2014-08-19 10:34:50
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -77,11 +77,11 @@ create_daemon_socket(in_port_t port, int backlog)
     int sock;
 
     memset((char *)&me, 0, sizeof(me));
-    me.sin_family = AF_INET;
-    me.sin_addr.s_addr = htonl(INADDR_ANY);
-    me.sin_port = htons(port);
+    me.sin_family      = AF_INET;
+    me.sin_addr.s_addr = htonl( INADDR_ANY );
+    me.sin_port        = htons( port );
 
-    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sock = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
     if (sock < 0) {
 	perror("dscudad:socket");
 	return -1;
@@ -282,50 +282,61 @@ void signal_from_child( int sig )
 }
 
 static void*
-response_to_search(void *arg)  /* call by pthread_create() */
+response_to_search( void *arg )  /* call by pthread_create() */
 {
-    char sendbuf[SEARCH_BUFLEN_TX];
-    char recvbuf[SEARCH_BUFLEN_RX];
+    char sendbuf[ SEARCH_BUFLEN_TX ];
+    char recvbuf[ SEARCH_BUFLEN_RX ];
 
-    int sock;
+    int       sock;
     socklen_t sin_size;
-    uid_t uid;
+    uid_t     uid;
+    char      host[256];
     struct sockaddr_in addr, clt;
     struct passwd *pwd = NULL;
+    int       retval;
 
     sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
-    if( sock == -1 ) {
+    if ( sock == -1 ) {
 	perror("response_to_search:socket()");
 	return NULL;
     }
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(RC_DAEMON_IP_PORT - 1);
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = htonl( INADDR_ANY );
-    if( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
+    if ( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
 	perror("response_to_search:bind()");
 	return NULL;
     }
 
+    /* Construct send message. */
     uid = getuid(); 
     pwd = getpwuid(uid);
+    
+    retval = gethostname( host, 256 );
+    if ( retval != 0 ) {
+	perror("gethostname()");
+	exit(1);
+    }
+    
     if ( pwd == NULL ) {
-	sprintf( sendbuf, "%s:NULL", SEARCH_ACK);	
+	sprintf( sendbuf, "%s:NULL@%s", SEARCH_ACK, host);	
     } else {
-	sprintf( sendbuf, "%s%s%s", SEARCH_ACK, SEARCH_DELIM, pwd->pw_name);	
+	sprintf( sendbuf, "%s%s%s@%s", SEARCH_ACK, SEARCH_DELIM, pwd->pw_name, host);	
     }
 
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     for(;;) {
-	sin_size = (sizeof(struct sockaddr_in));
-	recvfrom(sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size);
+	sin_size = sizeof( struct sockaddr_in );
+	recvfrom( sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size );
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
 	WARN(2, "#(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	clt.sin_family = AF_INET;
-	clt.sin_port = htons( RC_DAEMON_IP_PORT - 2 );
-	inet_aton( inet_ntoa(clt.sin_addr), &(clt.sin_addr) );
-	sendto(sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr));
+	clt.sin_port   = htons( RC_DAEMON_IP_PORT - 2 );
+	inet_aton( inet_ntoa( clt.sin_addr ), &(clt.sin_addr) );
+	
+	sendto( sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr) );
 	WARN(2, "#(info) +-- Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
