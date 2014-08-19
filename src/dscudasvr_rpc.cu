@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 13:48:35
+// Last Modified On : 2014-08-19 13:54:55
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -608,7 +608,7 @@ dscudastreamwaiteventid_1_svc(RCstream stream, RCevent event, unsigned int flags
     err = cudaStreamWaitEvent((cudaStream_t)stream, (cudaEvent_t)event, flags);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx 0x%08llx, 0x%08x) done.\n", stream, event, flags);
+    WARN(3, "%#"PRIx64" %#"PRIx64", 0x%08x) done.\n", stream, event, flags);
 
     return &res;
 }
@@ -624,7 +624,7 @@ dscudastreamsynchronizeid_1_svc(RCstream stream, struct svc_req *sr)
     err = cudaStreamSynchronize((cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", stream);
+    WARN(3, "%#"PRIx64") done.\n", stream);
 
     return &res;
 }
@@ -641,7 +641,7 @@ dscudastreamqueryid_1_svc(RCstream stream, struct svc_req *sr)
     // should not check error due to the nature of this API.
     // check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", stream);
+    WARN(3, "%#"PRIx64") done.\n", stream);
 
     return &res;
 }
@@ -681,7 +681,7 @@ dscudaeventcreatewithflagsid_1_svc(unsigned int flags, struct svc_req *sr)
     res.event = (RCadr)event;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, 0x%08x) done. event:0x%08llx\n", &event, flags, event);
+    WARN(3, "%p, 0x%08x) done. event:%#"PRIx64"\n", &event, flags, event);
 
     return &res;
 }
@@ -697,7 +697,7 @@ dscudaeventdestroyid_1_svc(RCevent event, struct svc_req *sr)
     err = cudaEventDestroy((cudaEvent_t)event);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", event);
+    WARN(3, "%#"PRIx64") done.\n", event);
 
     return &res;
 }
@@ -715,7 +715,7 @@ dscudaeventelapsedtimeid_1_svc(RCevent start, RCevent end, struct svc_req *sr)
     check_cuda_error(err);
     res.ms = millisecond;
     res.err = err;
-    WARN(3, "%5.3f 0x%08llx 0x%08llx) done.\n", millisecond, start, end);
+    WARN(3, "%5.3f %#"PRIx64" %#"PRIx64") done.\n", millisecond, start, end);
 
     return &res;
 }
@@ -731,7 +731,7 @@ dscudaeventrecordid_1_svc(RCevent event, RCstream stream, struct svc_req *sr)
     err = cudaEventRecord((cudaEvent_t)event, (cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx 0x%08llx) done.\n", event, stream);
+    WARN(3, "%#"PRIx64" %#"PRIx64") done.\n", event, stream);
 
     return &res;
 }
@@ -747,7 +747,7 @@ dscudaeventsynchronizeid_1_svc(RCevent event, struct svc_req *sr)
     err = cudaEventSynchronize((cudaEvent_t)event);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", event);
+    WARN(3, "%#"PRIx64") done.\n", event);
 
     return &res;
 }
@@ -764,7 +764,7 @@ dscudaeventqueryid_1_svc(RCevent event, struct svc_req *sr)
     // should not check error due to the nature of this API.
     // check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", event);
+    WARN(3, "%#"PRIx64") done.\n", event);
 
     return &res;
 }
