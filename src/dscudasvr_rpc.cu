@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 11:11:41
+// Last Modified On : 2014-08-19 13:48:35
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -592,7 +592,7 @@ dscudastreamdestroyid_1_svc(RCstream stream, struct svc_req *sr)
     err = cudaStreamDestroy((cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", stream);
+    WARN(3, "%#"PRIx64") done.\n", stream);
 
     return &res;
 }
