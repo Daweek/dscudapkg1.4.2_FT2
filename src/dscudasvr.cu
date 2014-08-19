@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 12:09:38
+// Last Modified On : 2014-08-19 11:25:08
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -322,11 +322,11 @@ initDscuda(void)
     }
     err = (CUresult)cudaSetValidDevices(Devid, Ndevice);
     if (err != CUDA_SUCCESS) {
-        WARN(0, "cudaSetValidDevices(0x%08llx, %d) failed.\n", Devid, Ndevice);
+        WARN(0, "cudaSetValidDevices(%p, %d) failed.\n", Devid, Ndevice);
         exit(1);
     }
     dscuDevice = Devid[0];
-    WARN(3, "cudaSetValidDevices(0x%08llx, %d). dscuDevice:%d\n",
+    WARN(3, "cudaSetValidDevices(%p, %d). dscuDevice:%d\n",
          Devid, Ndevice, dscuDevice);
     WARN(4, "#(info.)---> %s() done.\n", __func__);
     return (cudaError_t)err;

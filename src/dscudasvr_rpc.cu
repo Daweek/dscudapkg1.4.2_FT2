@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 12:56:10
+// Last Modified On : 2014-08-19 11:11:41
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -185,7 +185,7 @@ static void setupRpc(void)
         exit(1);
     }
     if (!svc_register(transp, prog, DSCUDA_VER, dscuda_prog_1, 0)) {
-        fprintf (stderr, "unable to register (prog:0x%x DSCUDA_VER:%d, TCP).\n",
+        fprintf (stderr, "unable to register (prog:0x%lx DSCUDA_VER:%d, TCP).\n",
                  prog, DSCUDA_VER);
         exit(1);
     }
@@ -576,7 +576,7 @@ dscudastreamcreateid_1_svc(struct svc_req *sr)
     res.stream = (RCadr)stream;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p) done. stream:0x%08llx\n", &stream, stream);
+    WARN(3, "%p) done. stream:%p\n", &stream, stream);
 
     return &res;
 }
@@ -663,7 +663,7 @@ dscudaeventcreateid_1_svc(struct svc_req *sr)
     res.event = (RCadr)event;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p) done. event:0x%08llx\n", &event, event);
+    WARN(3, "%p) done. event:%p\n", &event, event);
 
     return &res;
 }
@@ -855,7 +855,7 @@ dscudafreeid_1_svc(RCadr mem, struct svc_req *)
     err = cudaFree((void*)mem);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", mem);
+    WARN(3, "%p) done.\n", mem);
 
     return &res;
 }
@@ -879,7 +879,7 @@ dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *s
     err = cudaMemcpy((void*)dst, srcbuf.RCbuf_val, count, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08lx, %d, %s) done.\n",
+    WARN(3, "%p, 0x%08lx, %d, %s) done.\n",
             dst, (unsigned long)srcbuf.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
