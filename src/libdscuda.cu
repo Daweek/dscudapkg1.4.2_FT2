@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-18 17:51:41
+// Last Modified On : 2014-08-19 10:54:30
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -620,15 +620,14 @@ void printModuleList(void) {
 }
 
 static
-int dscudaSearchDaemon(char *ips, int size)
+int dscudaSearchDaemon( char *ips, int size )
 {
     int sendsock;
     int recvsock;
 
     char sendbuf[SEARCH_BUFLEN_TX];
     char recvbuf[SEARCH_BUFLEN_RX];
-    char *magic_word;
-    char *user_name;
+    
     int recvlen;
     int num_svr = 0; // # of dscuda daemons found.
     int num_ignore = 0;
@@ -711,12 +710,18 @@ int dscudaSearchDaemon(char *ips, int size)
     }
     
     pwd = getpwuid( getuid() );
-    
+
+    /* Recieve ack message from dscudad running at other host. */
+    char *magic_word;
+    char *user_name;
+    char *host_name;
+
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN_RX - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
 	WARN(2, "#(info) +--- Recieved ACK \"%s\" ", recvbuf);
 	magic_word = strtok( recvbuf, SEARCH_DELIM );
 	user_name  = strtok( NULL,    SEARCH_DELIM );
+	host_name  = strtok( NULL,    SEARCH_DELIM );
 	if ( magic_word == NULL ) {
 	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
 	    exit(1);
@@ -763,10 +768,10 @@ int dscudaSearchDaemon(char *ips, int size)
 }
 
 static
-void initCandServerList(const char *env)
+void initCandServerList( const char *env )
 {
     char *ip;
-    char buf[1024 * RC_NVDEVMAX];
+    char buf[ 1024 * RC_NVDEVMAX ];
     int nsvr;
 
     nsvr = dscudaSearchDaemon( buf, 1024 * RC_NVDEVMAX );
