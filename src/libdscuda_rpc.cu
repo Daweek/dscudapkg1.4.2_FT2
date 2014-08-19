@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 12:06:46
+// Last Modified On : 2014-08-19 18:49:47
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -202,7 +202,7 @@ cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
         }
         xdr_free((xdrproc_t)xdr_dscudaThreadGetLimitResult, (char *)rp);
     }
-    WARN(3, "done.  *pValue: %d\n", *pValue);
+    WARN(3, "done.  *pValue: %zu\n", *pValue);
 
     return err;
 }
@@ -237,7 +237,7 @@ cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
     dscudaThreadGetCacheConfigResult *rp;
     int vid = vdevidIndex();
 
-    WARN(3, "cudaThreadGetCacheConfig(0x%08llx)...", pCacheConfig);
+    WARN(3, "cudaThreadGetCacheConfig(%p)...", pCacheConfig);
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -361,7 +361,7 @@ cudaError_t cudaDriverGetVersion (int *driverVersion)
     dscudaDriverGetVersionResult *rp;
     int vid = vdevidIndex();
 
-    WARN(3, "cudaDriverGetVersionCount(0x%08llx)...", (unsigned long)driverVersion);
+    WARN(3, "cudaDriverGetVersionCount(%p)...", driverVersion);
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -384,7 +384,7 @@ cudaError_t cudaRuntimeGetVersion(int *runtimeVersion)
     dscudaRuntimeGetVersionResult *rp;
     int vid = vdevidIndex();
 
-    WARN(3, "cudaRuntimeGetVersion(0x%08llx)...", (unsigned long)runtimeVersion);
+    WARN(3, "cudaRuntimeGetVersion(%p)...", runtimeVersion);
     Vdev_t *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -928,7 +928,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
 
     st = RCstreamArrayQuery((cudaStream_t)stream);
     if (!st) {
-        WARN(0, "invalid stream : 0x%08llx\n", stream);
+        WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
 
@@ -987,9 +987,8 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     RCchanneldesc descbuf;
     cudaArray *ca[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaMallocArray(0x%08llx, 0x%08llx, %zu, %zu, 0x%08x)...",
-         (unsigned long)array, desc, width, height, flags);
-
+    WARN(3, "cudaMallocArray(%p, %p, %zu, %zu, 0x%08x)...",
+         array, desc, width, height, flags);
 
     descbuf.x = desc->x;
     descbuf.y = desc->y;
@@ -1011,7 +1010,7 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
 
     *array = ca[0];
     RCcuarrayArrayRegister(ca);
-    WARN(3, "done. *array:0x%08llx\n", *array);
+    WARN(3, "done. *array:%p\n", *array);
 
     return err;
 }
@@ -1023,10 +1022,10 @@ cudaFreeArray(struct cudaArray *array)
     dscudaResult *rp;
     RCcuarrayArray *ca;
 
-    WARN(3, "cudaFreeArray(0x%08llx)...", (unsigned long)array);
+    WARN(3, "cudaFreeArray(%p)...", array);
     ca = RCcuarrayArrayQuery(array);
     if (!ca) {
-        WARN(0, "invalid cudaArray : 0x%08llx\n", array);
+        WARN(0, "invalid cudaArray : %p\n", array);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -1055,11 +1054,11 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    WARN(3, "cudaMemcpyToArray(0x%08llx, %zu, %zu, 0x%08llx, %zu, %s)...",
-         (unsigned long)dst, wOffset, hOffset, (unsigned long)src, count, dscudaMemcpyKindName(kind));
+    WARN(3, "cudaMemcpyToArray(%p, %zu, %zu, %p, %zu, %s)...",
+         dst, wOffset, hOffset, src, count, dscudaMemcpyKindName(kind));
     ca = RCcuarrayArrayQuery(dst);
     if (!ca) {
-        WARN(0, "invalid cudaArray : 0x%08llx\n", dst);
+        WARN(0, "invalid cudaArray : %p\n", dst);
         exit(1);
     }
     switch (kind) {
@@ -1127,8 +1126,7 @@ cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaMallocPitchResult *rp;
 
-    WARN(3, "cudaMallocPitch(0x%08llx, 0x%08llx, %zu, %zu)...",
-         (unsigned long)devPtr, pitch, width, height);
+    WARN(3, "cudaMallocPitch(%p, %p, %zu, %zu)...", devPtr, pitch, width, height);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1144,7 +1142,7 @@ cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height)
         xdr_free((xdrproc_t)xdr_dscudaMallocPitchResult, (char *)rp);
     }
 
-    WARN(3, "done. *devPtr:0x%08llx  *pitch:%d\n", *devPtr, *pitch);
+    WARN(3, "done. *devPtr:%p  *pitch:%zu\n", *devPtr, *pitch);
 
     return err;
 }
@@ -1161,12 +1159,12 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
     Vdev_t *vdev;
     RCServer_t *sp;
 
-    WARN(3, "cudaMemcpy2DToArray(0x%08llx, %zu, %zu, 0x%08llx, %zu, %zu, %zu, %s)...",
-         (unsigned long)dst, wOffset, hOffset,
-         (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
+    WARN(3, "cudaMemcpy2DToArray(%p, %zu, %zu, %p, %zu, %zu, %zu, %s)...",
+         dst, wOffset, hOffset,
+         src, spitch, width, height, dscudaMemcpyKindName(kind));
     ca = RCcuarrayArrayQuery(dst);
     if (!ca) {
-        WARN(0, "invalid cudaArray : 0x%08llx\n", dst);
+        WARN(0, "invalid cudaArray : %p\n", dst);
         exit(1);
     }
     switch (kind) {
@@ -1241,8 +1239,8 @@ cudaMemcpy2D(void *dst, size_t dpitch,
     RCServer_t *sp;
 
     WARN(3, "cudaMemcpy2D(%p, %zu, %p, %zu, %zu, %zu, %s)...",
-         (unsigned long)dst, dpitch,
-         (unsigned long)src, spitch, width, height, dscudaMemcpyKindName(kind));
+         dst, dpitch,
+         src, spitch, width, height, dscudaMemcpyKindName(kind));
 
     switch (kind) {
       case cudaMemcpyDeviceToHost:
@@ -1310,8 +1308,8 @@ cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height)
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
-    WARN(3, "cudaMemset2D(%p, %zu, %zu, %zu, %zu)...",
-         (unsigned long)devPtr, pitch, value, width, height);
+    WARN(3, "cudaMemset2D(%p, %zu, %d, %zu, %zu)...",
+         devPtr, pitch, value, width, height);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1349,7 +1347,7 @@ cudaMallocHost(void **ptr, size_t size)
         xdr_free((xdrproc_t)xdr_dscudaMallocHostResult, (char *)rp);
     }
 
-    WARN(3, "done. *ptr:0x%08llx\n", *ptr);
+    WARN(3, "done. *ptr:%p\n", *ptr);
     return err;
 #else
     // returned memory is not page locked.
@@ -1395,12 +1393,12 @@ cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
     cudaError_t err = cudaSuccess;
     void *devmem;
 
-    WARN(3, "cudaHostAlloc(0x%08llx, %zu, 0x%08x)...", (unsigned long)pHost, size, flags);
+    WARN(3, "cudaHostAlloc(%p, %zu, 0x%08x)...", pHost, size, flags);
 
     *pHost = malloc(size);
     if (!*pHost) return cudaErrorMemoryAllocation;
     if (!(flags & cudaHostAllocMapped)) {
-        WARN(3, "done. *pHost:0x%08llx\n", *pHost);
+        WARN(3, "done. *pHost:%p\n", *pHost);
         return cudaSuccess;
     }
 
@@ -1409,7 +1407,7 @@ cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
     if (err == cudaSuccess) {
         RCmappedMemRegister(*pHost, devmem, size);
     }
-    WARN(3, "done. host mem:0x%08llx  device mem:0x%08llx\n", *pHost, devmem);
+    WARN(3, "done. host mem:%p  device mem:%p\n", *pHost, devmem);
 
     return err;
 #endif
@@ -1488,8 +1486,7 @@ cudaHostGetFlags(unsigned int *pFlags, void *pHost)
     cudaError_t err = cudaSuccess;
     dscudaHostGetFlagsResult *rp;
 
-    WARN(3, "cudaHostGetFlags(0x%08x 0x%08llx)...",
-         (unsigned long)pFlags, (unsigned long)pHost);
+    WARN(3, "cudaHostGetFlags(%p %p)...", pFlags, pHost);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1864,7 +1861,7 @@ cudaEventCreate(cudaEvent_t *event)
     dscudaEventCreateResult *rp;
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaEventCreate(0x%08llx)...", (unsigned long)event);
+    WARN(3, "cudaEventCreate(%p)...", event);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1878,7 +1875,7 @@ cudaEventCreate(cudaEvent_t *event)
     }
     *event = ev[0];
     RCeventArrayRegister(ev);
-    WARN(3, "done. *event:0x%08llx\n", *event);
+    WARN(3, "done. *event:%p\n", *event);
 
     return err;
 }
@@ -1890,7 +1887,7 @@ cudaEventCreateWithFlags(cudaEvent_t *event, unsigned int flags)
     dscudaEventCreateResult *rp;
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaEventCreateWithFlags(0x%08llx, 0x%08x)...", (unsigned long)event, flags);
+    WARN(3, "cudaEventCreateWithFlags(%p, 0x%08x)...", event, flags);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1904,7 +1901,7 @@ cudaEventCreateWithFlags(cudaEvent_t *event, unsigned int flags)
     }
     *event = ev[0];
     RCeventArrayRegister(ev);
-    WARN(3, "done. *event:0x%08llx\n", *event);
+    WARN(3, "done. *event:%p\n", *event);
 
     return err;
 }
@@ -1916,10 +1913,10 @@ cudaEventDestroy(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    WARN(3, "cudaEventDestroy(0x%08llx)...", (unsigned long)event);
+    WARN(3, "cudaEventDestroy(%p)...", event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
-        WARN(0, "invalid event : 0x%08llx\n", event);
+        WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -1944,16 +1941,15 @@ cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end)
     dscudaEventElapsedTimeResult *rp;
     RCeventArray *es, *ee;
 
-    WARN(3, "cudaEventElapsedTime(0x%08llx, 0x%08llx, 0x%08llx)...",
-         (unsigned long)ms, (unsigned long)start, (unsigned long)end);
+    WARN(3, "cudaEventElapsedTime(%p, %p, %p)...", ms, start, end);
     es = RCeventArrayQuery(start);
     if (!es) {
-        WARN(0, "invalid start event : 0x%08llx\n", start);
+        WARN(0, "invalid start event : %p\n", start);
         exit(1);
     }
     ee = RCeventArrayQuery(end);
     if (!ee) {
-        WARN(0, "invalid end event : 0x%08llx\n", end);
+        WARN(0, "invalid end event : %p\n", end);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -1980,15 +1976,15 @@ cudaEventRecord(cudaEvent_t event, cudaStream_t stream)
     RCstreamArray *st;
     RCeventArray *ev;
 
-    WARN(3, "cudaEventRecord(0x%08llx, 0x%08llx)...", (unsigned long)event, (unsigned long)stream);
+    WARN(3, "cudaEventRecord(%p, %p)...", event, stream);
     st = RCstreamArrayQuery(stream);
     if (!st) {
-        WARN(0, "invalid stream : 0x%08llx\n", stream);
+        WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
     ev = RCeventArrayQuery(event);
     if (!ev) {
-        WARN(0, "invalid event : 0x%08llx\n", event);
+        WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -2013,10 +2009,10 @@ cudaEventSynchronize(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    WARN(3, "cudaEventSynchronize(0x%08llx)...", (unsigned long)event);
+    WARN(3, "cudaEventSynchronize(%p)...", event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
-        WARN(0, "invalid event : 0x%08llx\n", event);
+        WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -2040,10 +2036,10 @@ cudaEventQuery(cudaEvent_t event)
     dscudaResult *rp;
     RCeventArray *ev;
 
-    WARN(3, "cudaEventQuery(0x%08llx)...", (unsigned long)event);
+    WARN(3, "cudaEventQuery(%p)...", event);
     ev = RCeventArrayQuery(event);
     if (!ev) {
-        WARN(0, "invalid event : 0x%08llx\n", event);
+        WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -2069,16 +2065,15 @@ cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
     RCstreamArray *st;
     RCeventArray *ev;
 
-    WARN(3, "cudaStreamWaitEvent(0x%08llx, 0x%08llx, 0x%08x)...",
-         (unsigned long)stream, (unsigned long)event, flags);
+    WARN(3, "cudaStreamWaitEvent(%p, %p, 0x%08x)...", stream, event, flags);
     st = RCstreamArrayQuery(stream);
     if (!st) {
-        WARN(0, "invalid stream : 0x%08llx\n", stream);
+        WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
     ev = RCeventArrayQuery(event);
     if (!ev) {
-        WARN(0, "invalid event : 0x%08llx\n", event);
+        WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
@@ -2136,7 +2131,7 @@ cudaGetChannelDesc(struct cudaChannelFormatDesc *desc, const struct cudaArray *a
     WARN(3, "cudaGetChannelDesc()...");
     ca = RCcuarrayArrayQuery((cudaArray *)array);
     if (!ca) {
-        WARN(0, "invalid cudaArray : 0x%08llx\n", array);
+        WARN(0, "invalid cudaArray : %p\n", array);
         exit(1);
     }
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];

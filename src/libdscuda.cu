@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 10:54:30
+// Last Modified On : 2014-08-19 18:50:29
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1193,7 +1193,7 @@ dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata
     FILE *tmpfp;
     char ptxfile[1024];
 
-    WARN(4, "getMangledFunctionName(%08llx, %08llx, %08llx)  funcif:\"%s\"\n",
+    WARN(4, "getMangledFunctionName(%p, %p, %p)  funcif:\"%s\"\n",
          name, funcif, ptxdata, funcif);
 
     // create a tmporary file that contains 'ptxdata'.
@@ -1330,7 +1330,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
     dscudaFuncGetAttributesResult *rp;
 
     WARN(3, "dscudaFuncGetAttributesWrapper(%d, 0x%08llx, %s)...",
-         moduleid, (unsigned long)attr, func);
+         moduleid, (unsigned long long)attr, func);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
@@ -1420,10 +1420,9 @@ dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
     int nredundancy;
     void *dstbuf;
 
-    WARN(3, "dscudaMemcpyFromSymbolWrapper(%p, 0x%08llx, 0x%08llx, %zu, %zu, %s)"
+    WARN(3, "dscudaMemcpyFromSymbolWrapper(%p, %p, %p, %zu, %zu, %s)"
          "symbol:%s  ...",
-         moduleid, (unsigned long)dst, (unsigned long)symbol,
-         count, offset, dscudaMemcpyKindName(kind), symbol);
+         moduleid, dst, symbol, count, offset, dscudaMemcpyKindName(kind), symbol);
 
     nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
     switch (kind) {
@@ -1481,7 +1480,7 @@ dscudaMemcpyToSymbolAsyncWrapper(int *moduleid, const char *symbol, const void *
          count, offset, dscudaMemcpyKindName(kind), (unsigned long)stream, symbol);
     st = RCstreamArrayQuery(stream);
     if (!st) {
-        WARN(0, "invalid stream : 0x%08llx\n", stream);
+        WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
     nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
@@ -1523,7 +1522,7 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
          count, offset, dscudaMemcpyKindName(kind), (unsigned long)stream, symbol);
     st = RCstreamArrayQuery(stream);
     if (!st) {
-        WARN(0, "invalid stream : 0x%08llx\n", stream);
+        WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
     nredundancy = (St.Vdev + Vdevid[vdevidIndex()])->nredundancy;
@@ -1603,7 +1602,7 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
     dscudaBindTextureResult *rp;
     RCtexture texbuf;
 
-    WARN(3, "dscudaBindTextureWrapper(%p, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %zu)...",
+    WARN(3, "dscudaBindTextureWrapper(%p, %s, %p, %p, %p, %p, %zu)...",
          moduleid, texname,
          offset, tex, devPtr, desc, size);
 
@@ -1648,7 +1647,7 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
     dscudaBindTexture2DResult *rp;
     RCtexture texbuf;
 
-    WARN(3, "dscudaBindTexture2DWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx, 0x%08llx, 0x%08llx, %zu, %zu, %zu)...",
+    WARN(3, "dscudaBindTexture2DWrapper(%p, %s, %p, %p, %p, %p, %zu, %zu, %zu)...",
          moduleid, texname,
          offset, tex, devPtr, desc, width, height, pitch);
 
@@ -1692,14 +1691,13 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
     RCtexture texbuf;
     RCcuarrayArray *ca;
 
-    WARN(3, "dscudaBindTextureToArrayWrapper(0x%08llx, %s, 0x%08llx, 0x%08llx)...",
-         moduleid, texname, (unsigned long)array, (unsigned long)desc);
+    WARN(3, "dscudaBindTextureToArrayWrapper(%p, %s, %p, %p)...", moduleid, texname, array, desc);
 
     setTextureParams(&texbuf, tex, desc);
 
     ca = RCcuarrayArrayQuery((cudaArray *)array);
     if (!ca) {
-        WARN(0, "invalid cudaArray : 0x%08llx\n", array);
+        WARN(0, "invalid cudaArray : %p\n", array);
         exit(1);
     }
 
@@ -1727,7 +1725,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
 cudaError_t cudaGetDevice(int *device) {
     cudaError_t err = cudaSuccess;
 
-    WARN(3, "cudaGetDevice(0x%08llx)...", (unsigned long)device);
+    WARN(3, "cudaGetDevice(%p)...", device);
     *device = Vdevid[vdevidIndex()];
     WARN(3, "done.\n");
 
@@ -1775,8 +1773,7 @@ cudaError_t
 cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     cudaError_t err = cudaSuccess;
 
-    WARN(3, "cudaChooseDevice(0x%08llx, 0x%08llx)...",
-         (unsigned long)device, (unsigned long)prop);
+    WARN(3, "cudaChooseDevice(%p, %p)...", device, prop);
     *device = 0;
     WARN(3, "done.\n");
     WARN(3, "Note : The current implementation always returns device 0.\n");
@@ -1790,8 +1787,7 @@ cudaError_t cudaGetDeviceCount(int *count)
 
     St.cudaCalled();
     *count = St.Nvdev;
-    WARN(3, "cudaGetDeviceCount(0x%08llx)  count:%d ...",
-    (unsigned long)count, *count);
+    WARN(3, "cudaGetDeviceCount(%p)  count:%d ...", count, *count);
     WARN(3, "done.\n");
 
     return err;
@@ -1801,8 +1797,7 @@ cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevi
 {
     cudaError_t err = cudaSuccess;
 
-    WARN(3, "cudaDeviceCanAccessPeer(0x%08lx, %d, %d)...",
-         canAccessPeer, device, peerDevice);
+    WARN(3, "cudaDeviceCanAccessPeer(%p, %d, %d)...", canAccessPeer, device, peerDevice);
     if (device < 0 || St.Nvdev <= device) {
         err = cudaErrorInvalidDevice;
     }

@@ -1,13 +1,18 @@
 #ifndef DSCUDA_MACROS_H
 #define DSCUDA_MACROS_H
 
-#define WARN(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
-      fprintf(stderr, "(dscudaWarn-%d) ", lv);		      \
-      fprintf(stderr, fmt, ## args); fflush(stderr);	      \
-   };
+#define WARN(lv, fmt, args...) if (lv <= dscudaWarnLevel()) {		\
+        time_t now = time(NULL);					\
+	struct tm *local = localtime( &now );				\
+	char tfmt[16];							\
+	strftime( tfmt, 16, "%T", local );				\
+	fprintf(stderr, "[%s](DSC-%d) ", tfmt, lv);			\
+	fprintf(stderr, fmt, ## args);					\
+    };
+
 #define WARN0(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
-      fprintf(stderr, fmt, ## args); fflush(stderr);	       \
-   };
+	fprintf(stderr, fmt, ## args);			       \
+    };
 #define WARNONCE(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
       static int firstcall = 1;					  \
       if (firstcall) {						  \

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 14:32:26
+// Last Modified On : 2014-08-19 19:00:10
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1040,7 +1040,7 @@ dscudamemcpytosymbolh2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize co
     getGlobalSymbol(moduleid, symbol, &gsptr, &gssize);
     err = cudaMemcpy((char *)gsptr + offset, src.RCbuf_val, count, cudaMemcpyHostToDevice);
                              
-    WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s) done. module name:%s  symbol:%s\n",
+    WARN(3, "%p, 0x%08lx, %d, %d, %s) done. module name:%s  symbol:%s\n",
          gsptr, (unsigned long)src.RCbuf_val, count, offset,
          dscudaMemcpyKindName(cudaMemcpyHostToDevice),
          SvrModulelist[moduleid].name, symbol);
@@ -1095,7 +1095,7 @@ dscudamemcpyfromsymbold2hid_1_svc(int moduleid, char *symbol, RCsize count, RCsi
     getGlobalSymbol(moduleid, symbol, &gsptr, &gssize);
     err = cudaMemcpy(res.buf.RCbuf_val, (char *)gsptr + offset, count, cudaMemcpyDeviceToHost);
                              
-    WARN(3, "0x%08llx, 0x%08llx, %d, %d, %s) done. module name:%s  symbol:%s\n",
+    WARN(3, "0x%08lx, %p, %d, %d, %s) done. module name:%s  symbol:%s\n",
          (unsigned long)res.buf.RCbuf_val, gsptr, count, offset,
          dscudaMemcpyKindName(cudaMemcpyDeviceToHost),
          SvrModulelist[moduleid].name, symbol);
@@ -1120,8 +1120,8 @@ dscudamemcpyfromsymbold2did_1_svc(int moduleid, RCadr dst, char *symbol, RCsize 
     err = cudaMemcpy((void*)dst, (char *)gsptr + offset, count, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %d, %s) done.\n",
-         (unsigned long)dst, gsptr, count, offset,
+    WARN(3, "%p, %p, %d, %d, %s) done.\n",
+         dst, gsptr, count, offset,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1141,7 +1141,7 @@ dscudamemcpytosymbolasynch2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsi
     getGlobalSymbol(moduleid, symbol, &gsptr, &gssize);
     err = cudaMemcpyAsync((char *)gsptr + offset, src.RCbuf_val, count, cudaMemcpyHostToDevice, (cudaStream_t)stream);
                              
-    WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done. module name:%s  symbol:%s\n",
+    WARN(3, "%p, 0x%08lx, %d, %d, %s, %p) done. module name:%s  symbol:%s\n",
          gsptr, (unsigned long)src.RCbuf_val, count, offset,
          dscudaMemcpyKindName(cudaMemcpyHostToDevice), stream,
          SvrModulelist[moduleid].name, symbol);
@@ -1167,8 +1167,8 @@ dscudamemcpytosymbolasyncd2did_1_svc(int moduleid, char *symbol, RCadr src, RCsi
     err = cudaMemcpyAsync((char *)gsptr + offset, (void*)src, count, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done.\n",
-         gsptr, (unsigned long)src, count, offset, stream,
+    WARN(3, "%p, %p, %d, %d, %s, 0x%08llx) done.\n",
+         gsptr, src, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1197,7 +1197,7 @@ dscudamemcpyfromsymbolasyncd2hid_1_svc(int moduleid, char *symbol, RCsize count,
     getGlobalSymbol(moduleid, symbol, &gsptr, &gssize);
     err = cudaMemcpyAsync(res.buf.RCbuf_val, (char *)gsptr + offset, count, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
                              
-    WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done. module name:%s  symbol:%s\n",
+    WARN(3, "0x%08lx, %p, %d, %d, %s, 0x%08llx) done. module name:%s  symbol:%s\n",
          (unsigned long)res.buf.RCbuf_val, gsptr, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToHost),
          SvrModulelist[moduleid].name, symbol);
@@ -1222,8 +1222,8 @@ dscudamemcpyfromsymbolasyncd2did_1_svc(int moduleid, RCadr dst, char *symbol, RC
     err = cudaMemcpyAsync((void*)dst, (char *)gsptr + offset, count, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08lx, 0x%08lx, %d, %d, %s, 0x%08llx) done.\n",
-         (unsigned long)dst, gsptr, count, offset, stream,
+    WARN(3, "%p, %p, %d, %d, %s, 0x%08llx) done.\n",
+         dst, gsptr, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1241,7 +1241,7 @@ dscudamemsetid_1_svc(RCadr dst, int value, RCsize count, struct svc_req *sq)
     err = cudaMemset((void *)dst, value, count);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d) done.\n", dst, value, count);
+    WARN(3, "%p, %d, %d) done.\n", dst, value, count);
     return &res;
 }
 
@@ -1258,7 +1258,7 @@ dscudahostallocid_1_svc(RCsize size, unsigned int flags, struct svc_req *sr)
     res.pHost = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, 0x%08x) done.\n", res.pHost, size, flags);
+    WARN(3, "%p, %d, 0x%08x) done.\n", res.pHost, size, flags);
 
     return &res;
 }
@@ -1276,7 +1276,7 @@ dscudamallochostid_1_svc(RCsize size, struct svc_req *sr)
     res.ptr = (RCadr)devadr;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d) done. devadr:0x%08llx\n", &devadr, size, devadr);
+    WARN(3, "%p, %d) done. devadr:%p\n", &devadr, size, devadr);
 
     return &res;
 }
@@ -1292,7 +1292,7 @@ dscudafreehostid_1_svc(RCadr ptr, struct svc_req *sr)
     err = cudaFreeHost((void*)ptr);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", ptr);
+    WARN(3, "%p) done.\n", ptr);
 
     return &res;
 }
@@ -1377,7 +1377,7 @@ dscudamemcpyasyncd2hid_1_svc(RCadr src, RCsize count, RCstream stream, struct sv
     err = cudaMemcpyAsync(res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %s, 0x%08llx) done.\n",
+    WARN(3, "0x%08llx, %p, %d, %s, %p) done.\n",
          (unsigned long)res.buf.RCbuf_val, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), stream);
     return &res;
 }
@@ -1391,7 +1391,7 @@ dscudamemcpyasyncd2did_1_svc(RCadr dst, RCadr src, RCsize count, RCstream stream
     err = cudaMemcpyAsync((void *)dst, (void *)src, count, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08llx, %d, %s, 0x%08llx) done.\n",
+    WARN(3, "%p, %p, %d, %s, %p) done.\n",
          dst, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice), stream);
     return &res;
 }
@@ -1412,7 +1412,7 @@ dscudamallocpitchid_1_svc(RCsize width, RCsize height, struct svc_req *sr)
     res.pitch = pitch;
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d) done. devadr:0x%08llx\n", &devadr, width, height, devadr);
+    WARN(3, "%p, %d, %d) done. devadr:%p\n", &devadr, width, height, devadr);
 
     return &res;
 }
@@ -1436,7 +1436,7 @@ dscudamemcpy2dtoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbu
     err = cudaMemcpy2DToArray((cudaArray*)dst, wOffset, hOffset, srcbuf.RCbuf_val, spitch, width, height, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08lx, %d, %d, 0x%08llx, %d, %d, %d, %s) done.\n",
+    WARN(3, "%p, %d, %d, 0x%08llx, %d, %d, %d, %s) done.\n",
          dst, wOffset, hOffset, (unsigned long)srcbuf.RCbuf_val, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
@@ -1540,7 +1540,7 @@ dscudamemcpy2dd2did_1_svc(RCadr dst, RCsize dpitch, RCadr src, RCsize spitch, RC
     err = cudaMemcpy2D((void *)dst, dpitch, (void *)src, spitch, width, height, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, 0x%08llx, %d, %d, %d, %s) done.\n",
+    WARN(3, "%p, %d, %p, %d, %d, %d, %s) done.\n",
          dst, dpitch, src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
@@ -1556,7 +1556,7 @@ dscudamemset2did_1_svc(RCadr dst, RCsize pitch, int value, RCsize width, RCsize 
     err = cudaMemset2D((void *)dst, pitch, value, width, height);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d, %d, %d) done.\n", dst, pitch, value, width, height);
+    WARN(3, "%p, %d, %d, %d, %d) done.\n", dst, pitch, value, width, height);
     return &res;
 }
 
@@ -1614,7 +1614,7 @@ dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size
     if (!dscuContext) createDscuContext();
 
     err = (cudaError_t)cuModuleGetTexRef(&texref, mp->handle, texname);
-    WARN(3, "cuModuleGetTexRef(0x%08llx, 0x%08llx, %s) : module: %s\n",
+    WARN(3, "cuModuleGetTexRef(%p, %p, %s) : module: %s\n",
          &texref, mp->handle, texname, mp->name);
     if (err != cudaSuccess) {
         check_cuda_error(err);
@@ -1628,7 +1628,7 @@ dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size
         return &res;
     }
 
-    WARN(4, "cuTexRefSetAddress(0x%08llx, 0x%08llx, 0x%08llx, %d)\n", &res.offset, texref, devPtr, size);
+    WARN(4, "cuTexRefSetAddress(%p, %p, %p, %d)\n", &res.offset, texref, devPtr, size);
     err = (cudaError_t)cuTexRefSetAddress((size_t *)&res.offset, texref, (CUdeviceptr)devPtr, size);
     if (err != cudaSuccess) {
         check_cuda_error(err);
@@ -1652,7 +1652,7 @@ dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize wi
     if (!dscuContext) createDscuContext();
 
     err = (cudaError_t)cuModuleGetTexRef(&texref, mp->handle, texname);
-    WARN(3, "cuModuleGetTexRef(0x%08llx, 0x%08llx, %s) : module: %s\n",
+    WARN(3, "cuModuleGetTexRef(%p, %p, %s) : module: %s\n",
          &texref, mp->handle, texname, mp->name);
     if (err != cudaSuccess) {
         check_cuda_error(err);
@@ -1668,7 +1668,7 @@ dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize wi
     desc.Height = height;
     desc.Width  = width;
 
-    WARN(4, "cuTexRefSetAddress2D(0x%08llx, 0x%08llx, 0x%08llx, %d)\n", texref, desc, devPtr, pitch);
+    WARN(4, "cuTexRefSetAddress2D(%p, 0x%08llx, %p, %d)\n", texref, desc, devPtr, pitch);
     err = (cudaError_t)cuTexRefSetAddress2D(texref, &desc, (CUdeviceptr)devPtr, pitch);
     if (err != cudaSuccess) {
         check_cuda_error(err);
@@ -1680,7 +1680,7 @@ dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize wi
     unsigned int align = CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT;
     unsigned long int roundup_adr = ((devPtr - 1) / align + 1) * align;
     res.offset = roundup_adr - devPtr;
-    WARN(4, "align:0x%x  roundup_adr:0x%08llx  devPtr:0x%08llx  offset:0x%08llx\n",
+    WARN(4, "align:0x%x  roundup_adr:%p  devPtr:%p  offset:0x%08llx\n",
          align, roundup_adr, devPtr, res.offset);
     return &res;
 }
@@ -1696,7 +1696,7 @@ dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtex
     if (!dscuContext) createDscuContext();
 
     err = (cudaError_t)cuModuleGetTexRef(&texref, mp->handle, texname);
-    WARN(3, "cuModuleGetTexRef(0x%08llx, 0x%08llx, %s) : module: %s  moduleid:%d\n",
+    WARN(3, "cuModuleGetTexRef(%p, %p, %s) : module: %s  moduleid:%d\n",
          &texref, mp->handle, texname, mp->name, moduleid);
     if (err != cudaSuccess) {
         check_cuda_error(err);
@@ -1710,7 +1710,7 @@ dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtex
         return &res;
     }
 
-    WARN(4, "cuTexRefSetArray(0x%08llx, 0x%08llx, %d)\n", texref, array, CU_TRSA_OVERRIDE_FORMAT);
+    WARN(4, "cuTexRefSetArray(%p, %p, %d)\n", texref, array, CU_TRSA_OVERRIDE_FORMAT);
     err = (cudaError_t)cuTexRefSetArray(texref, (CUarray)array, CU_TRSA_OVERRIDE_FORMAT);
     if (err != cudaSuccess) {
         check_cuda_error(err);
