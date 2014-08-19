@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 19:00:10
+// Last Modified On : 2014-08-19 19:26:22
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1121,7 +1121,7 @@ dscudamemcpyfromsymbold2did_1_svc(int moduleid, RCadr dst, char *symbol, RCsize 
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %p, %d, %d, %s) done.\n",
-         dst, gsptr, count, offset,
+         (void *)dst, gsptr, count, offset,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1168,7 +1168,7 @@ dscudamemcpytosymbolasyncd2did_1_svc(int moduleid, char *symbol, RCadr src, RCsi
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %p, %d, %d, %s, 0x%08llx) done.\n",
-         gsptr, src, count, offset, stream,
+         gsptr, (void *)src, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1223,7 +1223,7 @@ dscudamemcpyfromsymbolasyncd2did_1_svc(int moduleid, RCadr dst, char *symbol, RC
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %p, %d, %d, %s, 0x%08llx) done.\n",
-         dst, gsptr, count, offset, stream,
+         (void *)dst, (void *)gsptr, count, offset, stream,
          dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
 
     return &res;
@@ -1241,7 +1241,7 @@ dscudamemsetid_1_svc(RCadr dst, int value, RCsize count, struct svc_req *sq)
     err = cudaMemset((void *)dst, value, count);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, %d, %d) done.\n", dst, value, count);
+    WARN(3, "%p, %d, %d) done.\n", (void *)dst, value, count);
     return &res;
 }
 
@@ -1378,7 +1378,7 @@ dscudamemcpyasyncd2hid_1_svc(RCadr src, RCsize count, RCstream stream, struct sv
     check_cuda_error(err);
     res.err = err;
     WARN(3, "0x%08llx, %p, %d, %s, %p) done.\n",
-         (unsigned long)res.buf.RCbuf_val, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), stream);
+         (unsigned long)res.buf.RCbuf_val, (void *)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), stream);
     return &res;
 }
 
@@ -1392,7 +1392,7 @@ dscudamemcpyasyncd2did_1_svc(RCadr dst, RCadr src, RCsize count, RCstream stream
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %p, %d, %s, %p) done.\n",
-         dst, src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice), stream);
+         (void *)dst, (void *)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice), stream);
     return &res;
 }
 
@@ -1437,7 +1437,7 @@ dscudamemcpy2dtoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbu
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %d, %d, 0x%08llx, %d, %d, %d, %s) done.\n",
-         dst, wOffset, hOffset, (unsigned long)srcbuf.RCbuf_val, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
+         (void *)dst, wOffset, hOffset, (unsigned long)srcbuf.RCbuf_val, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
 
@@ -1462,8 +1462,8 @@ dscudamemcpy2dtoarrayd2hid_1_svc(RCsize wOffset, RCsize hOffset, RCadr src, RCsi
     err = cudaMemcpy2DToArray((cudaArray *)res.buf.RCbuf_val, wOffset, hOffset, (void *)src, spitch, width, height, cudaMemcpyDeviceToHost);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d, 0x%08llx, %d, %d, %d, %s) done. 2D buf size : %d\n",
-         (unsigned long)res.buf.RCbuf_val, wOffset, hOffset, src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), count);
+    WARN(3, "0x%08llx, %d, %d, %p, %d, %d, %d, %s) done. 2D buf size : %d\n",
+         (unsigned long)res.buf.RCbuf_val, wOffset, hOffset, (void *)src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), count);
     return &res;
 }
 
@@ -1476,8 +1476,9 @@ dscudamemcpy2dtoarrayd2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCad
     err = cudaMemcpy2DToArray((cudaArray *)dst, wOffset, hOffset, (void *)src, spitch, width, height, cudaMemcpyDeviceToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, %d, 0x%08llx, %d, %d, %d, %s) done.\n",
-         dst, wOffset, hOffset, src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
+    WARN(3, "%p, %d, %d, %p, %d, %d, %d, %s) done.\n",
+         (void *)dst, wOffset, hOffset,
+	 (void *)src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
 
@@ -1526,8 +1527,9 @@ dscudamemcpy2dd2hid_1_svc(RCsize dpitch, RCadr src, RCsize spitch, RCsize width,
     err = cudaMemcpy2D(res.buf.RCbuf_val, dpitch, (void *)src, spitch, width, height, cudaMemcpyDeviceToHost);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, %d, 0x%08llx, %d, %d, %d, %s) done. 2D buf size : %d\n",
-         (unsigned long)res.buf.RCbuf_val, dpitch, src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), count);
+    WARN(3, "0x%08llx, %d, %p, %d, %d, %d, %s) done. 2D buf size : %d\n",
+         (unsigned long)res.buf.RCbuf_val, dpitch,
+	 (void *)src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToHost), count);
     return &res;
 }
 
@@ -1541,7 +1543,8 @@ dscudamemcpy2dd2did_1_svc(RCadr dst, RCsize dpitch, RCadr src, RCsize spitch, RC
     check_cuda_error(err);
     res.err = err;
     WARN(3, "%p, %d, %p, %d, %d, %d, %s) done.\n",
-         dst, dpitch, src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
+         (void *)dst, dpitch,
+	 (void *)src, spitch, width, height, dscudaMemcpyKindName(cudaMemcpyDeviceToDevice));
     return &res;
 }
 
@@ -1556,7 +1559,8 @@ dscudamemset2did_1_svc(RCadr dst, RCsize pitch, int value, RCsize width, RCsize 
     err = cudaMemset2D((void *)dst, pitch, value, width, height);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "%p, %d, %d, %d, %d) done.\n", dst, pitch, value, width, height);
+    WARN(3, "%p, %d, %d, %d, %d) done.\n",
+	 (void *)dst, pitch, value, width, height);
     return &res;
 }
 
@@ -1800,7 +1804,7 @@ dscufftexecc2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int directio
 
     WARN(3, "cufftExecC2C(");
     err = cufftExecC2C((cufftHandle)plan, (cufftComplex *)idata, (cufftComplex *)odata, direction);
-    WARN(3, "%d, %p, %p, %d) done.\n", plan, idata, odata, direction);
+    WARN(3, "%d, %p, %p, %d) done.\n", plan, (void *)idata, (void *)odata, direction);
 
     res.err = err;
     return &res;
