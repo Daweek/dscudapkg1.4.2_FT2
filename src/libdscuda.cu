@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 18:50:29
+// Last Modified On : 2014-08-20 13:26:39
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -753,17 +753,20 @@ int dscudaSearchDaemon( char *ips, int size )
 	exit(1);
     }
 
-    if ( num_svr < 0 ) {
-	WARN(0, "#(ERROR) Unexpected trouble occur in %s(), num_svr=%d\n", __func__, num_svr );
-	exit(-1);
-    } else if ( num_svr == 0 ) {
-	WARN(0, "#(info) No DSCUDA daemons found.%s()\n", __func__ );
-	WARN(0, "#(info) Program terminated.\n");
-	exit(-1);
-    } else {
+    if ( num_svr > 0 ) {
 	WARN( 2, "#(info) +--- Found %d valid DSCUDA daemon%s. (%d ignored).\n",
 	      num_svr, (num_svr>1)? "s":"", num_ignore );
+    } else {
+	/* Terminate program and exit. */
+	if ( num_svr == 0 ) {
+	    WARN( 0, "%s(): Not found DS-CUDA daemon in this network.\n", __func__ );
+	    WARN( 0, "%s(): Terminate this application.\n", __func__ );
+	} else {
+	    WARN( 0, "%s(): Detected unexpected trouble; num_svr=%d\n", __func__, num_svr );
+	}
+	exit(-1);
     }
+
     return num_svr;
 }
 

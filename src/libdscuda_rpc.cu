@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 18:49:47
+// Last Modified On : 2014-08-20 09:48:42
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -643,7 +643,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 	sp++;
     } // for (int i=0; ...
 
-    if (vdev->nredundancy == 1) {
+    if ( vdev->nredundancy == 1 ) {
 	if ( St.isAutoVerb() && St.isHistoCalling()==0 ) {
 	    BKUPMEM.updateRegion( src, dst, count );
 	}
