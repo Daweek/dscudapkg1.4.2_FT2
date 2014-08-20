@@ -9,10 +9,12 @@ endif
 
 GCCVER = 4.4
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
-CC            = /usr/bin/gcc-$(GCCVER) -O0 -g -ffast-math -funroll-loops
-CXX           = /usr/bin/g++-$(GCCVER) -O0 -g -ffast-math -funroll-loops
+CC           ?= /usr/bin/gcc-$(GCCVER)
+CFLAGS       ?= -O0 -g -ffast-math -funroll-loops
+CXX          ?= /usr/bin/g++-$(GCCVER)
+CXXFLAGS     ?= -O0 -g -ffast-math -funroll-loops
 CUDAPATH     ?= /usr/local/cuda
-NVCC          = $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_20 --compiler-bindir=g++-$(GCCVER)
+NVCC         ?= $(CUDAPATH)/bin/nvcc -O0 -g -arch=sm_20 --compiler-bindir=g++-$(GCCVER)
 CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64
