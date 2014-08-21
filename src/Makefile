@@ -19,8 +19,8 @@ CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64
 
-TARGET         = dscudad dscudasvr libdscuda_rpc.a libcudart.so.3
-TARGET_RPCONLY = dscudad_rpc dscudasvr_rpc libdscuda_rpc.a libcudart.so.3
+TARGET         = dscudad dscudasvr dscudasvr_fault libdscuda_rpc.a libcudart.so.3
+TARGET_RPCONLY = dscudad_rpc libdscuda_rpc.a libcudart.so.3
 DSCUDAIF       = dscudarpc
 CLIENTBASE     = libdscuda.o
 
@@ -60,19 +60,24 @@ dummysvr :	dummysvr.c
 
 dummyclient :	dummyclient.c
 
-dscudasvr :	dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+#
+# dscudasvr series
+# 
+dscudasvr :	   dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
-dscudasvr_rpc :	dscudasvr_rpc_only.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+dscudasvr.o:       dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
+	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
+
+dscudasvr_fault :  dscudasvr_fault.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
-dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
-	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
+dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
+	$(NVCC) -c $(CUDAINCLUDES) -DRPC_ONLY=1 -DFAULT_AT_D2H=1 -o $@ $<
 
-dscudasvr_rpc_only.o: dscudasvr.cu dscudasvr_rpc.cu dscudasvr_ibv.cu dscuda.h \
-                      ibv_rdma.h dscudarpc.h sockutil.h  
-	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
-
+#
+#
+#
 dscudatest :	              dscudatest.cu libdscuda_ibv.so
 	$(NVCC) $(CUDAINCLUDES) -o $@ $< -L../lib -ldscuda_ibv -lrdmacm -libverbs -lpthread
 
@@ -131,6 +136,7 @@ install:
 	ln -fs ../src/sockutil.h     ../include/
 	ln -fs ../src/dscudad        ../bin/
 	ln -fs ../src/dscudasvr      ../bin/
+	ln -fs ../src/dscudasvr_fault  ../bin/
 	ln -fs ../src/libdscuda_rpc.a ../lib/
 clean:
 	/bin/rm $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo

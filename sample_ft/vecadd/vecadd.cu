@@ -11,7 +11,7 @@
 #define N (8)
 
 int main(void) {
-    int i, t, t_total=3;
+    int i, t, t_total=100;
     float a[N], b[N], c[N];
     float *d_a, *d_b, *d_c;
 

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 13:20:11
+// Last Modified On : 2014-08-21 18:10:49
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -535,7 +535,7 @@ cudaError_t cudaFree(void *mem) {
 static cudaError_t
 cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **clnt)
 {
-    WARN( 3, "libdscuda:%s() called with \"%s(%s)\" recordHist=%d, histoCalling=%d {\n",
+    WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" recordHist=%d, histoCalling=%d {\n",
 	  __func__, St.getFtModeString(), vdev->info, HISTREC.rec_en, St.isHistoCalling() );
     dscudaResult *rp;
     RCServer_t *sp;
@@ -546,8 +546,8 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
     srcbuf.RCbuf_len = count;
     srcbuf.RCbuf_val = (char *)src;
     sp = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
-	WARN(3, "   + Physical[%d] dst=%p\n", i, dst);
+    for ( int i = 0; i < vdev->nredundancy; i++, sp++ ) {
+	WARN( 4, "      + Physical[%d] dst=%p\n", i, dst);
         rp = dscudamemcpyh2did_1((RCadr)dst, srcbuf, count, clnt[sp->id]);
         checkResult(rp, sp);
         if (rp->err != cudaSuccess) {
@@ -555,11 +555,11 @@ cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev, CLIENT **c
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    if (St.isAutoVerb()) {
+    if ( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) {
 	cudaMemcpyArgs args( dst, (void*)src, count, cudaMemcpyHostToDevice );
 	HISTREC.add(dscudaMemcpyH2DId, (void *)&args);
     }
-    WARN(3, "} libdscuda:%s().\n", __func__);
+    WARN( 4, "   } libdscuda:%s().\n", __func__);
     return err;
 }
 
@@ -596,8 +596,10 @@ cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant )
 }
 
 static cudaError_t
-cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt ) {
-    WARN(3, "libdscuda:%s() called with \"%s(%s)\" {\n", __func__, St.getFtModeString(), vdev->info );
+cudaMemcpyD2H( void *dst, void *src, size_t count,
+	       Vdev_t *vdev, CLIENT **clnt ) {
+    WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" {\n",
+	  __func__, St.getFtModeString(), vdev->info );
 
     int matched_count   = 0;
     int unmatched_count = 0;
@@ -634,7 +636,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
     /* Get the data from remote GPU(s), then verify */
     RCServer_t *sp = vdev->server;
     for ( int i=0; i < vdev->nredundancy; i++, sp++ ) {
-	WARN(4, "   + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n", i, dst, src, count);
+	WARN(4, "      + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n", i, dst, src, count);
 	/*
 	 * Access to Physical GPU Device.
 	 */
@@ -650,7 +652,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
         } else {
 	    if ( bcmp( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len ) != 0 ) { // unmatched case
 		sp->errcount++; //count up error.
-		WARN( 5, "        total errors: %d\n", sp->errcount );
+		WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", sp->errcount );
 		unmatched_count++;
 		//fail_flag[i]=1;
 		failed_1st = sp; // temporary
@@ -684,31 +686,33 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 		WARN( 5, "checkpoint-1\n");
 	    }
 	} else { /* redundant failed */
-	    if (unmatched_count>0 && matched_count<(vdev->nredundancy-1)) {
-		WARN(1, "### #   #\n");
-		WARN(1, "###  # #\n");
-		WARN(1, "###   #  (+_+) Unmatched result from some redundant devices. OK/NG= %d/%d.\n", matched_count, unmatched_count);
-		WARN(1, "###  # #\n");
-		WARN(1, "### #   #\n");
+	    if ( unmatched_count>0 && matched_count<(vdev->nredundancy-1)) {
+		WARN( 1, " #   #\n");
+		WARN( 1, "  # #\n");
+		WARN( 1, "   #  Detected Unmatched result. OK/NG= %d/%d.\n", matched_count, unmatched_count);
+		WARN( 1, "  # #\n");
+		WARN( 1, " #   #\n");
 	    } else {
 		WARN(1, "   #(;_;)   All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
 		     vdev->nredundancy-1, matched_count, unmatched_count);
 	    }
+
+	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
+		St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
+		HISTREC.rec_en = 0; // <--- Must not record Historical call list.
 	    
-	    St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
-	    HISTREC.rec_en = 0; // <--- Must not record Historical call list.
+		BKUPMEM.restructDeviceRegion();
+		recall_result = HISTREC.recall();
 	    
-	    BKUPMEM.restructDeviceRegion();
-	    recall_result = HISTREC.recall();
-	    
-	    if (recall_result != 0) {
-		printModuleList();
-		printVirtualDeviceList();
-		//dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
-		dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
+		if (recall_result != 0) {
+		    printModuleList();
+		    printVirtualDeviceList();
+		    //dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
+		    dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
+		}
+		HISTREC.on();  // ---> restore recordHist enable.
+		St.setAutoVerb();    // ===> restore autoVerb enabled.
 	    }
-	    HISTREC.on();  // ---> restore recordHist enable.
-	    St.setAutoVerb();    // ===> restore autoVerb enabled. 
 	}
 	break;
     default: //irregular condition.
@@ -716,7 +720,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt )
 	exit( EXIT_FAILURE );
     }//switch
 
-    WARN(3, "} libdscuda:%s().\n", __func__);
+    WARN(4, "   } libdscuda:%s().\n", __func__);
     return err;
 }
 
@@ -789,7 +793,8 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
  * 
  */
 cudaError_t
-cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind ) {
+cudaMemcpy( void *dst, const void *src,
+	    size_t count, enum cudaMemcpyKind kind ) {
     int         vdevid = Vdevid[ vdevidIndex() ];
     Vdev_t     *vdev   = St.Vdev + vdevid;
     CLIENT    **clnt   = Clnt[vdevid];
@@ -800,25 +805,22 @@ cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind )
 
     lsrc = dscudaAdrOfUva((void *)src);
     ldst = dscudaAdrOfUva(dst);
+    
     switch ( kind ) {
     case cudaMemcpyDeviceToHost:
 	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToHost) called vdevid=%d...\n",
 	     ldst, lsrc, count, vdevid);
-	//<--- Avoid conflict with CheckPointing.
+	// Avoid conflict between CheckPointing thread.
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-	WARN(3, "mutex_lock:cudaMemcpyD2H\n");
-        err = cudaMemcpyD2H(ldst, lsrc, count, vdev, clnt);
+        err = cudaMemcpyD2H( ldst, lsrc, count, vdev, clnt );
 	pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
-	//---> Avoid conflict with CheckPointing.
-	WARN(3, "mutex_unlock:cudaMemcpyD2H\n");
         break;
     case cudaMemcpyHostToDevice:
 	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, HostToDevice) called\n", ldst, lsrc, count);
-	//<--- Avoid conflict with CheckPointing.	
+	// Avoid conflict with CheckPointing thread.	
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-        err = cudaMemcpyH2D(ldst, lsrc, count, vdev, clnt);
+        err = cudaMemcpyH2D( ldst, lsrc, count, vdev, clnt );
 	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
-	//---> Avoid conflict with CheciPointing.
         break;
     case cudaMemcpyDeviceToDevice:
 	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToDevice) called\n", ldst, lsrc, count);
@@ -862,6 +864,7 @@ cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind )
         exit(1);
     }
     WARN(3, "} libdscuda:%s().\n", __func__);
+    WARN(3, "\n");
     return err;
 }
 

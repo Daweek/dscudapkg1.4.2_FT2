@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 15:30:27
+// Last Modified On : 2014-08-21 18:17:56
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -214,6 +214,7 @@ public:
     void initProgress( ClntInitStat stat );
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
     ClientState_t(void);
+    ~ClientState_t(void);
 };
 extern struct ClientState_t St;
 

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 09:25:43
+// Last Modified On : 2014-08-21 17:44:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -31,6 +31,8 @@
 #define NBACKLOG 1   // max # of servers can be put into the listening queue.
 
 static int WarnLevel = 2;
+static int CallFaultServer = 0;
+
 #undef WARN
 
 #define WARN(lv, fmt, args...) if (lv <= WarnLevel) {		\
@@ -226,33 +228,43 @@ void spawn_server( int listening_sock ) {
     Nserver++;
     pid = fork();
     if ( pid ) { // parent
-        signal(SIGCHLD, signal_from_child);
-        WARN(3, "spawn a server with sock: %d\n", sock);
-        register_server(pid, sport);
-        close(sock);
+        signal( SIGCHLD, signal_from_child );
+        WARN( 3, "spawn a server with sock: %d\n", sock );
+        register_server( pid, sport );
+        close( sock );
     } else { // child
 #if RPC_ONLY
         argv[0] = "dscudasvr_rpc";
 #else
-        argv[0] = "dscudasvr";
+	if ( CallFaultServer == 0 ) {
+	    argv[0] = "dscudasvr";
+	} else {
+	    argv[0] = "dscudasvr_fault";
+	}
 #endif
-        sprintf(portstr, "-p%d", sport);
+        sprintf( portstr, "-p%d", sport );
         argv[1] = portstr;
-        sprintf(devstr, "-d%d", dev);
+	
+        sprintf( devstr, "-d%d", dev );
         argv[2] = devstr;
-        sprintf(sockstr, "-S%d", sock);
+	
+        sprintf( sockstr, "-S%d", sock );
         argv[3] = sockstr;
+	
         argv[4] = (char *)NULL;
-        WARN(3, "exec %s %s %s %s\n", argv[0], argv[1], argv[2], argv[3]);
-        execvp(argv[0], (char **)argv);
-        perror(argv[0]);
-        WARN(0, "execvp() failed.\n");
-        WARN(0, "%s may not be in the PATH?\n", argv[0]);
-        exit(1);
+        WARN( 3, "exec %s %s %s %s\n", argv[0], argv[1], argv[2], argv[3] );
+	
+        execvp( argv[0], (char **)argv );
+        perror( argv[0] );
+        WARN( 0, "execvp() failed.\n" );
+        WARN( 0, "%s may not be in the PATH?\n", argv[0] );
+        exit( EXIT_FAILURE );
     }
 }
 
-
+/*
+ *
+ */
 static
 void signal_from_child( int sig )
 {
@@ -280,6 +292,9 @@ void signal_from_child( int sig )
     }
 }
 
+/*
+ *
+ */
 static void*
 response_to_search( void *arg ) {
     char sendbuf[ SEARCH_BUFLEN_TX ];
@@ -356,8 +371,10 @@ response_to_search( void *arg ) {
   */
 }
 
-static void initEnv(void)
-{
+/*
+ *
+ */
+static void initEnv(void) {
     static int firstcall = 1;
     char *env;
 
@@ -377,8 +394,10 @@ static void initEnv(void)
     }
 }
 
-static void showUsage(char *command)
-{
+/*
+ *
+ */
+static void showUsage(char *command) {
     fprintf(stderr,
             "usage: %s [-d]\n"
             "  -d: daemonize.\n",
@@ -390,15 +409,18 @@ extern int optind;
 static void parseArgv( int argc, char **argv )
 {
     int c;
-    char *param = "dl:h";
+    char *param = "dfl:h";
 
     while ((c = getopt(argc, argv, param)) != EOF) {
         switch (c) {
 	case 'd':
             Daemonize = 1;
             break;
+	case 'f':
+	    CallFaultServer = 1;
+	    break;
 	case 'l':
-            strncpy(LogFileName, optarg, sizeof(LogFileName));
+            strncpy( LogFileName, optarg, sizeof(LogFileName) );
             break;
 	case 'h':
 	default:

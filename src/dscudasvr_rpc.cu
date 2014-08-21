@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 19:26:22
+// Last Modified On : 2014-08-21 17:30:13
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -151,8 +151,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     return argp->offset + argp->size;
 }
 
-static void setupRpc(void)
-{
+static void setupRpc(void) {
     register SVCXPRT *transp;
     unsigned long int prog = DSCUDA_PROG;
     pthread_t tid;
@@ -203,8 +202,7 @@ static void setupRpc(void)
  */
 
 dscudaResult *
-dscudathreadexitid_1_svc(struct svc_req *sr)
-{
+dscudathreadexitid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -219,8 +217,7 @@ dscudathreadexitid_1_svc(struct svc_req *sr)
 }
 
 dscudaResult *
-dscudathreadsynchronizeid_1_svc(struct svc_req *sr)
-{
+dscudathreadsynchronizeid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -251,8 +248,7 @@ dscudathreadsetlimitid_1_svc(int limit, RCsize value, struct svc_req *sr)
 }
 
 dscudaThreadGetLimitResult *
-dscudathreadgetlimitid_1_svc(int limit, struct svc_req *sr)
-{
+dscudathreadgetlimitid_1_svc(int limit, struct svc_req *sr) {
     cudaError_t err;
     static dscudaThreadGetLimitResult res;
     size_t value;
@@ -885,39 +881,43 @@ dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *s
 }
 
 dscudaMemcpyD2HResult *
-dscudamemcpyd2hid_1_svc(RCadr src, RCsize count, struct svc_req *sr)
+dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, struct svc_req *sr )
 {
     static RCsize maxcount = 0;
     static dscudaMemcpyD2HResult res;
     cudaError_t err;
 
-    WARN(3, "cudaMemcpy(");
-    if (!dscuContext) createDscuContext();
-    if (maxcount == 0) {
+    WARN( 3, "cudaMemcpy(");
+    if ( !dscuContext ) createDscuContext();
+    if ( maxcount == 0 ) {
         res.buf.RCbuf_val = NULL;
     }
-    if (maxcount < count) {
+    if ( maxcount < count ) {
         res.buf.RCbuf_val = (char*)realloc(res.buf.RCbuf_val, count);
         maxcount = count;
     }
     res.buf.RCbuf_len = count;
-    err = cudaMemcpy(res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost);
-    WARN(3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
-         (unsigned long)res.buf.RCbuf_val, (long long)src, count, dscudaMemcpyKindName(cudaMemcpyDeviceToHost));
+    err = cudaMemcpy( res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost );
+    WARN( 3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
+         (unsigned long)res.buf.RCbuf_val, (long long)src, count, dscudaMemcpyKindName( cudaMemcpyDeviceToHost ));
     check_cuda_error(err);
     res.err = err;
 
-#if 0 // !!! [debugging purpose only] destroy some part of the returning data
-      // !!! in order to emulate a malfunctional GPU.
+#if defined(FAULT_AT_D2H)
+    // !!! [debugging purpose only] destroy some part of the returning data
+    // !!! in order to emulate a malfunctional GPU.
     {
-        static int firstcall = 1;
-        static int err_in_prev_call = 0; // avoid bad data generation in adjacent calls.
-        if (firstcall) {
+        static int    firstcall = 1;
+        static int    err_in_prev_call = 0; // avoid bad data generation in adjacent calls.
+	const  double err_rate = 1.0 / 10.0; // 1.0 / 1000.0;
+	
+        if ( firstcall ) {
             firstcall = 0;
-            srand48(time(NULL));
+            srand48( time(NULL) );
         }
-        if (drand48() < 1.0/1000.0 && !err_in_prev_call) {
-            WARN(2, "################ bad data generatad.\n\n");
+	
+        if ( drand48() < err_rate && err_in_prev_call==0 ) {
+            WARN( 2, "################ bad data generatad.\n\n" );
             res.buf.RCbuf_val[0] = 123;
             err_in_prev_call = 1;
         } else {
@@ -925,7 +925,6 @@ dscudamemcpyd2hid_1_svc(RCadr src, RCsize count, struct svc_req *sr)
         }
     }
 #endif
-
 
     return &res;
 }

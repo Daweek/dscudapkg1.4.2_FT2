@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 15:34:19
+// Last Modified On : 2014-08-21 18:18:48
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -607,7 +607,7 @@ void printVirtualDeviceList( void ) {
 	}
     }
 
-    if ( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) {
+    if ( St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) {
 	/*
 	 * Device Candidates
 	 */
@@ -915,14 +915,16 @@ void initVirtualServerList(const char *env) {
 		    printf("\n");
 		}
 		if ( det_abc == 1 ) {
-		    strcpy(hostname, ip);
-		    hostent0 = gethostbyname(hostname);
-		    if (hostent0==NULL) {
-			fprintf(stderr, "%s():gethostbyname() returned NULL.\n", __func__);
-			exit(1);
+		    strcpy( hostname, ip );
+		    hostent0 = gethostbyname( hostname );
+		    if ( hostent0 == NULL ) {
+			//herror("initVirtualServerList():");
+			WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
+			WARN( 0, "Program terminated.\n\n\n\n" );
+			exit( EXIT_FAILURE );
 		    } else {
-			ip_ref = inet_ntoa(*(struct in_addr*)hostent0->h_addr_list[0]);
-			strcpy(ip, ip_ref);
+			ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
+			strcpy( ip, ip_ref );
 		    }
 		}
 	    }
@@ -1180,6 +1182,8 @@ ClientState_t::ClientState_t(void) {
     Vdev_t *vdev;
     RCServer_t *sp;
 
+    WARN( 0, "[ERRORSTATICS] start.\n" );
+    
     pthread_mutex_lock( &InitClientMutex );
     initProgress( ORIGIN );
 	
@@ -1210,6 +1214,10 @@ ClientState_t::ClientState_t(void) {
     initProgress( INITIALIZED );    
     WARN( 5, "The constructor %s() ends.\n", __func__);
     pthread_mutex_unlock( &InitClientMutex ); //---> mutex_unlock
+}
+
+ClientState_t::~ClientState_t(void) {
+    WARN( 0, "[ERRORSTATICS] stop.\n" );
 }
 
 void invalidateModuleCache(void) {
