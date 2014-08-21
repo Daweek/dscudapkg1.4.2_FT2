@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 12:07:10
+// Last Modified On : 2014-08-21 15:07:35
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ BkupMemList_t::BkupMemList_t( void ) {
     tail = NULL;
     length = 0;
     total_size = 0;
-    fprintf(stderr, "(dscuda-info) The constructor %s() called.\n", __func__);
+    WARN( 5, "The constructor %s() called.\n", __func__);
 
     pthread_mutex_lock( &InitClientMutex );
     // Get autoverb enable flag from environmental variable.
@@ -57,7 +57,7 @@ BkupMemList_t::BkupMemList_t( void ) {
     if ( env != NULL ) {
 	autoverb=atoi(env);
 	bkup_en = autoverb;
-	fprintf(stderr, "(dscuda-info)%s(): bkup_en=%d\n", __func__, bkup_en);
+	WARN( 5, "%s(): bkup_en=%d\n", __func__, bkup_en );
 	if (bkup_en > 0) {
 	    /*
 	     * Create a thread periodic snapshot of each GPU device.
@@ -869,13 +869,13 @@ HistRecord_t::HistRecord_t( void ) {
     max_len = 0;
     recalling = 0;
     pthread_mutex_lock( &InitClientMutex );
-    fprintf(stderr, "(dscuda-info) The constructor %s() called.\n", __func__);
+    WARN( 5, "The constructor %s() called.\n", __func__ );
     // Get autoverb enable flag from environmental variable.
     env=getenv( DSCUDA_ENV_00 );
     if ( env != NULL ) {
 	autoverb=atoi(env);
 	rec_en = autoverb;
-	fprintf(stderr, "(dscuda-info)%s(): %s=%d\n", __func__, DSCUDA_ENV_00, rec_en);
+	WARN( 5, "%s(): %s=%d\n", __func__, DSCUDA_ENV_00, rec_en );
     }
     pthread_mutex_unlock( &InitClientMutex );
 }
@@ -963,7 +963,7 @@ int HistRecord_t::recall(void) {
    static int called_depth = 0;
    recalling = 1;
    int result;
-   int verb_curr = St.auto_verb;
+   int verb_curr = St.autoverb;
 
    WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, length, __func__);
    WARN(1, "called_depth= %d.\n", called_depth);
@@ -991,7 +991,7 @@ int HistRecord_t::recall(void) {
    }
 
    WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
-   St.auto_verb = verb_curr;
+   St.autoverb = verb_curr;
    recalling = 0;
    return result;
 }

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 14:36:52
+// Last Modified On : 2014-08-21 09:25:43
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ static int WarnLevel = 2;
 
 typedef struct Server_t {
     pid_t pid;
-    int port; // port.
+    int   port;
     struct Server_t *prev;
     struct Server_t *next;
 } Server;
@@ -62,7 +62,7 @@ static void unregister_server(pid_t pid);
 static Server *server_with_pid(pid_t pid);
 static int unused_server_port(void);
 static void initEnv(void);
-static void* response_to_search(void *arg);
+static void* response_to_search( void *arg );
 
 static int Daemonize = 0;
 static int Nserver = 0;
@@ -197,8 +197,7 @@ unused_server_port(void)
 }
 
 static
-void spawn_server( int listening_sock )
-{
+void spawn_server( int listening_sock ) {
     int len, dev, sock, sport;
     pid_t pid;
     char *argv[16];
@@ -282,11 +281,11 @@ void signal_from_child( int sig )
 }
 
 static void*
-response_to_search( void *arg )  /* call by pthread_create() */
-{
+response_to_search( void *arg ) {
     char sendbuf[ SEARCH_BUFLEN_TX ];
     char recvbuf[ SEARCH_BUFLEN_RX ];
 
+    int       dev_count;
     int       sock;
     socklen_t sin_size;
     uid_t     uid;
@@ -294,7 +293,17 @@ response_to_search( void *arg )  /* call by pthread_create() */
     struct sockaddr_in addr, clt;
     struct passwd *pwd = NULL;
     int       retval;
+    cudaError_t cuerr;
 
+    cuerr = cudaGetDeviceCount( &dev_count );
+    if ( cuerr != cudaSuccess ) {
+	WARN( 0, "cudaGetDeviceCount() failed.\n");
+	return NULL;
+    } else if ( dev_count == 0 ) {
+	WARN( 0, "cudaGetDeviceCount() returned 0.\n");
+	return NULL;
+    }
+    
     sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
     if ( sock == -1 ) {
 	perror("response_to_search:socket()");
@@ -322,7 +331,7 @@ response_to_search( void *arg )  /* call by pthread_create() */
     if ( pwd == NULL ) {
 	sprintf( sendbuf, "%s:NULL@%s", SEARCH_ACK, host);	
     } else {
-	sprintf( sendbuf, "%s:%s@%s", SEARCH_ACK, pwd->pw_name, host);	
+	sprintf( sendbuf, "%s:%s@%s:Ndev=%d", SEARCH_ACK, pwd->pw_name, host, dev_count );	
     }
 
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
@@ -331,13 +340,13 @@ response_to_search( void *arg )  /* call by pthread_create() */
 	recvfrom( sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size );
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
-	WARN(2, "#(info) Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
+	WARN(2, "Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	clt.sin_family = AF_INET;
 	clt.sin_port   = htons( RC_DAEMON_IP_PORT - 2 );
 	inet_aton( inet_ntoa( clt.sin_addr ), &(clt.sin_addr) );
 	
 	sendto( sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr) );
-	WARN(2, "#(info) +-- Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
+	WARN(2, "---> Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
 
@@ -399,12 +408,11 @@ static void parseArgv( int argc, char **argv )
     }
 }
 
-int main( int argc, char **argv )
-{
+int main( int argc, char **argv ) {
     int sock, nserver0;
     int errfd;
     pthread_t th;
-
+    
     pthread_create( &th, NULL, response_to_search, NULL );
     parseArgv( argc, argv );
     if ( Daemonize ) {
@@ -422,6 +430,7 @@ int main( int argc, char **argv )
     }
     
     initEnv();
+    
     sock = create_daemon_socket( RC_DAEMON_IP_PORT, NBACKLOG );
     if ( sock == -1 ) {
 	WARN(0, "create_daemon_socket() failed\n");

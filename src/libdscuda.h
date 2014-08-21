@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:06:41
+// Last Modified On : 2014-08-21 15:30:27
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -56,15 +56,7 @@ typedef struct ClientModule_t {
 	
     }
     */
-    ClientModule_t() {
-	fprintf(stderr, "The constructor %s() called.\n", __func__);
-	valid  = -1;
-	vdevid = -1;
-	for (int i=0; i<RC_NREDUNDANCYMAX; i++) id[i] = -1;
-	strncpy(name, "init", RC_KMODULENAMELEN);
-	strncpy(ptx_image, "init", RC_KMODULEIMAGELEN);
-
-    }
+    ClientModule_t(void);
 } ClientModule;
 
 typedef struct RCmappedMem_t {
@@ -114,10 +106,12 @@ typedef struct RCServer {
     char hostname[64]; // ex. "titan01"
     int  uniq; // unique number in all RCServer_t including svrCand[].
     int  *d_faultconf;
+    int  errcount;
     RCServer() {
 	id = cid = uniq = 0xffff;
 	strcpy(ip, "empty");
 	strcpy(hostname, "empty");
+	errcount = 0;
     }
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
@@ -125,49 +119,72 @@ typedef struct SvrList {
     int num;                      /* # of server candidates.         */
     RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
     /* methods */
-    void clear(void) { num = 0; }
-    int cat( const char *ip ) {
+    int cat( const char *ipaddr, int ndev, const char *hname ) {
 	if ( num >= (RC_NVDEVMAX - 1) ) {
 	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
-	    exit(1);
+	    exit( EXIT_FAILURE );
 	}
-	strcpy( svr[num].ip, ip );
+	strcpy( svr[num].ip, ipaddr );
+	svr[num].cid  = ndev;
+	svr[num].uniq = RC_UNIQ_CANDBASE + num;
+	strcpy( svr[num].hostname, hname );
+	
 	num++;
 	return 0;
     }
 } SvrList_t;
 
+typedef enum {
+    VDEV_MONO = 0, //Vdev_t.nredundancy == 1
+    VDEV_POLY = 1, //                   >= 2
+    VDEV_INVALID = 8,
+    VDEV_UNKNOWN = 9
+} VdevConf;
+
 typedef struct {
     int        nredundancy;
     RCServer_t server[RC_NREDUNDANCYMAX];
+    VdevConf   conf;
+    char       info[16]; //{MONO, POLY(nredundancy)}
 } Vdev_t;
 
 /******************************************/
 /* Client Application Status/Information. */
 /******************************************/
-enum ClntInitStat {
+typedef enum {
+    /*
+     * Define basic behavior of Fault tolerant functions.
+     */
+    FT_PLAIN = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
+    FT_REDUN = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
+    FT_MIGRA = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
+    FT_BOTH  = 3   // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
+} ClntFtMode;
+
+typedef enum {
     ORIGIN      = 0,
     INITIALIZED,
     CUDA_CALLED
-};
+} ClntInitStat;
 
 struct ClientState_t {
 private:
-    void setUseDaemonByEnv(const char *env_name);
-    void setAutoVerbByEnv(const char *env_name);
-    void setMigrateByEnv(const char *env_name);
-    void initEnv(void);
+    void initEnv( void );
+    void setFaultTolerantMode( void );
 public:
-    enum ClntInitStat init_stat;
+    ClntFtMode   ft_mode;
+    char *getFtModeString(void);    
+
+    ClntInitStat init_stat;
     int    Nvdev;               // # of virtual devices available.
     Vdev_t Vdev[RC_NVDEVMAX];   // a list of virtual devices.
 
     unsigned int ip_addr;    /* My IP address */
     /* Mode */
     int use_ibv;             /* 1:IBV, 0:RPC   */
-    int auto_verb;           /* 1:Redundant calculation */
-    int migrate_en;
-    int use_daemon;
+    int autoverb;           /* 1:Redundant calculation */
+    int migration;
+    int daemon;
     int historical_calling;
 
     void setIpAddress(unsigned int val) { ip_addr = val; }
@@ -178,23 +195,23 @@ public:
     int  isIbv()  { return use_ibv;       }
     int  isRpc()  { return (1 - use_ibv); }
     
-    void   setAutoVerb(int val=1)  { auto_verb = val; }
-    void unsetAutoVerb() { auto_verb = 0; }
-    int  isAutoVerb(void)    { return auto_verb; }
+    void   setAutoVerb(int val=1)  { autoverb = val; }
+    void unsetAutoVerb() { autoverb = 0; }
+    int  isAutoVerb(void)    { return autoverb; }
 
-    void   setUseDaemon(void) { use_daemon = 1; }
-    void unsetUseDaemon() { use_daemon = 0; }
-    int  isUseDaemon(void)   { return use_daemon; }
+    void   setUseDaemon(void) { daemon = 1; }
+    void unsetUseDaemon() { daemon = 0; }
+    int  isUseDaemon(void)   { return daemon; }
 
     void   setHistoCalling() { historical_calling = 1; }
     void unsetHistoCalling() { historical_calling = 0; }
     int  isHistoCalling()   { return historical_calling; }
 
-    void setMigrateDevice(int val=1) { migrate_en = val; }
-    void unsetMigrateDevice() { migrate_en = 0; }
-    int  getMigrateDevice() { return migrate_en; }
+    void setMigrateDevice(int val=1) { migration = val; }
+    void unsetMigrateDevice() { migration = 0; }
+    int  getMigrateDevice() { return migration; }
 
-    void initProgress(enum ClntInitStat stat);
+    void initProgress( ClntInitStat stat );
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
     ClientState_t(void);
 };

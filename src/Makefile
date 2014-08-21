@@ -126,9 +126,11 @@ install:
 	ln -fs ../src/dscudamacros.h ../include/
 	ln -fs ../src/dscudarpc.h    ../include/
 	ln -fs ../src/dscudaverb.h   ../include/
+	ln -fs ../src/dscudautil.h   ../include/
 	ln -fs ../src/libdscuda.h    ../include/
 	ln -fs ../src/sockutil.h     ../include/
 	ln -fs ../src/dscudad        ../bin/
 	ln -fs ../src/dscudasvr      ../bin/
+	ln -fs ../src/libdscuda_rpc.a ../lib/
 clean:
 	/bin/rm $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
