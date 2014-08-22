@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 18:17:56
+// Last Modified On : 2014-08-21 19:32:40
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -187,6 +187,10 @@ public:
     int daemon;
     int historical_calling;
 
+    /* Staticstics */
+    time_t start_time;
+    time_t stop_time;
+    
     void setIpAddress(unsigned int val) { ip_addr = val; }
     unsigned int getIpAddress() { return ip_addr; }
     

@@ -49,6 +49,7 @@ int main(void) {
         }
         printf("\n"); fflush(stdout);
     }
+    sleep(3);
     cudaFree(d_a);
     cudaFree(d_b);
     cudaFree(d_c);

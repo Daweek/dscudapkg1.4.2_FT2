@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 18:18:48
+// Last Modified On : 2014-08-21 20:16:01
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -35,9 +35,6 @@ ClientModule_t::ClientModule_t(void) {
     strncpy(name, "init", RC_KMODULENAMELEN);
     strncpy(ptx_image, "init", RC_KMODULEIMAGELEN);
 }
-
-
-
 
 static int   VdevidIndexMax = 0;            // # of pthreads which utilize virtual devices.
 const  char *DEFAULT_SVRIP = "localhost";
@@ -1181,8 +1178,10 @@ ClientState_t::ClientState_t(void) {
     int i, k;
     Vdev_t *vdev;
     RCServer_t *sp;
+    
+    start_time = time( NULL );
+    WARN( 1, "[ERRORSTATICS] start.\n" );
 
-    WARN( 0, "[ERRORSTATICS] start.\n" );
     
     pthread_mutex_lock( &InitClientMutex );
     initProgress( ORIGIN );
@@ -1217,7 +1216,38 @@ ClientState_t::ClientState_t(void) {
 }
 
 ClientState_t::~ClientState_t(void) {
-    WARN( 0, "[ERRORSTATICS] stop.\n" );
+    RCServer *svr;
+    time_t exe_time;
+    char my_tfmt[64];	      
+    struct tm *my_local;
+    
+    stop_time = time( NULL );
+    exe_time = stop_time - start_time;
+
+    WARN( 1, "[ERRORSTATICS] stop.\n" );
+    WARN( 1, "[ERRORSTATICS] ************** Summary *******************************\n" );
+    
+    my_local = localtime( &start_time );
+    strftime( my_tfmt, 64, "%c", my_local );
+    WARN( 1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt );
+    
+    my_local = localtime( &stop_time );
+    strftime( my_tfmt, 64, "%c", my_local );
+    WARN( 1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt );
+
+    my_local = localtime( &exe_time );
+    strftime( my_tfmt, 64, "%s", my_local );
+    WARN( 1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt );
+    for ( int i=0; i<Nvdev; i++ ) {
+
+	WARN( 1, "[ERRORSTATICS]  Virtual[%2d]\n", i );
+	for ( int j=0; j<Vdev[i].nredundancy; j++ ) {
+	    svr = &Vdev[i].server[j];
+	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d\n",
+		  j, svr->ip, svr->hostname, svr->errcount );
+	}
+    }
+    WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
 }
 
 void invalidateModuleCache(void) {
