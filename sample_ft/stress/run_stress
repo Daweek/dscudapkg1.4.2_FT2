@@ -1,0 +1,26 @@
+#!/bin/bash
+
+cudaver=4.2
+export CUDAPATH=/usr/local/cuda-${cudaver}/cuda
+export CUDASDKPATH=${CUDAPATH%cuda}NVIDIA_GPU_Computing_SDK
+export DSCUDA_PATH=~/dscudapkg
+export DSCUDA_WARNLEVEL=10
+export DSCUDA_REMOTECALL="rpc"
+#export DSCUDA_SERVER="ds05:0,ds06:0"
+export DSCUDA_SERVER="ds05:0,ds06:0 ds07:0,ds08:0"
+#export DSCUDA_SERVER='ds03:0,ds04:0 ds05:0,ds06:0 ds07:0,ds08:0 ds09:0,ds10:0 ds11:0,ds12:0 ds13:0,ds14:0 ds15:0,ds16:0'
+#export DSCUDA_SERVER_IGNORE="192.168.0.213 192.168.0.110 192.168.0.212"
+#export DSCUDA_SERVER="titan05:0"
+#export DSCUDA_SERVER="titan05:0,titan06:0"
+#export DSCUDA_SERVER="titan05:0,titan06:0,titan07:0"
+export DSCUDA_USEDAEMON=1
+export DSCUDA_AUTOVERB=1
+export DSCUDA_MIGRATION=0
+export LD_LIBRARY_PATH=$DSCUDA_PATH/lib:$CUDAPATH/lib64:$CUDAPATH/lib:$LD_LIBRARY_PATH
+export PATH=$DSCUDA_PATH/src:$CUDAPATH/bin:$PATH
+export OMP_NUM_THREADS=16
+
+printf "DSCUDA_SERVER=%s\n" $DSCUDA_SERVER
+
+./stress_rpc 2>&1 | tee stress_rpc.log
+
