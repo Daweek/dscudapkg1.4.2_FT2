@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 18:10:49
+// Last Modified On : 2014-08-24 18:16:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -31,9 +31,9 @@ int dscudaRemoteCallType(void)
 }
 
 void setupConnection(int idev, RCServer_t *sp) {
-    int id   = sp->id;
-    int cid  = sp->cid;
-    int pgid = DSCUDA_PROG;
+    int  id   = sp->id;
+    int  cid  = sp->cid;
+    int  pgid = DSCUDA_PROG;
     char msg[256];
 
     struct sockaddr_in sockaddr;
@@ -42,7 +42,7 @@ void setupConnection(int idev, RCServer_t *sp) {
     int sport; // port number of the server. given by the daemon, or calculated from cid.
 
     St.useRpc();
-    if ( St.isUseDaemon() ) { // access to the server via daemon.
+    if ( St.daemon > 0 ) { // access to the server via daemon.
         sport = requestDaemonForDevice(sp->ip, cid, St.isIbv());
     } else { // directly access to the server.
         sport = RC_SERVER_IP_PORT + cid;
@@ -596,8 +596,7 @@ cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant )
 }
 
 static cudaError_t
-cudaMemcpyD2H( void *dst, void *src, size_t count,
-	       Vdev_t *vdev, CLIENT **clnt ) {
+cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev, CLIENT **clnt ) {
     WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" {\n",
 	  __func__, St.getFtModeString(), vdev->info );
 
@@ -792,9 +791,8 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
 /*
  * 
  */
-cudaError_t
-cudaMemcpy( void *dst, const void *src,
-	    size_t count, enum cudaMemcpyKind kind ) {
+cudaError_t cudaMemcpy( void *dst, const void *src,
+			size_t count, enum cudaMemcpyKind kind ) {
     int         vdevid = Vdevid[ vdevidIndex() ];
     Vdev_t     *vdev   = St.Vdev + vdevid;
     CLIENT    **clnt   = Clnt[vdevid];

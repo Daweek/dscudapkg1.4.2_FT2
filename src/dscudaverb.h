@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-17 09:07:17
+// Last Modified On : 2014-08-24 17:47:07
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -17,11 +17,11 @@
  *** Backup memory region of devices allocated by cudaMemcpy().
  ***/
 typedef struct BkupMem_t {
-    void *dst;        /* server device momeory space (UVA)*/
-    void *src;        /* client host memory space */
-    void *src_golden;
-    int   size;       /* in Byte */
-    int   update_rdy; /* 1:"*dst" has valid data, 0:invalid */
+    void  *d_region;      /* server device memory space (UVA)*/
+    void  *h_region;        /* client host memory space */
+    void  *h_region_safe; /* */
+    int    size;       /* in Byte */
+    int    update_rdy; /* 1:"*dst" has valid data, 0:invalid */
     struct BkupMem_t *next;
     struct BkupMem_t *prev;
     //--- methods
@@ -33,30 +33,37 @@ typedef struct BkupMem_t {
 	if ( next==NULL ) return 1;
 	else              return 0;
     }
-    void init(void *idst, int isize ) {
-	dst = idst;
+    void init( void *idst, int isize ) {
+	d_region = idst;
 	size = isize;
 	update_rdy = 0;
-	src = (void *)malloc( isize );
-	src_golden = (void *)malloc( isize );
-	if ( src == NULL || src_golden == NULL) {
+	
+	h_region = (void *)malloc( isize );
+	if ( h_region == NULL ) {
 	    perror("BkupMem_t.init()");
+	    exit( EXIT_FAILURE );
+	}
+		
+	h_region_safe = (void *)malloc( isize );
+	if ( h_region_safe == NULL) {
+	    perror("BkupMem_t.init()");
+	    exit( EXIT_FAILURE );
 	}
 	prev = next = NULL;
     }
-    void updateGolden(void) {
-	memcpy( src_golden, src, size );
+    void updateGolden( void ) {
+	memcpy( h_region_safe, h_region, size );
     }
-    void restoreGolden(void) {
+    void restoreGolden( void ) {
 	cudaError_t cuerr = cudaSuccess;
-        cuerr = cudaMemcpy( dst, src_golden, size, cudaMemcpyHostToDevice);
-	if (cuerr != cudaSuccess) {
-	    fprintf(stderr, "%s():cudaMemcpy(H2D) failed.\n", __func__);
-	    exit(1);
+        cuerr = cudaMemcpy( d_region, h_region_safe, size, cudaMemcpyHostToDevice);
+	if ( cuerr != cudaSuccess ) {
+	    fprintf( stderr, "%s():cudaMemcpy(H2D) failed.\n", __func__ );
+	    exit( EXIT_FAILURE );
 	}
     }
-    BkupMem_t(void) {
-	dst = src = NULL;
+    BkupMem_t( void ) {
+	d_region = h_region = NULL;
 	size = update_rdy = 0;
     }
 } BkupMem;
@@ -66,11 +73,10 @@ private:
     pthread_t tid;        /* thread ID of Checkpointing */
     static void* periodicCheckpoint( void *arg );
 public:
-    int     bkup_en;
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
-    int     length;       /* Counts of allocated memory region */
-    long    total_size;   /* Total size of backuped memory in Byte */
+    int      length;       /* Counts of allocated memory region */
+    long     total_size;   /* Total size of backuped memory in Byte */
     //--- methods --------------------------------------------------------------
     int      isEmpty( void );
     int      getLen( void ) { return length; }
@@ -101,7 +107,7 @@ typedef struct HistCell_t {
 
 typedef struct HistRecord_t {
     HistCell *hist;
-    int rec_en;    /* enable */
+    int rec_en;
     int recalling;
     int length;    /* # of recorded function calls to be recalled */
     int max_len;   /* Upper bound of "verbHistNum", extensible */
@@ -158,27 +164,27 @@ typedef struct {                        /* cudaLoadModule() */
 } cudaLoadModuleArgs;
 
 typedef struct {                        /* cudaRpcLaunchKernel() */
-    int *moduleid;
-    int kid;
-    char *kname;
-    RCdim3 gdim;
-    RCdim3 bdim;
-    RCsize smemsize;
+    int     *moduleid;
+    int      kid;
+    char    *kname;
+    RCdim3   gdim;
+    RCdim3   bdim;
+    RCsize   smemsize;
     RCstream stream;
-    RCargs args;
+    RCargs   args;
 } cudaRpcLaunchKernelArgs;
 
 #if 0 // RPC_ONLY
 typedef struct {
-    int      *moduleid;
+    int     *moduleid;
     int      kid;
-    char     *kname;
-    int      *gdim;
-    int      *bdim;
+    char    *kname;
+    int     *gdim;
+    int     *bdim;
     RCsize   smemsize;
     RCstream stream;
     int      narg;
-    IbvArg   *arg;
+    IbvArg  *arg;
 } cudaIbvLaunchKernelArgs;
 #endif
 
@@ -187,7 +193,7 @@ void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
 void dscudaClearHist(void);
 void printRegionalCheckSum(void);
 
-extern BkupMemList BKUPMEM;
+//extern BkupMemList BKUPMEM;
 extern HistRecord  HISTREC;
 
 #endif // __DSCUDAVERB_H__

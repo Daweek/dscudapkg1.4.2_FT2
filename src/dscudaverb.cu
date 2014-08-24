@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 15:07:35
+// Last Modified On : 2014-08-24 17:48:33
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -18,7 +18,7 @@
 
 #define DEBUG
 
-BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */
+//BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */t
 HistRecord  HISTREC; /* CUDA calling history. */
 
 typedef enum {
@@ -38,350 +38,6 @@ typedef enum {
     DSCVMethodEnd
 } DSCVMethod;
 
-/*==============================================================================
- * 
- */
-BkupMemList_t::BkupMemList_t( void ) {
-    char *env;
-    int autoverb;
-
-    head = NULL;
-    tail = NULL;
-    length = 0;
-    total_size = 0;
-    WARN( 5, "The constructor %s() called.\n", __func__);
-
-    pthread_mutex_lock( &InitClientMutex );
-    // Get autoverb enable flag from environmental variable.
-    env=getenv( DSCUDA_ENV_00 );
-    if ( env != NULL ) {
-	autoverb=atoi(env);
-	bkup_en = autoverb;
-	WARN( 5, "%s(): bkup_en=%d\n", __func__, bkup_en );
-	if (bkup_en > 0) {
-	    /*
-	     * Create a thread periodic snapshot of each GPU device.
-	     */
-	    pthread_create( &tid, NULL, periodicCheckpoint, NULL);
-	}
-    }
-    pthread_mutex_unlock( &InitClientMutex );
-}
-
-BkupMemList_t::~BkupMemList_t( void ) {
-    pthread_cancel( tid );
-}
-
-int BkupMemList_t::isEmpty( void ) {
-    if      ( head==NULL && tail==NULL ) return 1;
-    else if ( head!=NULL && tail!=NULL ) return 0;
-    else {
-	fprintf(stderr, "Unexpected error in %s().\n", __func__);
-	exit(1);
-    }
-}
-
-int BkupMemList_t::countRegion( void ) {
-    BkupMem *mem = head;
-    int count = 0;
-    while ( mem != NULL ) {
-	mem = mem->next;
-	count++;
-    }
-    return count;
-}
-
-int BkupMemList_t::checkSumRegion( void *targ, int size ) {
-    int sum=0;
-    int  *ptr = (int *)targ;
-    
-    for (int s=0; s < size; s+=sizeof(int)) {
-	sum += *ptr;
-	ptr++;
-    }
-    return sum;
-}
-/* Class: "BkupMemList_t"
- * Method: queryRegion()
- *
- */
-BkupMem* BkupMemList_t::queryRegion( void *dst ) {
-    BkupMem *mem = head;
-    int i = 0;
-    while ( mem != NULL ) { /* Search */
-	if ( mem->dst == dst ) { /* tagged by its address on GPU */
-	    WARN(10, "---> %s(%p): return %p\n", __func__, dst, mem);
-	    return mem;
-	}
-	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, dst, i, mem->dst);
-	mem = mem->next;
-	i++;
-    }
-    return NULL;
-}
-/*********************************************************************
- *
- */
-void BkupMemList_t::addRegion( void *dst, int size ) {
-    BkupMem *mem;
-    
-    mem = (BkupMem *)malloc( sizeof(BkupMem) );
-    if ( mem==NULL ) {
-	perror( "addRegion()" );
-    }
-    mem->init( dst, size );
-
-    if ( isEmpty() ) {
-	head = mem;
-	mem->prev = NULL;
-    } else {
-	tail->next = mem;
-	mem->prev = tail;
-    }
-    tail = mem;
-    length++;
-    total_size += size;
-
-    WARN( 5, "+--- add BkupMemList[%d]: p_dev=%p, size=%d\n", length - 1, dst, size );
-    if ( getLen() < 0 ) {
-	fprintf( stderr, "(+_+) Unexpected error in %s()\n", __func__ );
-	exit(1);
-    }
-}
-/*====================================================================
- * Class: "BkupMemlist_t"
- * Method: removeRegion()
- */
-void BkupMemList_t::removeRegion(void *dst) {
-    BkupMem *mem = queryRegion(dst);
-    BkupMem *p_list = head;
-    int i;
-    if ( mem == NULL ) {
-	WARN(0, "%s(): not found requested memory region.\n", __func__);
-	WARN(0, "mem. list length= %d \n", countRegion());
-	i = 0;
-	while ( p_list != NULL ) {
-	    WARN(0, "mem-list[%d] = %p\n", i, p_list->dst);
-	    p_list = p_list->next;
-	    i++;
-	}
-	return;
-    } else if ( mem->isHead() ) { // remove head, begin with 2nd.
-	head = mem->next;
-	if ( head != NULL ) {
-	    head->prev = NULL;
-	}
-    } else if ( mem->isTail() ) {
-	tail = mem->prev;
-    } else {
-	mem->prev->next = mem->next;
-    }
-    
-    total_size -= mem->size;    
-    free(mem->src);
-    free(mem);
-    length--;
-    if ( getLen() < 0 ) {
-	fprintf( stderr, "(+_+) Unexpected error in %s()\n", __func__ );
-	exit(1);
-    }
-}
-
-void* BkupMemList_t::searchUpdateRegion(void *dst) {
-    BkupMem *mem = head;
-    char *d_targ  = (char *)dst;
-    char *d_begin;
-    char *h_begin;
-    char *h_p     = NULL;
-    int   i = 0;
-    
-    while (mem) { /* Search */
-	d_begin = (char *)mem->dst;
-	h_begin = (char *)mem->src;
-	
-	if (d_targ >= d_begin &&
-	    d_targ < (d_begin + mem->size)) {
-	    h_p = h_begin + (d_targ - d_begin);
-	    break;
-	}
-	mem = mem->next;
-	i++;
-    }
-    return (void *)h_p;
-}
-
-void BkupMemList_t::updateRegion( void *dst, void *src, int size ) {
-// dst : GPU device memory region
-// src : HOST memory region
-    BkupMem *mem;
-    void    *src_mirrored;
-    
-    if ( src == NULL ) {
-	WARN(0, "(+_+) not found backup target memory region (%p).\n", dst);
-	exit(1);
-    } else {
-	//mem = BkupMem.queryRegion(dst);
-	//src_mirrored = mem->src;
-	src_mirrored = searchUpdateRegion(dst);
-	memcpy(src_mirrored, src, size); // update historical memory region.
-	WARN(3, "+--- Also copied to backup region (%p), checksum=%d.\n",
-	     dst, checkSumRegion(src, size));
-    }
-}
-
-/* ============================================================================= 
- * Take the data backups of each virtualized GPU to client's host memory
- * after verifying between redundant physical GPUs every specified wall clock
- * time period. The period is defined in second.
- */
-void*
-BkupMemList_t::periodicCheckpoint( void *arg ) {
-    int devid, i, j, m, n;
-    int errcheck = 1;
-    cudaError_t cuerr;
-    int pmem_devid;
-    BkupMem *pmem;
-    int  pmem_count;
-    void *lsrc;
-    void *ldst;
-    int  redun;
-    int  size;
-    
-    int  cmp_result[RC_NREDUNDANCYMAX][RC_NREDUNDANCYMAX]; //verify
-    int  regional_match;
-    int  snapshot_match = 1;
-    int  snapshot_count = 0;
-    void *dst_cand[RC_NREDUNDANCYMAX];
-    int  dst_color[RC_NREDUNDANCYMAX], next_color;
-
-    dscudaMemcpyD2HResult *rp;
-
-    //
-    // Wait for all connections established, invoked 1st call of initClient().
-    //
-    WARN(10, "%s() thread starts.\n", __func__);
-
-    int passflag = 0;
-    while ( St.init_stat == ORIGIN ) {
-	if ( passflag == 0 ) {
-	    WARN(10, "%s() thread wait for INITIALIZED.\n", __func__);
-	}
-     	sleep(1);
-	passflag = 1;
-    }
-    WARN(10, "%s() thread detected INITIALIZED.\n", __func__);
-    
-    for (;;) { /* infinite loop */
-	WARN(10, "%s\n", __func__);
-	for ( devid=0; devid < St.Nvdev; devid++ ) { /* All virtual GPUs */
-	    pmem = BKUPMEM.head;
-	    while ( pmem != NULL ) { /* sweep all registered regions */
-		pmem_devid = dscudaDevidOfUva( pmem->dst );
-		size = pmem->size;
-		if ( devid == pmem_devid ) {
-		    cudaSetDevice_clnt( devid, errcheck );
-		    redun = St.Vdev[devid].nredundancy;
-		    //<-- Mutex lock
-		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-		    pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-		    pthread_mutex_lock( &cudaKernelRun_mutex );
-		    WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
-		    for ( i=0; i < redun; i++ ) {
-			dst_cand[i] = malloc( size );
-			if ( dst_cand[i] == NULL ) {
-			    fprintf(stderr, "%s():malloc() failed.\n", __func__ );
-			    exit(1);
-			}
-			cudaMemcpyD2H_redundant( dst_cand[i], pmem->dst, size, i );
-		    }
-		    pthread_mutex_unlock( &cudaMemcpyD2H_mutex );/*mutex-unlock*/
-		    pthread_mutex_unlock( &cudaMemcpyH2D_mutex );/*mutex-unlock*/
-		    pthread_mutex_unlock( &cudaKernelRun_mutex );/*mutex-unlock*/
-		    //--> Mutex lock
-		    WARN(3, "mutex_unlock:%s(),cudaMemcpyD2H\n", __func__);
-		    /**************************
-		     * compare redundant data.
-		     **************************/
-		    regional_match = 1;
-
-		    for ( i=0; i<RC_NREDUNDANCYMAX; i++) {
-			dst_color[i] = -1;
-		    }
-		    next_color = 0;
-		    dst_color[0] = next_color;
-		    for ( m=1; m<redun; m++ ) {
-			for ( n=0; n<m; n++ ) {
-			    WARN(3, "memcmp(%3d <--> %3d, %d Byte)... ", m, n, size);
-			    cmp_result[m][n] = memcmp(dst_cand[m], dst_cand[n], size);
-			    if ( cmp_result[m][n] == 0 ) {
-				WARN0(3, "Matched.\n");
-				dst_color[m] = dst_color[n];
-				break;
-			    } else {
-				WARN0(3, "*** Unmatched. ***\n");
-				regional_match = 0;
-				snapshot_match = 0;
-				if ( n == (m - 1) ) {
-				    next_color++;
-				    dst_color[m] = next_color;
-				}
-			    }//if ( cmp_result...
-			}//for (n...
-		    }//for (m...
-		    /********************
-		     * Verify
-		     ********************/
-		    for ( i=0; i<redun; i++ ) {
-			WARN(3, "redundant pattern: dst_color[%d]=%d\n", i, dst_color[i]);
-		    }
-		    if ( regional_match == 1 ) {    /* completely matched data */
-			WARN(3, "(^_^) matched all redundants(%d).\n", redun);
-			memcpy( pmem->src, dst_cand[0], size );
-		    } else {                   /* unmatch exist */
-			fprintf(stderr, "%s(): unmatched data.\n", __func__ );
-			exit(1);
-		    }
-		    /*
-		     * free 
-		     */
-		    for ( i=0; i<redun; i++ ) {
-			free( dst_cand[i] );
-		    }
-		} 
-		pmem = pmem->next;
-	    }
-	}//for ( devid=0; ...
-	if (snapshot_match == 1) {
-	    /*****************************************
-	     * Update snapshot memories, and storage.
-	     */
-	    WARN(3, "***********************************\n");
-	    WARN(3, "*** Update checkpointing data(%d).\n", snapshot_count);
-	    WARN(3, "***********************************\n");
-	    pmem = BKUPMEM.head;
-	    pmem_count = 0;
-	    while ( pmem != NULL ) { /* sweep all registered regions */
-		pmem->updateGolden();
-		pmem_count++;	
-		pmem = pmem->next;
-	    }
-	    WARN(3, "*** Made checkpointing of all %d regions.\n", pmem_count);
-	    WARN(3, "***********************************\n");
-	    WARN(3, "*** Clear following cuda API called history(%d).\n", snapshot_count);
-	    WARN(3, "***********************************\n");
-	    HISTREC.print();
-	    HISTREC.clear();
-	    snapshot_count++;	    
-	} else {
-	    /*
-	     * Rollback and retry cuda sequence.
-	     */
-	    WARN(3, "Can not update checkpointing data, then Rollback retry.\n");
-	}
-	sleep(2);
-	pthread_testcancel();/* cancelation available */
-    }//for (;;)
-}
 
 static int
 checkSum(void *targ, int size) {
@@ -399,9 +55,8 @@ void printRegionalCheckSum(void) {
     BkupMem *pMem = BKUPMEM.head;
     int length = 0;
     while (pMem != NULL) {
-	printf("Region[%d](dp=%p, size=%d): checksum=0x%08x\n",
-	       length, pMem->dst, pMem->size, checkSum(pMem->src, pMem->size));
-	fflush(stdout);
+	fprintf(stderr, "Region[%d](dp=%p, size=%d): checksum=0x%08x\n",
+	       length, pMem->d_region, pMem->size, checkSum(pMem->h_region, pMem->size));
 	pMem = pMem->next;
 	length++;
     }
@@ -434,47 +89,6 @@ dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
     return err;
 }
 
-void BkupMemList_t::reallocDeviceRegion(RCServer_t *svr) {
-    BkupMem *mem = head;
-    int     verb = St.isAutoVerb();
-    int     copy_count = 0;
-    int     i = 0;
-    
-    WARN(1, "%s(RCServer_t *sp).\n", __func__);
-    WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
-    St.unsetAutoVerb();
-    while ( mem != NULL ) {
-	/* TODO: select migrateded virtual device, not all region. */
-	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->dst, mem->size);
-	dscudaVerbMalloc(&mem->dst, mem->size, svr);
-	mem = mem->next;
-	i++;
-    }
-    St.setAutoVerb(verb);
-    WARN(1, "+--- Done.\n");
-}
-/* 
- * Resore the all data of a GPU device with backup data on client node.
- */
-void BkupMemList_t::restructDeviceRegion(void) {
-    BkupMem *mem = head;
-    int      verb = St.isAutoVerb();
-    int      copy_count = 0;
-    unsigned char    *mon;
-    float            *fmon;
-    int              *imon;
-
-    WARN(2, "%s(void).\n", __func__);
-    St.unsetAutoVerb();
-    while (mem != NULL) {
-	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
-	     copy_count++, mem->dst, mem->src, mem->size, checkSum(mem->src, mem->size));
-	mem->restoreGolden();
-	mem = mem->next;
-    }
-    St.setAutoVerb( verb );
-    WARN(2, "+--- done.\n");
-}
 
 //stubs for store/release args, and recall functions.
 static void *(*storeArgsStub[DSCVMethodEnd])(void *);
@@ -857,7 +471,7 @@ void dscudaVerbInit(void) {
     }
     HISTREC.on();
 }
-/*==============================================================================
+/*
  * 
  */
 HistRecord_t::HistRecord_t( void ) {
@@ -868,7 +482,7 @@ HistRecord_t::HistRecord_t( void ) {
     length = 0;
     max_len = 0;
     recalling = 0;
-    pthread_mutex_lock( &InitClientMutex );
+
     WARN( 5, "The constructor %s() called.\n", __func__ );
     // Get autoverb enable flag from environmental variable.
     env=getenv( DSCUDA_ENV_00 );
@@ -877,7 +491,6 @@ HistRecord_t::HistRecord_t( void ) {
 	rec_en = autoverb;
 	WARN( 5, "%s(): %s=%d\n", __func__, DSCUDA_ENV_00, rec_en );
     }
-    pthread_mutex_unlock( &InitClientMutex );
 }
 
 /*==============================================================================
@@ -903,7 +516,7 @@ void HistRecord_t::add( int funcID, void *argp ) {
     switch (funcID2DSCVMethod(funcID)) {
     case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
 	cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
-	BkupMem *mem = BKUPMEM.queryRegion(args->dst);
+	BkupMem *mem = BKUPMEM.queryRegion( args->d_region );
 	if (!mem) {
 	    break;
 	}

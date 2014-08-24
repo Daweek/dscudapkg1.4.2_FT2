@@ -4,12 +4,13 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 19:32:40
+// Last Modified On : 2014-08-24 18:21:05
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
+#include "libdscuda_bkupmem.h"
 #include "sockutil.h"
 
 typedef struct ClientModule_t {
@@ -93,9 +94,9 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
-/**********************************/
-/* Virtual GPU device Management. */
-/**********************************/
+/**************************************
+ ***  "Physical" GPU Device Class.  ***
+ **************************************/
 typedef struct RCServer {
     int  id;   // index for each redundant server.
     int  cid;  // id of a server given by -c option to dscudasvr.
@@ -107,6 +108,11 @@ typedef struct RCServer {
     int  uniq; // unique number in all RCServer_t including svrCand[].
     int  *d_faultconf;
     int  errcount;
+
+#if 0 //moved from "libdscuda_rpc.cu"
+    setupConnection(int idev);
+#endif
+    /*CONSTRUCTOR*/
     RCServer() {
 	id = cid = uniq = 0xffff;
 	strcpy(ip, "empty");
@@ -141,11 +147,20 @@ typedef enum {
     VDEV_UNKNOWN = 9
 } VdevConf;
 
+/*****************************************
+ ***  "Virtualized" GPU Device Class.  ***
+ *****************************************/
 typedef struct {
-    int        nredundancy;
-    RCServer_t server[RC_NREDUNDANCYMAX];
-    VdevConf   conf;
-    char       info[16]; //{MONO, POLY(nredundancy)}
+    int         nredundancy;               //Redundant count
+    RCServer_t  server[RC_NREDUNDANCYMAX]; //Physical Device array.
+    VdevConf    conf;                      //Infomation.
+    char        info[16];                  //{MONO, POLY(nredundancy)}
+                                           /*** CHECKPOINTING ***/
+    BkupMemlist memlist_svr[RC_NREDUNDANCYMAX];
+    BkupMemList memlist_clean;             //part of Checkpoint data.
+
+    HistRecord  histrec_svr[RC_NREDUNDANCYMAX];
+    HistRecord  histrec_clean;
 } Vdev_t;
 
 /******************************************/
@@ -169,27 +184,29 @@ typedef enum {
 
 struct ClientState_t {
 private:
-    void initEnv( void );
-    void setFaultTolerantMode( void );
+    void initEnv(void);
+    void setFaultTolerantMode(void);
 public:
+    int          Nvdev;               // # of virtual devices available.
+    Vdev_t       Vdev[RC_NVDEVMAX];   // list of virtual devices.
+
     ClntFtMode   ft_mode;
-    char *getFtModeString(void);    
-
     ClntInitStat init_stat;
-    int    Nvdev;               // # of virtual devices available.
-    Vdev_t Vdev[RC_NVDEVMAX];   // a list of virtual devices.
+    char *getFtModeString(void);    
+                              /*** Static Information ***/
+    unsigned int ip_addr;     // Client IP address.
+    time_t       start_time;  // Clinet start time.
+    time_t       stop_time;   // Client stop time.
 
-    unsigned int ip_addr;    /* My IP address */
     /* Mode */
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int autoverb;           /* 1:Redundant calculation */
     int migration;
     int daemon;
     int historical_calling;
-
-    /* Staticstics */
-    time_t start_time;
-    time_t stop_time;
+    
+    ClientState_t(void);
+    ~ClientState_t(void);
     
     void setIpAddress(unsigned int val) { ip_addr = val; }
     unsigned int getIpAddress() { return ip_addr; }
@@ -203,11 +220,7 @@ public:
     void unsetAutoVerb() { autoverb = 0; }
     int  isAutoVerb(void)    { return autoverb; }
 
-    void   setUseDaemon(void) { daemon = 1; }
-    void unsetUseDaemon() { daemon = 0; }
-    int  isUseDaemon(void)   { return daemon; }
-
-    void   setHistoCalling() { historical_calling = 1; }
+     void   setHistoCalling() { historical_calling = 1; }
     void unsetHistoCalling() { historical_calling = 0; }
     int  isHistoCalling()   { return historical_calling; }
 
@@ -217,8 +230,8 @@ public:
 
     void initProgress( ClntInitStat stat );
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
-    ClientState_t(void);
-    ~ClientState_t(void);
+
+    void periodicCheckpoint( void *arg );
 };
 extern struct ClientState_t St;
 
@@ -418,7 +431,6 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
 			     int narg, IbvArg *arg);
 #endif
 
-extern pthread_mutex_t InitClientMutex;
 extern pthread_mutex_t cudaMemcpyD2H_mutex;
 extern pthread_mutex_t cudaMemcpyH2D_mutex;
 extern pthread_mutex_t cudaKernelRun_mutex;

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-02-12 20:57:57
+// Last Modified On : 2014-08-24 17:57:27
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ setupConnection(int idev, RCServer_t *sp)
     char *service;
 
     St.useIbv();
-    if (St.isUseDaemon()) { // access to the server via daemon.
+    if (nSt.daemon > 0 ) { // access to the server via daemon.
         sport = requestDaemonForDevice(sp->ip, cid, St.isIbv());
     }
     else { // directly access to the server.

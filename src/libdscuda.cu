@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 20:16:01
+// Last Modified On : 2014-08-24 18:15:38
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1032,7 +1032,7 @@ void updateDscudaPath(void) {
 /*
  *
  */
-void ClientState_t::setFaultTolerantMode( void ) {
+void ClientState_t::setFaultTolerantMode(void) {
     char *env;
 
     env = getenv( "DSCUDA_USEDAEMON" );
@@ -1101,7 +1101,8 @@ void ClientState_t::setFaultTolerantMode( void ) {
  * 
  */
 void ClientState_t::initEnv(void) {
-    char *sconfname, *env;
+    char *sconfname;
+    char *env;
 
     printVersion();
     updateDscudaPath();      /* set "Dscudapath[]" from DSCUDA_PATH */
@@ -1120,22 +1121,31 @@ void ClientState_t::initEnv(void) {
     dscudaSearchDaemon();
 
     initVirtualServerList(env);  /* Update the list of virtual devices information. */
-
     updateSpareServerList();
-
     
     printVirtualDeviceList(); /* Print result to screen. */
 
     WARN(2, "method of remote procedure call: ");
-    switch (dscudaRemoteCallType()) {
-      case RC_REMOTECALL_TYPE_RPC: WARN(2, "RPC\n");              break;
-      case RC_REMOTECALL_TYPE_IBV: WARN(2, "InfiniBand Verbs\n"); break;
-      default:                     WARN(0, "(Unkown)\n"); exit(1);
+    switch ( dscudaRemoteCallType() ) {
+    case RC_REMOTECALL_TYPE_RPC:
+	WARN(2, "RPC\n");
+	break;
+    case RC_REMOTECALL_TYPE_IBV:
+	WARN(2, "InfiniBand Verbs\n");
+	break;
+    default:
+	WARN(0, "(Unkown)\n"); exit(1);
     }
 
+    /*
+     * Create a thread of checkpointing.
+     */
+    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
+    }
+    
     return;
 }
-
 
 void ClientState_t::initProgress( ClntInitStat stat ) {
     switch(stat) {
@@ -1169,39 +1179,214 @@ void ClientState_t::initProgress( ClntInitStat stat ) {
 }
 
 /*
+ * Take the data backups of each virtualized GPU to client's host memory
+ * after verifying between redundant physical GPUs every specified wall clock
+ * time period. The period is defined in second.
+ */
+void*
+ClientState_t::periodicCheckpoint( void *arg ) {
+    int devid, d, i, j, m, n;
+    int errcheck = 1;
+    cudaError_t cuerr;
+    int pmem_devid;
+    BkupMem *pmem;
+    int  pmem_count;
+    void *lsrc;
+    void *ldst;
+    int  redun;
+    int  size;
+    
+    int  cmp_result[RC_NREDUNDANCYMAX][RC_NREDUNDANCYMAX]; //verify
+    int  regional_match;
+    int  snapshot_match = 1;
+    int  snapshot_count = 0;
+    void *dst_cand[RC_NREDUNDANCYMAX];
+    int  dst_color[RC_NREDUNDANCYMAX], next_color;
+
+    dscudaMemcpyD2HResult *rp;
+
+    //
+    // Wait for all connections established, invoked 1st call of initClient().
+    //
+    WARN( 10, "%s() thread starts.\n", __func__ );
+
+    int passflag = 0;
+    while ( init_stat == ORIGIN ) {
+	if ( passflag == 0 ) {
+	    WARN(10, "%s() thread wait for INITIALIZED.\n", __func__);
+	}
+     	sleep(1);
+	passflag = 1;
+    }
+    WARN(10, "%s() thread detected INITIALIZED.\n", __func__);
+    
+    for (;;) { /* infinite loop */
+	WARN( 10, "%s\n", __func__ );
+#if 1
+	for ( d=0; d < Nvdev; d++ ) { /* Sweep all virtual GPUs */
+	    pmem = Vdev[d].bkupmemlist.head ;
+	    while ( pmem != NULL ) {
+		cudaSetDevice_clnt( d, errcheck );
+		
+		// mutex locks
+		pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+		pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+		pthread_mutex_lock( &cudaKernelRun_mutex );
+		WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
+
+		for ( i=0; i < Vdev[d].nredundancy; i++ ) {
+		    
+		}
+
+		// mutex unlocks
+		pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
+		pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+		pthread_mutex_unlock( &cudaKernelRun_mutex );
+
+	    }
+
+	}//for
+#else	
+	for ( devid=0; devid < Nvdev; devid++ ) { /* All virtual GPUs */
+	    pmem = BKUPMEM.head;
+	    while ( pmem != NULL ) { /* sweep all registered regions */
+		pmem_devid = dscudaDevidOfUva( pmem->d_region );
+		size = pmem->size;
+		if ( devid == pmem_devid ) {
+		    cudaSetDevice_clnt( devid, errcheck );
+		    redun = Vdev[devid].nredundancy;
+		    //<-- Mutex lock
+		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+		    pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+		    pthread_mutex_lock( &cudaKernelRun_mutex );
+		    WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
+		    for ( i=0; i < redun; i++ ) {
+			dst_cand[i] = malloc( size );
+			if ( dst_cand[i] == NULL ) {
+			    fprintf(stderr, "%s():malloc() failed.\n", __func__ );
+			    exit( EXIT_FAILURE );
+			}
+			cudaMemcpyD2H_redundant( dst_cand[i], pmem->d_region, size, i );
+		    }
+		    pthread_mutex_unlock( &cudaMemcpyD2H_mutex );/*mutex-unlock*/
+		    pthread_mutex_unlock( &cudaMemcpyH2D_mutex );/*mutex-unlock*/
+		    pthread_mutex_unlock( &cudaKernelRun_mutex );/*mutex-unlock*/
+		    //--> Mutex lock
+		    WARN(3, "mutex_unlock:%s(),cudaMemcpyD2H\n", __func__);
+		    /**************************
+		     * compare redundant data.
+		     **************************/
+		    regional_match = 1;
+
+		    for ( i=0; i<RC_NREDUNDANCYMAX; i++) {
+			dst_color[i] = -1;
+		    }
+		    next_color = 0;
+		    dst_color[0] = next_color;
+		    for ( m=1; m<redun; m++ ) {
+			for ( n=0; n<m; n++ ) {
+			    WARN(3, "memcmp(%3d <--> %3d, %d Byte)... ", m, n, size);
+			    cmp_result[m][n] = memcmp(dst_cand[m], dst_cand[n], size);
+			    if ( cmp_result[m][n] == 0 ) {
+				WARN0(3, "Matched.\n");
+				dst_color[m] = dst_color[n];
+				break;
+			    } else {
+				WARN0(3, "*** Unmatched. ***\n");
+				regional_match = 0;
+				snapshot_match = 0;
+				if ( n == (m - 1) ) {
+				    next_color++;
+				    dst_color[m] = next_color;
+				}
+			    }//if ( cmp_result...
+			}//for (n...
+		    }//for (m...
+		    /********************
+		     * Verify
+		     ********************/
+		    for ( i=0; i<redun; i++ ) {
+			WARN(3, "redundant pattern: dst_color[%d]=%d\n", i, dst_color[i]);
+		    }
+		    if ( regional_match == 1 ) {    /* completely matched data */
+			WARN(3, "(^_^) matched all redundants(%d).\n", redun);
+			memcpy( pmem->h_region, dst_cand[0], size );
+		    } else {                   /* unmatch exist */
+			fprintf(stderr, "%s(): unmatched data.\n", __func__ );
+			exit(1);
+		    }
+		    /*
+		     * free 
+		     */
+		    for ( i=0; i<redun; i++ ) {
+			free( dst_cand[i] );
+		    }
+		} 
+		pmem = pmem->next;
+	    }
+	}//for ( devid=0; ...
+	
+#endif //replacing new code
+	
+	if (snapshot_match == 1) {
+	    /*****************************************
+	     * Update snapshot memories, and storage.
+	     */
+	    WARN(3, "***********************************\n");
+	    WARN(3, "*** Update checkpointing data(%d).\n", snapshot_count);
+	    WARN(3, "***********************************\n");
+	    pmem = BKUPMEM.head;
+	    pmem_count = 0;
+	    while ( pmem != NULL ) { /* sweep all registered regions */
+		pmem->updateSafeRegion();
+		pmem_count++;	
+		pmem = pmem->next;
+	    }
+	    WARN(3, "*** Made checkpointing of all %d regions.\n", pmem_count);
+	    WARN(3, "***********************************\n");
+	    WARN(3, "*** Clear following cuda API called history(%d).\n", snapshot_count);
+	    WARN(3, "***********************************\n");
+	    HISTREC.print();
+	    HISTREC.clear();
+	    snapshot_count++;	    
+	} else {
+	    /*
+	     * Rollback and retry cuda sequence.
+	     */
+	    WARN(3, "Can not update checkpointing data, then Rollback retry.\n");
+	}
+	sleep(2);
+	pthread_testcancel();/* cancelation available */
+    }//for (;;)
+}
+
+
+/*
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.    
  */
-pthread_mutex_t InitClientMutex = PTHREAD_MUTEX_INITIALIZER;
-
 ClientState_t::ClientState_t(void) {
     int i, k;
-    Vdev_t *vdev;
-    RCServer_t *sp;
     
     start_time = time( NULL );
     WARN( 1, "[ERRORSTATICS] start.\n" );
-
     
-    pthread_mutex_lock( &InitClientMutex );
     initProgress( ORIGIN );
 	
     WARN( 5, "The constructor %s() called.\n", __func__ );
 
     ip_addr     = 0;
     use_ibv     = 0;
-    autoverb   = 0;
-    migration  = 0;
-    daemon  = 0;
+    autoverb    = 0;
+    migration   = 0;
+    daemon      = 0;
     historical_calling = 0;
     
     initEnv();
     
-    for (i=0; i<St.Nvdev; i++ ) {
-	vdev = St.Vdev + i;
-	sp = vdev->server;
-	for (k=0; k<vdev->nredundancy; k++, sp++ ) {
-            setupConnection(i, sp);
+    for ( i=0; i < Nvdev; i++ ) {
+	for (k=0; k < Vdev[i].nredundancy; k++ ) {
+            setupConnection( i, &Vdev[i].server[k] );
         }
     }
     struct sockaddr_in addrin;
@@ -1212,7 +1397,6 @@ ClientState_t::ClientState_t(void) {
     
     initProgress( INITIALIZED );    
     WARN( 5, "The constructor %s() ends.\n", __func__);
-    pthread_mutex_unlock( &InitClientMutex ); //---> mutex_unlock
 }
 
 ClientState_t::~ClientState_t(void) {
