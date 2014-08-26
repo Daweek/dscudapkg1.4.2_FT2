@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-24 17:47:07
+// Last Modified On : 2014-08-25 17:13:45
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -12,115 +12,7 @@
 #define __DSCUDAVERB_H__
 #include <pthread.h>
 #include "libdscuda.h"
-#define DSCUDAVERB_HISTMAX_GROWSIZE (10)
-/*** ==========================================================================
- *** Backup memory region of devices allocated by cudaMemcpy().
- ***/
-typedef struct BkupMem_t {
-    void  *d_region;      /* server device memory space (UVA)*/
-    void  *h_region;        /* client host memory space */
-    void  *h_region_safe; /* */
-    int    size;       /* in Byte */
-    int    update_rdy; /* 1:"*dst" has valid data, 0:invalid */
-    struct BkupMem_t *next;
-    struct BkupMem_t *prev;
-    //--- methods
-    int isHead( void ) {
-	if ( prev==NULL ) return 1;
-	else              return 0;
-    }
-    int isTail( void ) {
-	if ( next==NULL ) return 1;
-	else              return 0;
-    }
-    void init( void *idst, int isize ) {
-	d_region = idst;
-	size = isize;
-	update_rdy = 0;
-	
-	h_region = (void *)malloc( isize );
-	if ( h_region == NULL ) {
-	    perror("BkupMem_t.init()");
-	    exit( EXIT_FAILURE );
-	}
-		
-	h_region_safe = (void *)malloc( isize );
-	if ( h_region_safe == NULL) {
-	    perror("BkupMem_t.init()");
-	    exit( EXIT_FAILURE );
-	}
-	prev = next = NULL;
-    }
-    void updateGolden( void ) {
-	memcpy( h_region_safe, h_region, size );
-    }
-    void restoreGolden( void ) {
-	cudaError_t cuerr = cudaSuccess;
-        cuerr = cudaMemcpy( d_region, h_region_safe, size, cudaMemcpyHostToDevice);
-	if ( cuerr != cudaSuccess ) {
-	    fprintf( stderr, "%s():cudaMemcpy(H2D) failed.\n", __func__ );
-	    exit( EXIT_FAILURE );
-	}
-    }
-    BkupMem_t( void ) {
-	d_region = h_region = NULL;
-	size = update_rdy = 0;
-    }
-} BkupMem;
-
-typedef struct BkupMemList_t {
-private:
-    pthread_t tid;        /* thread ID of Checkpointing */
-    static void* periodicCheckpoint( void *arg );
-public:
-    BkupMem *head;        /* pointer to 1st  BkupMem */
-    BkupMem *tail;        /* pointer to last BkupMem */
-    int      length;       /* Counts of allocated memory region */
-    long     total_size;   /* Total size of backuped memory in Byte */
-    //--- methods --------------------------------------------------------------
-    int      isEmpty( void );
-    int      getLen( void ) { return length; }
-    long     getTotalSize( void ) { return total_size; }
-    int      countRegion( void );
-    int      checkSumRegion( void *targ, int size );
-    BkupMem* queryRegion( void *dst );
-    void     addRegion( void *dst, int size ); // verbAllocatedMemRegister()
-    void     removeRegion( void *dst );        // verbAllocatedMemUnregister()
-    void*    searchUpdateRegion( void *dst );
-    void     updateRegion( void *dst, void *src, int size );
-    void     reallocDeviceRegion(RCServer_t *svr);             /* ReLoad backups */
-    void     restructDeviceRegion(void);              /* ReLoad backups */
-    //---
-    BkupMemList_t( void );
-    ~BkupMemList_t( void );
-} BkupMemList;
-
-/*** ==========================================================================
- *** Each argument types and lists for historical recall.
- *** If you need to memorize another function into history, add new one.
- ***/
-typedef struct HistCell_t {
-   int  funcID;   // Recorded cuda*() function.
-   void *args;    // And its arguments.
-   int  dev_id;   // The Device ID, set by last cudaSetDevice().
-} HistCell;
-
-typedef struct HistRecord_t {
-    HistCell *hist;
-    int rec_en;
-    int recalling;
-    int length;    /* # of recorded function calls to be recalled */
-    int max_len;   /* Upper bound of "verbHistNum", extensible */
-    //
-    void on(void) { rec_en = 1; }
-    void off(void) { rec_en = 0; }
-    void add( int funcID, void *argp ); /* Add */
-    void clear( void );           /* Clear */
-    void print( void );           /* Print to stdout */
-    int  recall( void );          /* Recall */
-    //
-    HistRecord_t( void );
-} HistRecord;
+#include "libdscuda_bkupmem.h"
 
 typedef struct { /* cudaSetDevice() */
     int device;
@@ -192,8 +84,5 @@ void dscudaVerbInit(void);                /* Initializer    */
 void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
 void dscudaClearHist(void);
 void printRegionalCheckSum(void);
-
-//extern BkupMemList BKUPMEM;
-extern HistRecord  HISTREC;
 
 #endif // __DSCUDAVERB_H__

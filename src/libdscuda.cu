@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-24 18:15:38
+// Last Modified On : 2014-08-26 10:05:27
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -73,6 +73,7 @@ SvrList_t SvrBroken;
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
+
 CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX]; /* RPC clients */
 struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
@@ -966,34 +967,6 @@ void updateSpareServerList(void) //TODO: need more good algorithm.
     }
     SvrSpare.num = spare_count;
 }
-static
-void copyServer(RCServer_t *dst, RCServer_t *src)
-{
-    //dst->id   = src->id;   // id must be the same.
-    //dst->cid  = src->cid;  // cid too.
-    dst->uniq = src->uniq;
-    strcpy(dst->ip, src->ip);
-}
-static
-void swapServer(RCServer_t *s0, RCServer_t *s1)
-{
-    RCServer_t buf;
-    copyServer(&buf, s0);
-    copyServer(s0,   s1);
-    copyServer(s1, &buf);
-}
-
-void replaceBrokenServer(RCServer_t *broken, RCServer_t *spare)
-{
-    RCServer_t tmp;
-
-    if ( SvrSpare.num < 1) {  //redundant check?
-	WARN(0, "(+_+) Not found any spare server.\n");
-	exit(1);
-    } else {
-	swapServer(broken, spare);
-    }
-}
 
 static void printVersion(void)
 {
@@ -1366,8 +1339,6 @@ ClientState_t::periodicCheckpoint( void *arg ) {
  * This function may be executed in parallel threads, so need mutex lock.    
  */
 ClientState_t::ClientState_t(void) {
-    int i, k;
-    
     start_time = time( NULL );
     WARN( 1, "[ERRORSTATICS] start.\n" );
     
@@ -1383,10 +1354,13 @@ ClientState_t::ClientState_t(void) {
     historical_calling = 0;
     
     initEnv();
-    
-    for ( i=0; i < Nvdev; i++ ) {
-	for (k=0; k < Vdev[i].nredundancy; k++ ) {
-            setupConnection( i, &Vdev[i].server[k] );
+
+    /*
+     * Establish connections of all physical devices.
+     */
+    for ( int i=0; i < Nvdev; i++ ) {
+	for ( int j=0; j < Vdev[i].nredundancy; j++ ) {
+	    Vdev[i].server[j].setupConnection();
         }
     }
     struct sockaddr_in addrin;
@@ -1623,6 +1597,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
          moduleid, (unsigned long long)attr, func);
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
+    
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         if (St.isIbv()) {
 #warning fill this part in dscudaFuncGetAttributesWrapper().
@@ -2123,4 +2098,29 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice)
     WARN(3, "done.\n");
 
     return err;
+}
+
+/*
+ * MEMO: BkupMemList_t::reallocDeviceRegion(RCServer_t *svr)
+ * 
+ */
+void VirDev_t::remallocRegionsGPU(int num_svr) {
+    BkupMem *mem = head;
+    int     verb = St.isAutoVerb();
+    int     copy_count = 0;
+    int     i = 0;
+    
+    WARN(1, "%s(RCServer_t *sp).\n", __func__);
+    WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
+    St.unsetAutoVerb();
+    while ( mem != NULL ) {
+	/* TODO: select migrateded virtual device, not all region. */
+	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_regio, mem->size);
+	dscudaVerbMalloc(&mem->d_region, mem->size, svr);
+	mem = mem->next;
+	i++;
+    }
+    St.setAutoVerb(verb);
+    WARN(1, "+--- Done.\n");
+
 }

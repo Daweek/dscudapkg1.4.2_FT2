@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-24 17:48:33
+// Last Modified On : 2014-08-25 19:23:26
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -17,9 +17,6 @@
 #include "dscudaverb.h"
 
 #define DEBUG
-
-//BkupMemList BKUPMEM; /* Backup memory regions against all GPU devices. */t
-HistRecord  HISTREC; /* CUDA calling history. */
 
 typedef enum {
     DSCVMethodNone = 0,
@@ -215,14 +212,12 @@ storeMemcpyToSymbolD2D(void *argp) {
     return argdst;
 }
 
-static void *
-storeFree(void *argp) {
+static void *storeFree(void *argp) {
     //nothing to do
     return NULL;
 }
 
-static void *
-storeLoadModule(void *argp) {
+static void *storeLoadModule(void *argp) {
     DSCUDAVERB_STORE_ARGS(LoadModule);
     argdst->name = (char *)malloc(sizeof(char) * (strlen(argsrc->name) + 1));
     argdst->strdata = (char *)malloc(sizeof(char) * (strlen(argsrc->strdata) + 1));
@@ -231,8 +226,7 @@ storeLoadModule(void *argp) {
     return argdst;
 }
 
-static void *
-storeRpcLaunchKernel(void *argp) {
+static void *storeRpcLaunchKernel(void *argp) {
     WARN(3, "add hist RpcLaunchKernel\n");
     DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
 
@@ -471,143 +465,11 @@ void dscudaVerbInit(void) {
     }
     HISTREC.on();
 }
-/*
- * 
- */
-HistRecord_t::HistRecord_t( void ) {
-    char *env;
-    int autoverb;
-    
-    hist = NULL;
-    length = 0;
-    max_len = 0;
-    recalling = 0;
-
-    WARN( 5, "The constructor %s() called.\n", __func__ );
-    // Get autoverb enable flag from environmental variable.
-    env=getenv( DSCUDA_ENV_00 );
-    if ( env != NULL ) {
-	autoverb=atoi(env);
-	rec_en = autoverb;
-	WARN( 5, "%s(): %s=%d\n", __func__, DSCUDA_ENV_00, rec_en );
-    }
-}
-
-/*==============================================================================
- *
- */
-void HistRecord_t::add( int funcID, void *argp ) {
-    int DSCVMethodId;
-
-    if ( rec_en==0 || recalling==1 ) {
-       /* record-enable-flag is disabled, or in recalling process. */
-       return;
-    }
-    if ( length == max_len ) { /* Extend the existing memory region. */
-	max_len += DSCUDAVERB_HISTMAX_GROWSIZE;
-	hist = (HistCell *)realloc( hist, sizeof(HistCell) * max_len );
-    }
-
-    DSCVMethodId = funcID2DSCVMethod(funcID);
-    hist[length].args = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
-    hist[length].funcID = funcID;
-    length++; /* Increment the count of cuda call */
-
-    switch (funcID2DSCVMethod(funcID)) {
-    case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
-	cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
-	BkupMem *mem = BKUPMEM.queryRegion( args->d_region );
-	if (!mem) {
-	    break;
-	}
-	int verb = St.isAutoVerb();
-	St.unsetAutoVerb();
-	cudaMemcpy(mem->dst, args->src, args->count, cudaMemcpyDeviceToHost);
-	St.setAutoVerb(verb);
-	break;
-      }
-    }
-    return;
-}
-/*==============================================================================
- * Clear all hisotry of calling cuda functions.
- */
-void HistRecord_t::clear( void ) {
-   if ( hist != NULL ) {
-      for (int i=0; i < length; i++) {
-         (releaseArgsStub[funcID2DSCVMethod( hist[i].funcID)])(hist[i].args);
-      }
-      //free(hist);
-      //hist = NULL;
-   }
-   length = 0;
-}
 
 void dscudaClearHist(void) {
     HISTREC.clear();
 }
 
-void HistRecord_t::print(void) {
-    WARN(1, "%s(): *************************************************\n", __func__);
-    if ( length == 0 ) {
-	WARN(1, "%s(): Recall History[]> (Empty).\n", __func__);
-	return;
-    }
-    for (int i=0; i < length; i++) { /* Print recall history. */
-	WARN(1, "%s(): Recall History[%d]> ", __func__, i);
-	switch (hist[i].funcID) { /* see "dscudarpc.h" */
-	  case 305: WARN(1, "cudaSetDevice()\n");        break;
-	  case 504: WARN(1, "cudaEventRecord()\n");      break;
-	  case 505: WARN(1, "cudaEventSynchronize()\n"); break;
-	  case 600: WARN(1, "kernel-call<<< >>>()\n");   break;
-	  case 700: WARN(1, "cudaMalloc()\n");           break;
-	  case 701: WARN(1, "cudaFree()\n");             break;
-	  case 703: WARN(1, "cudaMemcpy(H2D)\n");        break;
-	  case 704: WARN(1, "cudaMemcpy(D2H)\n");        break;
-	  default:  WARN(1, "/* %d */()\n", hist[i].funcID);
-	}
-    }
-    WARN(1, "%s(): *************************************************\n", __func__);
-}
-/*==============================================================================
- * Rerun the recorded history of cuda function series.
- */
-int HistRecord_t::recall(void) {
-   static int called_depth = 0;
-   recalling = 1;
-   int result;
-   int verb_curr = St.autoverb;
-
-   WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, length, __func__);
-   WARN(1, "called_depth= %d.\n", called_depth);
-   if (called_depth < 0) {       /* irregal error */
-       WARN(1, "#**********************************************************************\n");
-       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-       WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
-       WARN(1, "#**********************************************************************\n\n");
-       exit(1);
-   } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
-       this->print();
-       called_depth++;       
-       for (int i=0; i< length; i++) { /* Do recall history */
-	   (recallStub[funcID2DSCVMethod( HISTREC.hist[i].funcID )])(HISTREC.hist[i].args); /* partially recursive */
-       }
-       called_depth=0;
-       result = 0;
-   } else { /* try migraion or not. */
-       WARN(1, "#**********************************************************************\n");
-       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-       WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
-       WARN(1, "#**********************************************************************\n\n");
-       called_depth=0;
-       result = 1;
-   }
-
-   WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
-   St.autoverb = verb_curr;
-   recalling = 0;
-   return result;
-}
 /*
  *
  */
@@ -631,14 +493,15 @@ void dscudaVerbMigrateModule() {
 /*
  *
  */
+#if 0
 void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
     WARN(1, "#**********************************************************************\n");
     WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
     WARN(1, "#**********************************************************************\n\n");
     WARN(1, "Failed 1st= %s\n", from->ip);
-    replaceBrokenServer(from, to);
-    WARN(1, "Reconnecting to %s replacing %s\n", from->ip, to->ip);
-    setupConnection(Vdevid[vdevidIndex()], from);
+    //replaceBrokenServer(from, to);
+    //WARN(1, "Reconnecting to %s replacing %s\n", from->ip, to->ip);
+    //setupConnection(Vdevid[vdevidIndex()], from);
 
     BKUPMEM.reallocDeviceRegion(from);
     BKUPMEM.restructDeviceRegion(); /* */
@@ -647,3 +510,4 @@ void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
     dscudaVerbMigrateModule(); // not good ;_;, or no need.
     HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
 }
+#endif

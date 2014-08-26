@@ -4,13 +4,14 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-24 18:21:05
+// Last Modified On : 2014-08-26 10:04:19
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
 #include "libdscuda_bkupmem.h"
+#include "libdscuda_histrec.h"
 #include "sockutil.h"
 
 typedef struct ClientModule_t {
@@ -98,26 +99,34 @@ typedef struct RCuva_t {
  ***  "Physical" GPU Device Class.  ***
  **************************************/
 typedef struct RCServer {
-    int  id;   // index for each redundant server.
-    int  cid;  // id of a server given by -c option to dscudasvr.
-               // clients specify the server using this num preceded
-               // by an IP address & colon, e.g.,
-               // export DSCUDA_SERVER="192.168.1.123:2"
-    char ip[512];      // ex. "192.168.0.92"
-    char hostname[64]; // ex. "titan01"
-    int  uniq; // unique number in all RCServer_t including svrCand[].
-    int  *d_faultconf;
-    int  errcount;
+    int         id;   // index for each redundant server.
+    int         cid;  // id of a server given by -c option to dscudasvr.
+                      // clients specify the server using this num preceded
+                      // by an IP address & colon, e.g.,
+                      // export DSCUDA_SERVER="192.168.1.123:2"
+    char        ip[512];      // ex. "192.168.0.92"
+    char        hostname[64]; // ex. "titan01"
+    int         uniq;         // unique number in all RCServer_t including svrCand[].
+    
+    int        *d_faultconf;  //
+    int         errcount;     //
 
-#if 0 //moved from "libdscuda_rpc.cu"
-    setupConnection(int idev);
-#endif
+    BkupMemList memlist_phy;  // GPU global memory mirroring region.
+    HistRecList reclist_phy;  // GPU CUDA function called history.
+    
+    CLIENT     *Clnt;         // RPC client
+
+    void setupConnection(void);
+    void dupServer(RCServer_t *dup);
+    void migrateServer(RCServer_t *newone, RCServer_t *broken);
+
     /*CONSTRUCTOR*/
     RCServer() {
 	id = cid = uniq = 0xffff;
 	strcpy(ip, "empty");
 	strcpy(hostname, "empty");
 	errcount = 0;
+	Clnt = NULL;
     }
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
@@ -150,17 +159,17 @@ typedef enum {
 /*****************************************
  ***  "Virtualized" GPU Device Class.  ***
  *****************************************/
-typedef struct {
-    int         nredundancy;               //Redundant count
+typedef struct VirDev_t {
     RCServer_t  server[RC_NREDUNDANCYMAX]; //Physical Device array.
+    int         nredundancy;               //Redundant count
+    
     VdevConf    conf;                      //Infomation.
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
-    BkupMemlist memlist_svr[RC_NREDUNDANCYMAX];
-    BkupMemList memlist_clean;             //part of Checkpoint data.
+    BkupMemList memlist_vir;              //part of Checkpoint data.
+    HistRecList reclist_vir;
 
-    HistRecord  histrec_svr[RC_NREDUNDANCYMAX];
-    HistRecord  histrec_clean;
+    void remallocRegionsGPU(int num_svr);
 } Vdev_t;
 
 /******************************************/
