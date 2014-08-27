@@ -4,28 +4,25 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 11:16:16
+// Last Modified On : 2014-08-27 17:32:08
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
-#include "libdscuda_bkupmem.h"
-#include "libdscuda_histrec.h"
 #include "sockutil.h"
 
-/*
- * Breif:
- *    Backup memory region of devices allocated by cudaMemcpy().
- * Description:
- *    mirroring of a global memory region to client memory region.
- *    In case when device memory region was corrupted, restore with
- *    clean data to device memory.
- *    In case when using device don't response from client request,
- *    migrate to another device and restore with clean data.
- */
-typedef struct BkupMem_t
-{
+//************************************************************************
+//***  Class Name: "BkupMem_t"
+//***  Description:
+//***    - Backup memory region of devices allocated by cudaMemcpy().
+//***    - mirroring of a global memory region to client memory region.
+//***    - In case when device memory region was corrupted, restore with
+//***    - clean data to device memory.
+//***    - In case when using device don't response from client request,
+//***    - migrate to another device and restore with clean data.
+//************************************************************************
+typedef struct BkupMem_t {
     void  *d_region;        // server device memory space (UVA).
     void  *h_region;        //
     int    size;            // in Byte.
@@ -42,8 +39,12 @@ typedef struct BkupMem_t
     BkupMem_t( void );
 } BkupMem;
 
-typedef struct BkupMemList_t
-{
+//********************************************************************
+//***  Class Name: "BkupMemList_t"
+//***  Description:
+//***      - 
+//********************************************************************
+typedef struct BkupMemList_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
     static void* periodicCheckpoint( void *arg );
@@ -70,16 +71,22 @@ public:
     void     restructDeviceRegion(void);              /* ReLoad backups */
 } BkupMemList;
 
-/*** 
- *** Each argument types and lists for historical recall.
- *** If you need to memorize another function into history, add new one.
- ***/
+//********************************************************************
+//***  Class Name: "HistRec_t"
+//***  Description:
+//***      - Recording the sequential CUDA-call.
+//********************************************************************
 typedef struct HistRec_t {
     int      funcID;   // Recorded cuda*() function.
     void    *args;     // And its arguments.
     int      dev_id;   // The Device ID, set by last cudaSetDevice().
 } HistRec;
 
+//********************************************************************
+//***  Class Name: "HistRecList_t"
+//***  Description:
+//***      - 
+//********************************************************************
 typedef struct HistRecList_t {
 
     HistRec *histrec;
@@ -182,11 +189,11 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
-//*************************************************
+//********************************************************************
 //***  Class Name: "RCServer"
 //***  Description:
 //***      - Physical GPU Device Class.
-//*************************************************
+//********************************************************************
 typedef struct RCServer {
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
@@ -208,6 +215,10 @@ typedef struct RCServer {
     void setupConnection(void);
     void dupServer(RCServer_t *dup);
     void migrateServer(RCServer_t *newone, RCServer_t *broken);
+
+    cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
+    cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
 
     /*CONSTRUCTOR*/
     RCServer() {
@@ -265,6 +276,10 @@ typedef struct VirDev_t {
     BkupMemList memlist_vir;              //part of Checkpoint data.
     HistRecList reclist_vir;
 
+    cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
+    cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
+    
     void remallocRegionsGPU(int num_svr);
 } Vdev_t;
 
@@ -338,10 +353,10 @@ public:
     void unsetMigrateDevice() { migration = 0; }
     int  getMigrateDevice() { return migration; }
 
-    void initProgress( ClntInitStat stat );
+    void initProgress(ClntInitStat stat);
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
 
-    void periodicCheckpoint( void *arg );
+    void periodicCheckpoint(void *arg);
 };
 extern struct ClientState_t St;
 
@@ -353,7 +368,7 @@ extern SvrList_t SvrSpare;
 extern int    Vdevid[RC_NPTHREADMAX];
 extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void (*errorHandler)(void *arg);
-extern CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
+
 extern void *errorHandlerArg;
 extern ClientModule  CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 extern RCmappedMem    *RCmappedMemListTop;

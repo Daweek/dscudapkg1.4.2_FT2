@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-25 19:34:45
+// Last Modified On : 2014-08-27 11:54:28
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -21,18 +21,15 @@
 #include <pthread.h>
 #include "dscuda.h"
 #include "libdscuda.h"
-#include "libdscuda_histrec.h"
 #include "dscudaverb.h"
 
 #define DEBUG 1
 
-int dscudaRemoteCallType(void)
-{
+int dscudaRemoteCallType(void) {
     return RC_REMOTECALL_TYPE_RPC;
 }
 
-void RCServer_t::setupConnection(void)  // Physical Device pointer.
-{
+void RCServer_t::setupConnection(void) {  // Physical Device pointer.
     int  pgid = DSCUDA_PROG;
     char msg[256];
 
@@ -102,8 +99,7 @@ void checkResult( void *rp, RCServer_t &sp ) {
 }
 
 static
-void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err)
-{
+void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
     switch ( err->re_status ) {
 	/* re_status is "clnt_stat" type.
 	 * refer to /usr/include/rpc/clnt.h.
@@ -231,8 +227,7 @@ cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
 }
 
 cudaError_t
-cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
-{
+cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig) {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
@@ -254,8 +249,7 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
 }
 
 cudaError_t
-cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
-{
+cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig) {
     cudaError_t err = cudaSuccess;
     dscudaThreadGetCacheConfigResult *rp;
     int vid = vdevidIndex();
@@ -284,8 +278,7 @@ cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
  * Error Handling
  */
 
-cudaError_t cudaGetLastError(void)
-{
+cudaError_t cudaGetLastError(void) {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
@@ -306,8 +299,7 @@ cudaError_t cudaGetLastError(void)
     return err;
 }
 
-cudaError_t cudaPeekAtLastError(void)
-{
+cudaError_t cudaPeekAtLastError(void) {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
@@ -328,8 +320,7 @@ cudaError_t cudaPeekAtLastError(void)
     return err;
 }
 
-const char *cudaGetErrorString(cudaError_t error)
-{
+const char *cudaGetErrorString(cudaError_t error) {
     dscudaGetErrorStringResult *rp;
     static char str[4096];
     int vid = vdevidIndex();
@@ -483,7 +474,49 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
  * Memory Management
  */
 
-cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
+cudaError_t
+RCServer::cudaMalloc(void **devAdrPtr, size_t size) {
+    dscudaMallocResult *rp;
+    cudaError_t cuerr = cudaSuccess;
+    int vid = vdevidIndex();
+    void *adrs[RC_NREDUNDANCYMAX];
+
+    WARN(3, "cudaMalloc( %p, %zu )...\n", devAdrPtr, size);
+    St.cudaCalled();
+    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    RCServer_t *sp   = vdev->server;
+
+    rp = dscudamallocid_1(size, Clnt);
+    //recoverClntError( sp, &(SvrSpare.svr[0]),  p_clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+    
+    adrs[i] = (void*)rp->devAdr;
+    WARN(3, "+--- Physical[%d]: devAdrPtr=%p\n", i, adrs[i]);	
+    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
+
+    RCuvaRegister(Vdevid[vid], adrs, size);
+    *devAdrPtr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
+    /*
+     * Automatic Recoverly
+     */
+    if ( St.isAutoVerb() ) {
+	cudaMallocArgs args( *devAdrPtr, size );
+//	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
+    }
+    //WARN(3, "+--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
+
+    return err;
+}
+
+cudaError_t
+VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
     dscudaMallocResult *rp;
     cudaError_t err = cudaSuccess;
     int vid = vdevidIndex();
@@ -494,15 +527,10 @@ cudaError_t cudaMalloc(void **devAdrPtr, size_t size) {
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
     RCServer_t *sp   = vdev->server;
     for ( int i = 0; i < vdev->nredundancy; i++ ) {
-        rp = dscudamallocid_1( size, sp[i].Clnt );
-	//recoverClntError( sp, &(SvrSpare.svr[0]),  p_clnt);
-        checkResult( rp, sp[i] );
-        if ( rp->err != cudaSuccess ) {
-            err = (cudaError_t)rp->err;
-        }
+	server[i].cudaMalloc();
+	
         adrs[i] = (void*)rp->devAdr;
 	WARN(3, "+--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
-        xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
     }
 
     RCuvaRegister(Vdevid[vid], adrs, size);

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-26 10:05:27
+// Last Modified On : 2014-08-27 17:32:53
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -74,12 +74,11 @@ SvrList_t SvrBroken;
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 
-CLIENT *Clnt[RC_NVDEVMAX][RC_NREDUNDANCYMAX]; /* RPC clients */
 struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 
-struct ClientState_t St; // is Singleton
+struct ClientState_t St;
 
 char *ClientState_t::getFtModeString( void ) {
     static char s[80];
@@ -93,20 +92,6 @@ char *ClientState_t::getFtModeString( void ) {
 	exit( EXIT_FAILURE );
     }
     return s;
-}
-
-void dscudaRecordHistOn(void) {
-    HISTREC.rec_en = 1;
-}
-void dscudaRecordHistOff(void) {
-    HISTREC.rec_en = 0;
-}
-
-void dscudaAutoVerbOn(void) {
-    St.setAutoVerb();
-}
-void dscudaAutoVerbOff(void) {
-    St.unsetAutoVerb();
 }
 
 int requestDaemonForDevice(char *ipaddr,  // ex.)"192.168.0.101"
