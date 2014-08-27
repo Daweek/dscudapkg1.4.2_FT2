@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-26 10:04:19
+// Last Modified On : 2014-08-27 11:16:16
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -13,6 +13,93 @@
 #include "libdscuda_bkupmem.h"
 #include "libdscuda_histrec.h"
 #include "sockutil.h"
+
+/*
+ * Breif:
+ *    Backup memory region of devices allocated by cudaMemcpy().
+ * Description:
+ *    mirroring of a global memory region to client memory region.
+ *    In case when device memory region was corrupted, restore with
+ *    clean data to device memory.
+ *    In case when using device don't response from client request,
+ *    migrate to another device and restore with clean data.
+ */
+typedef struct BkupMem_t
+{
+    void  *d_region;        // server device memory space (UVA).
+    void  *h_region;        //
+    int    size;            // in Byte.
+    int    update_rdy;      // 1:"*dst" has valid data, 0:invalid.
+    struct BkupMem_t *next; // For double-linked-list prev.
+    struct BkupMem_t *prev; // For double-linked-list next.
+    //--- methods
+    void   init( void *uva_ptr, int isize );
+    int    isHead( void );
+    int    isTail( void );
+    void   updateSafeRegion( void );
+    void   restoreSafeRegion( void );
+    /*constructor/destructor.*/
+    BkupMem_t( void );
+} BkupMem;
+
+typedef struct BkupMemList_t
+{
+private:
+    pthread_t tid;        /* thread ID of Checkpointing */
+    static void* periodicCheckpoint( void *arg );
+public:
+    BkupMem *head;        /* pointer to 1st  BkupMem */
+    BkupMem *tail;        /* pointer to last BkupMem */
+    int      length;       /* Counts of allocated memory region */
+    long     total_size;   /* Total size of backuped memory in Byte */
+    //--- construct/destruct
+    BkupMemList_t(void);
+    ~BkupMemList_t(void);
+    //--- methods ---------------
+    void     add(void *dst, int size); // verbAllocatedMemRegister()
+    void     remove( void *dst );        // verbAllocatedMemUnregister()
+    int      isEmpty(void);
+    int      getLen(void);
+    long     getTotalSize(void); // get total size of allocated memory.
+    int      countRegion(void);
+    int      checkSumRegion(void *targ, int size );
+    BkupMem* queryRegion(void *dst );
+    void*    searchUpdateRegion(void *dst );
+    void     updateRegion(void *dst, void *src, int size );
+    void     reallocDeviceRegion( RCServer_t *svr );  /* ReLoad backups */
+    void     restructDeviceRegion(void);              /* ReLoad backups */
+} BkupMemList;
+
+/*** 
+ *** Each argument types and lists for historical recall.
+ *** If you need to memorize another function into history, add new one.
+ ***/
+typedef struct HistRec_t {
+    int      funcID;   // Recorded cuda*() function.
+    void    *args;     // And its arguments.
+    int      dev_id;   // The Device ID, set by last cudaSetDevice().
+} HistRec;
+
+typedef struct HistRecList_t {
+
+    HistRec *histrec;
+    int      length;    /* # of recorded function calls to be recalled */
+    int      max_len;   /* Upper bound of "verbHistNum", extensible */
+    // Constructor.
+    HistRecord_t(void);
+    //
+    void add(int funcID, void *argp); /* Add */
+    void clear(void);           /* Clear */
+    void print(void);           /* Print to stdout */
+    int  recall(void);          /* Recall */
+private:
+    static const int EXTEND_LEN = 32; // Size of growing of "max_len"
+    int      recall_flag;
+    void     setRecallFlag(void);
+    void     clrRecallFlag(void);
+    void     extendLen(void);
+
+} HistRecList;
 
 typedef struct ClientModule_t {
     int    valid;   /* 1=>alive, 0=>cache out, -1=>init val. */
@@ -95,9 +182,11 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
-/**************************************
- ***  "Physical" GPU Device Class.  ***
- **************************************/
+//*************************************************
+//***  Class Name: "RCServer"
+//***  Description:
+//***      - Physical GPU Device Class.
+//*************************************************
 typedef struct RCServer {
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
@@ -130,6 +219,11 @@ typedef struct RCServer {
     }
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
+//*************************************************
+//***  Class Name: "SvrList"
+//***  Description:
+//***      - The Group of Physical GPU Device Class.
+//*************************************************
 typedef struct SvrList {
     int num;                      /* # of server candidates.         */
     RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
@@ -156,9 +250,11 @@ typedef enum {
     VDEV_UNKNOWN = 9
 } VdevConf;
 
-/*****************************************
- ***  "Virtualized" GPU Device Class.  ***
- *****************************************/
+//*************************************************
+//***  Class Name: "VirDev_t"
+//***  Description:
+//***      - Virtualized GPU Device class.
+//*************************************************
 typedef struct VirDev_t {
     RCServer_t  server[RC_NREDUNDANCYMAX]; //Physical Device array.
     int         nredundancy;               //Redundant count
@@ -191,6 +287,11 @@ typedef enum {
     CUDA_CALLED
 } ClntInitStat;
 
+//*************************************************
+//***  Class Name: "ClientState_t"
+//***  Description:
+//***      - DS-CUDA Client Status class.
+//*************************************************
 struct ClientState_t {
 private:
     void initEnv(void);
