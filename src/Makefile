@@ -29,11 +29,13 @@ default :	$(TARGET)
 rpconly:	$(TARGET_RPCONLY)
 
 libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
-                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o
+                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o \
+                        libdscuda_bkupmem.o libdscuda_histrec.o
 	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
 
 libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
-                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o
+                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o \
+                        libdscuda_bkupmem.o libdscuda_histrec.o
 	ar rvu $@ $^
 	ranlib $@
 
@@ -46,9 +48,6 @@ $(CLIENTBASE) : libdscuda.cu
 # A dummy library to override CUDA runtime library functions.
 libcudart.so.3:	cudart_dummy.cu
 	$(NVCC) $(CUDAINCLUDES) -shared -Xcompiler -fPIC -o $@ $<
-
-dscudaverb.o:	dscudaverb.cu
-	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
 libdscuda_bkupmem.o:  libdscuda_bkupmem.cu libdscuda.h
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
