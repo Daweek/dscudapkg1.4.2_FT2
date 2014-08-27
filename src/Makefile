@@ -50,7 +50,10 @@ libcudart.so.3:	cudart_dummy.cu
 dscudaverb.o:	dscudaverb.cu
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
-libdscuda_bkupmem.o:  libdscuda_bkupmem.cu libdscuda_bkupmem.h
+libdscuda_bkupmem.o:  libdscuda_bkupmem.cu libdscuda.h
+	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
+
+libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
 
 dscudad :	dscudad.cu sockutil.c
