@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 10:44:32
+// Last Modified On : 2014-08-27 17:48:58
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -28,12 +28,6 @@
 #include "dscudamacros.h"
 #include "dscudaverb.h"
 #include "libdscuda.h"
-
-/* Environmental variables */
-const char DSCUDA_ENV_00[] = "DSCUDA_AUTOVERB";
-const char DSCUDA_ENV_01[] = "DSCUDA_USEDAEMON";
-const char DSCUDA_ENV_02[] = "DSCUDA_MIGRATION";
-
 
 typedef unsigned long DscudaUva_t; /* Global virtual address type */
 
@@ -71,9 +65,6 @@ typedef struct FaultConf {
 	fault_count = fault_set;
 	strcpy(tag, s);
 	/* malloc on device */
-#if defined(__DSCUDA__)
-	dscudaRecordHistOff();
-#endif
 	cudaSetDevice(0); /* temporary */
 	err = cudaMalloc( &d_Nfault, sizeof(int) );
 	if (err != cudaSuccess) {
@@ -87,10 +78,6 @@ typedef struct FaultConf {
 	    printf("CUDA error: %s\n", cudaGetErrorString(err)); 
 	    exit(1);
 	}
-#if defined(__DSCUDA__)
-	//dscudaRecordHistOn();
-	//BKUPMEM.removeRegion(d_Nfault);
-#endif
     }
 #if 0
   /*

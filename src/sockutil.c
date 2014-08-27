@@ -22,9 +22,7 @@ setupSockaddr( char *ipaddr, int   tcpport ) {
     return sockaddr;
 }
 
-void
-sendMsgBySocket(int sock, char *msg)
-{
+void sendMsgBySocket(int sock, char *msg) {
     char buf[1024];
     int len = strlen(msg) + 1;
 
@@ -37,9 +35,7 @@ sendMsgBySocket(int sock, char *msg)
     send(sock, buf, sizeof(int) + len, 0);
 }
 
-void
-recvMsgBySocket(int sock, char *msg, int msgbufsize)
-{
+void recvMsgBySocket(int sock, char *msg, int msgbufsize) {
     char buf[1024];
     int len = strlen(msg) + 1;
 

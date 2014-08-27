@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-19 19:15:33
+// Last Modified On : 2014-08-27 17:47:58
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -36,10 +36,6 @@
 #include "dscudarpc.h"
 #include "dscuda.h"
 #include "sockutil.h"
-
-#if !defined(RPC_ONLY)
-#include "ibv_rdma.h"
-#endif
 
 //<-- oikawa
 #define FAULT_INJECTION_LEN (32)
@@ -157,8 +153,7 @@ inline void check_cuda_error(cudaError err) {
 #    include "dscudasvr_rpc.cu"
 
 
-static void notifyIamReady(void)
-{
+static void notifyIamReady(void) {
     char msg[] = "ready";
     if (D2Csock >= 0) {
         WARN(3, "send \"ready\" to the client.\n");
@@ -166,9 +161,7 @@ static void notifyIamReady(void)
     }
 }
 
-static int
-receiveProtocolPreference(void)
-{
+static int receiveProtocolPreference(void) {
     char msg[256], rc[64];
 
     if (D2Csock >= 0) {
@@ -186,8 +179,7 @@ receiveProtocolPreference(void)
     }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     parseArgv(argc, argv);
     initEnv();
     initDscuda();
@@ -210,18 +202,14 @@ int main(int argc, char **argv)
     exit (1);
 }
 
-static void
-showUsage(char *command)
-{
+static void showUsage(char *command) {
     fprintf(stderr,
             "usage: %s [-s server_id] [-d 'deviceid'] [-p port] [-S socket]\n"
             "       (-p & -S are used by the daemon only.)\n",
             command);
 }
 
-static void
-showConf(void)
-{
+static void showConf(void) {
     int i;
     char str[1024], str0[1024];
 
@@ -244,8 +232,7 @@ showConf(void)
 extern char *optarg;
 extern int optind;
 static void
-parseArgv(int argc, char **argv)
-{
+parseArgv(int argc, char **argv) {
     int c, ic;
     char *param = "d:hp:s:S:";
     char *num;
@@ -301,9 +288,7 @@ parseArgv(int argc, char **argv)
 }
 
 // should be called only once in a run.
-static cudaError_t
-initDscuda(void)
-{
+static cudaError_t initDscuda(void) {
     unsigned int flags = 0; // should always be 0.
     CUresult err;
 
@@ -334,9 +319,7 @@ initDscuda(void)
     return (cudaError_t)err;
 }
 
-static cudaError_t
-createDscuContext(void)
-{
+static cudaError_t createDscuContext(void) {
     //    unsigned int flags = 0; // should always be 0.
     CUdevice dev = 0;
     CUresult err;
@@ -360,9 +343,7 @@ createDscuContext(void)
     return (cudaError_t)err;
 }
 
-static cudaError_t
-destroyDscuContext(void)
-{
+static cudaError_t destroyDscuContext(void) {
 #if 0
 
     CUresult cuerr;
@@ -390,8 +371,7 @@ destroyDscuContext(void)
     return cudaSuccess;
 }
 
-static void initEnv(void)
-{
+static void initEnv(void) {
     static int firstcall = 1;
     int tmp, tmp2[FAULT_INJECTION_LEN];
     char *env;
