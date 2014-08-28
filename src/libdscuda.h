@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 17:32:08
+// Last Modified On : 2014-08-28 20:00:45
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -29,6 +29,7 @@ typedef struct BkupMem_t {
     int    update_rdy;      // 1:"*dst" has valid data, 0:invalid.
     struct BkupMem_t *next; // For double-linked-list prev.
     struct BkupMem_t *prev; // For double-linked-list next.
+    
     //--- methods
     void   init( void *uva_ptr, int isize );
     int    isHead( void );
@@ -88,7 +89,6 @@ typedef struct HistRec_t {
 //***      - 
 //********************************************************************
 typedef struct HistRecList_t {
-
     HistRec *histrec;
     int      length;    /* # of recorded function calls to be recalled */
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
@@ -108,6 +108,11 @@ private:
 
 } HistRecList;
 
+//********************************************************************
+//***  Class Name: "ClientModule_t"
+//***  Description:
+//***      - 
+//********************************************************************
 typedef struct ClientModule_t {
     int    valid;   /* 1=>alive, 0=>cache out, -1=>init val. */
     int    vdevid;  /* the virtual device the module is loaded into. */
@@ -155,6 +160,11 @@ typedef struct ClientModule_t {
     ClientModule_t(void);
 } ClientModule;
 
+//********************************************************************
+//***  Class Name: "RCmappedMem_t"
+//***  Description:
+//***      - 
+//********************************************************************
 typedef struct RCmappedMem_t {
     void *pHost;
     void *pDevice;
@@ -205,7 +215,9 @@ typedef struct RCServer {
     int         uniq;         // unique number in all RCServer_t including svrCand[].
     
     int        *d_faultconf;  //
-    int         errcount;     //
+    
+    int         unmacth_count;
+    int         match_count;
 
     BkupMemList memlist_phy;  // GPU global memory mirroring region.
     HistRecList reclist_phy;  // GPU CUDA function called history.
@@ -216,9 +228,10 @@ typedef struct RCServer {
     void dupServer(RCServer_t *dup);
     void migrateServer(RCServer_t *newone, RCServer_t *broken);
 
-    cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
+    cudaError_t cudaFree(void *d_ptr);
 
     /*CONSTRUCTOR*/
     RCServer() {
@@ -279,6 +292,7 @@ typedef struct VirDev_t {
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
+    cudaError_t cudaFree(void *d_ptr);
     
     void remallocRegionsGPU(int num_svr);
 } Vdev_t;

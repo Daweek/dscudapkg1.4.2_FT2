@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 11:54:28
+// Last Modified On : 2014-08-28 20:06:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -29,6 +29,11 @@ int dscudaRemoteCallType(void) {
     return RC_REMOTECALL_TYPE_RPC;
 }
 
+//********************************************************************
+//
+// RCServer::
+//
+//********************************************************************
 void RCServer_t::setupConnection(void) {  // Physical Device pointer.
     int  pgid = DSCUDA_PROG;
     char msg[256];
@@ -83,8 +88,109 @@ void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
 	  this->ip,f broken->ip ); 
     setupConnection();
 
-    
     return;
+}
+
+cudaError_t
+RCServer::cudaMalloc(void **d_ptr, size_t size) {
+    dscudaMallocResult *rp;
+    cudaError_t cuerr = cudaSuccess;
+    int vid = vdevidIndex();
+    void *adrs[RC_NREDUNDANCYMAX];
+
+    rp = dscudamallocid_1(size, Clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+    
+    *d_ptr = (void*)rp->devAdr;
+    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
+
+    RCuvaRegister(Vdevid[vid], adrs, size);
+    /*
+     * Automatic Recoverly
+     */
+    if ( St.isAutoVerb() ) {
+	cudaMallocArgs args( *devAdrPtr, size );
+	reclist_phy.addRegion(args.devPtr, args.size);
+    }
+
+    return err;
+}
+
+cudaError_t
+RCServer::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
+    dscudaResult *rp;
+    RCbuf srcbuf;
+    cudaError_t err = cudaSuccess;
+
+    St.cudaCalled();
+    srcbuf.RCbuf_len = count;
+    srcbuf.RCbuf_val = (char *)src;
+
+    rp = dscudamemcpyh2did_1((RCadr)dst, srcbuf, count, Clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+    xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
+
+    if (St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH) {
+	cudaMemcpyArgs args( dst, (void*)src, count, cudaMemcpyHostToDevice );
+	reclist_phy.add(dscudaMemcpyH2DId, (void *)&args);
+    }
+
+    return err;
+}
+
+cudaError_t
+RCServer::cudaMemcpyD2H(void *dst, void *src, size_t count) {
+    dscudaMemcpyD2HResult *rp;
+    cudaMemcpyArgs args;
+    cudaError_t err = cudaSuccess;
+
+    switch ( St.ft_mode ) {
+    case FT_PLAIN:
+	break;
+    case FT_REDUN: //thru
+    case FT_MIGRA: //thru
+    case FT_BOTH:
+	args.dst   = (void *)dst;
+	args.src   = (void *)src;
+	args.count = count;
+	args.kind  = cudaMemcpyDeviceToHost;
+	reclist_phy.add(dscudaMemcpyD2HId, (void *)&args);
+	break;
+    default:
+	WARN( 0, "Unexpected failure.\n");
+	exit( EXIT_FAILURE );
+    }
+
+    rp = dscudamemcpyd2hid_1((RCadr)src, count, Clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+    err = (cudaError_t)rp->err;
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+
+    memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
+
+    xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
+
+    return err;
 }
 
 void checkResult( void *rp, RCServer_t &sp ) {
@@ -474,46 +580,6 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
  * Memory Management
  */
 
-cudaError_t
-RCServer::cudaMalloc(void **devAdrPtr, size_t size) {
-    dscudaMallocResult *rp;
-    cudaError_t cuerr = cudaSuccess;
-    int vid = vdevidIndex();
-    void *adrs[RC_NREDUNDANCYMAX];
-
-    WARN(3, "cudaMalloc( %p, %zu )...\n", devAdrPtr, size);
-    St.cudaCalled();
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
-
-    rp = dscudamallocid_1(size, Clnt);
-    //recoverClntError( sp, &(SvrSpare.svr[0]),  p_clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
-    }
-    if (rp->err != cudaSuccess) {
-	err = (cudaError_t)rp->err;
-    }
-    
-    adrs[i] = (void*)rp->devAdr;
-    WARN(3, "+--- Physical[%d]: devAdrPtr=%p\n", i, adrs[i]);	
-    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
-
-    RCuvaRegister(Vdevid[vid], adrs, size);
-    *devAdrPtr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
-    /*
-     * Automatic Recoverly
-     */
-    if ( St.isAutoVerb() ) {
-	cudaMallocArgs args( *devAdrPtr, size );
-//	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
-    }
-    //WARN(3, "+--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
-
-    return err;
-}
 
 cudaError_t
 VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
