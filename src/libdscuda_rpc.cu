@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 20:06:34
+// Last Modified On : 2014-08-28 23:51:51
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -34,6 +34,18 @@ int dscudaRemoteCallType(void) {
 // RCServer::
 //
 //********************************************************************
+RCServer::RCServer(void) {
+    id   = -1;
+    cid  = -1;
+    uniq = -1;
+    strcpy(ip,       "empty");
+    strcpy(hostname, "empty");
+    stat_error   = 0;
+    stat_correct = 0;
+    d_faultconf = NULL;
+    Clnt = NULL;
+}
+
 void RCServer_t::setupConnection(void) {  // Physical Device pointer.
     int  pgid = DSCUDA_PROG;
     char msg[256];
@@ -91,37 +103,6 @@ void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
     return;
 }
 
-cudaError_t
-RCServer::cudaMalloc(void **d_ptr, size_t size) {
-    dscudaMallocResult *rp;
-    cudaError_t cuerr = cudaSuccess;
-    int vid = vdevidIndex();
-    void *adrs[RC_NREDUNDANCYMAX];
-
-    rp = dscudamallocid_1(size, Clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
-    }
-    if (rp->err != cudaSuccess) {
-	err = (cudaError_t)rp->err;
-    }
-    
-    *d_ptr = (void*)rp->devAdr;
-    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
-
-    RCuvaRegister(Vdevid[vid], adrs, size);
-    /*
-     * Automatic Recoverly
-     */
-    if ( St.isAutoVerb() ) {
-	cudaMallocArgs args( *devAdrPtr, size );
-	reclist_phy.addRegion(args.devPtr, args.size);
-    }
-
-    return err;
-}
 
 cudaError_t
 RCServer::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
@@ -579,7 +560,36 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
 /*
  * Memory Management
  */
+cudaError_t
+RCServer::cudaMalloc(void **d_ptr, size_t size) {
+    dscudaMallocResult *rp;
+    cudaError_t cuerr = cudaSuccess;
+    int vid = vdevidIndex();
+    void *adrs[RC_NREDUNDANCYMAX];
 
+    rp = dscudamallocid_1(size, Clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+    if (rp->err != cudaSuccess) {
+	err = (cudaError_t)rp->err;
+    }
+    
+    *d_ptr = (void*)rp->devAdr;
+    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
+
+    /*
+     * Automatic Recoverly
+     */
+    if ( St.isAutoVerb() ) {
+	cudaMallocArgs args( *devAdrPtr, size );
+	reclist_phy.addRegion(args.devPtr, args.size);
+    }
+
+    return err;
+}
 
 cudaError_t
 VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
@@ -599,7 +609,6 @@ VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
 	WARN(3, "+--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
     }
 
-    RCuvaRegister(Vdevid[vid], adrs, size);
     *devAdrPtr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
     /*
      * Automatic Recoverly
@@ -611,6 +620,22 @@ VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
     //WARN(3, "+--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 
     return err;
+}
+
+cudaError_t cudaMalloc(void **d_ptr, size_t size) {
+    dscudaMallocResult *rp;
+    cudaError_t cuerr;
+    int         vid  = vdevidIndex();
+    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    void *adrs[RC_NREDUNDANCYMAX];
+
+    WARN(3, "cudaMalloc(%p, %zu )...\n", d_ptr, size);
+
+    cuerr = vdev->cudaMalloc(d_ptr, size);
+
+    *d_ptr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
+    
+    return cuerr;
 }
 
 cudaError_t cudaFree( void *mem ) {
@@ -629,8 +654,6 @@ cudaError_t cudaFree( void *mem ) {
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    RCuvaUnregister( mem );
-
     /*
      * Automatic Recoverly
      */
@@ -643,8 +666,8 @@ cudaError_t cudaFree( void *mem ) {
     return err;
 }
 
-static cudaError_t
-cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev) {
+cudaError_t
+VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count, Vdev_t *vdev) {
     WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" recordHist=%d, histoCalling=%d {\n",
 	  __func__, St.getFtModeString(), vdev->info, HISTREC.rec_en, St.isHistoCalling() );
     dscudaResult *rp;
@@ -916,61 +939,34 @@ cudaError_t cudaMemcpy( void *dst, const void *src,
     Vdev_t     *vdev   = St.Vdev + vdevid;
     
     switch ( kind ) {
-    case cudaMemcpyDeviceToHost:
-	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToHost) called vdevid=%d...\n",
-	     ldst, lsrc, count, vdevid);
-	// Avoid conflict between CheckPointing thread.
-	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-        err = cudaMemcpyD2H( ldst, lsrc, count, vdev );
-	pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
-        break;
-    case cudaMemcpyHostToDevice:
-	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, HostToDevice) called\n", ldst, lsrc, count);
-	// Avoid conflict with CheckPointing thread.	
-	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-        err = cudaMemcpyH2D( ldst, lsrc, count, vdev );
-	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
-        break;
-    case cudaMemcpyDeviceToDevice:
-	WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToDevice) called\n", ldst, lsrc, count);
-        err = cudaMemcpyD2D(ldst, lsrc, count, vdev );
-        break;
-    case cudaMemcpyDefault:
+      case cudaMemcpyDeviceToHost:
+	  WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToHost) called vdevid=%d...\n",
+	       ldst, lsrc, count, vdevid);
+	  // Avoid conflict between CheckPointing thread.
+	  pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+	  err = cudaMemcpyD2H( ldst, lsrc, count, vdev );
+	  pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
+	  break;
+      case cudaMemcpyHostToDevice:
+	  WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, HostToDevice) called\n", ldst, lsrc, count);
+	  // Avoid conflict with CheckPointing thread.	
+	  pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+	  err = cudaMemcpyH2D( ldst, lsrc, count, vdev );
+	  pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+	  break;
+      case cudaMemcpyDeviceToDevice:
+	  WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, DeviceToDevice) called\n", ldst, lsrc, count);
+	  err = cudaMemcpyD2D(ldst, lsrc, count, vdev );
+	  break;
+      case cudaMemcpyDefault: //thru
 #if !__LP64__
-        WARN(0, "cudaMemcpy:In 32-bit environment, cudaMemcpyDefault cannot be given as arg4."
+	  WARN(0, "cudaMemcpy:In 32-bit environment, cudaMemcpyDefault cannot be given as arg4."
              "UVA is supported for 64-bit environment only.\n");
         exit(1);
 #endif
-
-        cudaGetDevice(&dev0);
-        suva = RCuvaQuery((void *)src);
-        duva = RCuvaQuery(dst);
-        if ( !suva && !duva ) {
-            WARN(0, "cudaMemcpy:invalid argument.\n");
-            exit(1);
-        } else if ( !suva ) { // sbuf resides in the client.
-            if ( duva->devid != dev0 ) {
-                cudaSetDevice( duva->devid );
-            }
-            err = cudaMemcpy( dst, src, count, cudaMemcpyHostToDevice );
-            if ( duva->devid != dev0 ) {
-                cudaSetDevice( dev0 );
-            }
-        } else if ( !duva ) { // dbuf resides in the client.
-            if ( suva->devid != dev0 ) {
-                cudaSetDevice( suva->devid );
-            }
-            err = cudaMemcpy( dst, src, count, cudaMemcpyDeviceToHost );
-            if ( suva->devid != dev0 ) {
-                cudaSetDevice( dev0 );
-            }
-        } else {
-            err = cudaMemcpyP2P( dst, duva->devid, src, suva->devid, count );
-        }
-        break;
       default:
-        WARN(0, "Unsupported value for cudaMemcpyKind : %s\n", dscudaMemcpyKindName(kind));
-        exit(1);
+	  WARN(0, "Unsupported value for cudaMemcpyKind : %s\n", dscudaMemcpyKindName(kind));
+	  exit(1);
     }
     WARN(3, "} libdscuda:%s().\n", __func__);
     WARN(3, "\n");
@@ -1107,16 +1103,6 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     pthread_mutex_unlock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.
     WARN(5, "+--- done. %s().\n", __func__)
 }
-
-#if !defined(RPC_ONLY)
-void
-ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
-                             int *gdim, int *bdim, RCsize smemsize, RCstream stream,
-                             int narg, IbvArg *arg)
-{
-    // a dummy func.
-}
-#endif
 
 cudaError_t
 cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,

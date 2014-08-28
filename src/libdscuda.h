@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 20:00:45
+// Last Modified On : 2014-08-29 00:10:40
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -12,6 +12,8 @@
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
 
+struct RCServer;
+typedef RCServer RCServer_t;
 //************************************************************************
 //***  Class Name: "BkupMem_t"
 //***  Description:
@@ -47,7 +49,7 @@ typedef struct BkupMem_t {
 //********************************************************************
 typedef struct BkupMemList_t {
 private:
-    pthread_t tid;        /* thread ID of Checkpointing */
+
     static void* periodicCheckpoint( void *arg );
 public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
@@ -93,7 +95,7 @@ typedef struct HistRecList_t {
     int      length;    /* # of recorded function calls to be recalled */
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
     // Constructor.
-    HistRecord_t(void);
+    HistRecList_t(void);
     //
     void add(int funcID, void *argp); /* Add */
     void clear(void);           /* Clear */
@@ -163,7 +165,6 @@ typedef struct ClientModule_t {
 //********************************************************************
 //***  Class Name: "RCmappedMem_t"
 //***  Description:
-//***      - 
 //********************************************************************
 typedef struct RCmappedMem_t {
     void *pHost;
@@ -173,24 +174,40 @@ typedef struct RCmappedMem_t {
     RCmappedMem_t *next;
 } RCmappedMem;
 
+//********************************************************************
+//***  Class Name: "RCstreamArray_t"
+//***  Description:
+//********************************************************************
 typedef struct RCstreamArray_t {
     cudaStream_t s[RC_NREDUNDANCYMAX];
     RCstreamArray_t *prev;
     RCstreamArray_t *next;
 } RCstreamArray;
 
+//********************************************************************
+//***  Class Name: "RCeventArray_t"
+//***  Description:
+//********************************************************************
 typedef struct RCeventArray_t {
     cudaEvent_t e[RC_NREDUNDANCYMAX];
     RCeventArray_t *prev;
     RCeventArray_t *next;
 } RCeventArray;
 
+//********************************************************************
+//***  Class Name: "RCcuarrayArray_t"
+//***  Description:
+//********************************************************************
 typedef struct RCcuarrayArray_t {
     cudaArray *ap[RC_NREDUNDANCYMAX];
     RCcuarrayArray_t *prev;
     RCcuarrayArray_t *next;
 } RCcuarrayArray;
 
+//********************************************************************
+//***  Class Name: "RCuva_t"
+//***  Description:
+//********************************************************************
 typedef struct RCuva_t {
     void    *adr[RC_NREDUNDANCYMAX];
     int      devid;
@@ -204,7 +221,7 @@ typedef struct RCuva_t {
 //***  Description:
 //***      - Physical GPU Device Class.
 //********************************************************************
-typedef struct RCServer {
+struct RCServer {
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
                       // clients specify the server using this num preceded
@@ -212,16 +229,16 @@ typedef struct RCServer {
                       // export DSCUDA_SERVER="192.168.1.123:2"
     char        ip[512];      // ex. "192.168.0.92"
     char        hostname[64]; // ex. "titan01"
-    int         uniq;         // unique number in all RCServer_t including svrCand[].
+    int         uniq;         // unique in all RCServer_t including svrCand[].
     
-    int        *d_faultconf;  //
-    
-    int         unmacth_count;
-    int         match_count;
-
     BkupMemList memlist_phy;  // GPU global memory mirroring region.
     HistRecList reclist_phy;  // GPU CUDA function called history.
     
+    int        *d_faultconf;  //
+
+    int         stat_error; // Error and Fault statics results.
+    int         stat_correct;
+
     CLIENT     *Clnt;         // RPC client
 
     void setupConnection(void);
@@ -234,14 +251,8 @@ typedef struct RCServer {
     cudaError_t cudaFree(void *d_ptr);
 
     /*CONSTRUCTOR*/
-    RCServer() {
-	id = cid = uniq = 0xffff;
-	strcpy(ip, "empty");
-	strcpy(hostname, "empty");
-	errcount = 0;
-	Clnt = NULL;
-    }
-} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
+    RCServer();
+};  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
 //***  Class Name: "SvrList"
@@ -323,6 +334,7 @@ typedef enum {
 //*************************************************
 struct ClientState_t {
 private:
+    pthread_t tid;        /* thread ID of Checkpointing */
     void initEnv(void);
     void setFaultTolerantMode(void);
 public:
@@ -370,7 +382,7 @@ public:
     void initProgress(ClntInitStat stat);
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
 
-    void periodicCheckpoint(void *arg);
+    static void periodicCheckpoint(void *arg);
 };
 extern struct ClientState_t St;
 
@@ -433,9 +445,6 @@ cudaError_t
 dscudaMemcpyFromSymbolAsyncD2D(int moduleid, void *dstadr, char *symbol,
 			       size_t count, size_t offset, RCstream stream, int vdevid, int raidid);
 RCstreamArray *RCstreamArrayQuery(cudaStream_t stream0);
-void RCuvaRegister(int devid, void *adr[], size_t size);
-void RCuvaUnregister(void *adr);
-RCuva *RCuvaQuery(void *adr);
 
 void RCcuarrayArrayRegister(cudaArray **cuarrays);
 void RCcuarrayArrayUnregister(cudaArray *cuarray0);
@@ -537,12 +546,9 @@ cudaError_t dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
     cudaError_t err = cudaGetChannelDesc(&desc, array);
     return err == cudaSuccess ? dscudaBindTextureToArrayWrapper(moduleid, texname, &tex, array, &desc) : err;
 }
-int
-dscudaNredundancy(void);
-int
-dscudaRemoteCallType(void);
-void
-dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg);
+int dscudaNredundancy(void);
+int dscudaRemoteCallType(void);
+void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg);
 void
 dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata);
 cudaError_t
@@ -563,12 +569,6 @@ void
 rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
 			     RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
 			     RCargs args);
-#if 0 //RPC_ONLY
-void
-ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
-			     int *gdim, int *bdim, RCsize smemsize, RCstream stream,
-			     int narg, IbvArg *arg);
-#endif
 
 extern pthread_mutex_t cudaMemcpyD2H_mutex;
 extern pthread_mutex_t cudaMemcpyH2D_mutex;

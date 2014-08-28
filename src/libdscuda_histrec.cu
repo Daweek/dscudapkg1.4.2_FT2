@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 17:42:23
+// Last Modified On : 2014-08-28 23:40:15
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -67,7 +67,6 @@ dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
     WARN(3, "device : devAdrPtr:%p\n", adrs);	
     xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
 
-    RCuvaRegister(Vdevid[vid], &adrs, size);
     *devAdrPtr = dscudaUvaOfAdr(adrs, Vdevid[vid]);
     WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
 

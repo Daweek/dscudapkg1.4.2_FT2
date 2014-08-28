@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-25 17:13:45
+// Last Modified On : 2014-08-28 23:53:00
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -12,7 +12,6 @@
 #define __DSCUDAVERB_H__
 #include <pthread.h>
 #include "libdscuda.h"
-#include "libdscuda_bkupmem.h"
 
 typedef struct { /* cudaSetDevice() */
     int device;

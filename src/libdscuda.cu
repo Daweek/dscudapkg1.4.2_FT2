@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 17:32:53
+// Last Modified On : 2014-08-29 00:29:53
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -58,9 +58,6 @@ static RCeventArray   *RCeventArrayListTail   = NULL;
 
 static RCcuarrayArray *RCcuarrayArrayListTop  = NULL;
 static RCcuarrayArray *RCcuarrayArrayListTail = NULL;
-
-static RCuva          *RCuvaListTop           = NULL;
-static RCuva          *RCuvaListTail          = NULL;
 
 int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
 
@@ -441,79 +438,7 @@ void *dscudaAdrOfUva( void *adr ) {
     return (void *)adri;
 }
 
-/*
- * Register an array of UVA. each component is associated to an UVA
- * on each Server[i]. User see only the 1st element, [0].
- * Others, i.e., Server[1..Nredunddancy-1], are hidden to the user,
- * and used by this library to handle redundant calculation mechanism.
- */
-void RCuvaRegister(int devid, void *adr[], size_t size) {
-    int i;
-    int nredundancy = dscudaNredundancy();
-    RCuva *uva = (RCuva *)malloc(sizeof(RCuva));
-
-    if (!uva) {
-        perror("RCuvaRegister");
-    }
-    for (i = 0; i < nredundancy; i++) {
-        uva->adr[i] = adr[i];
-    }
-    uva->devid = devid;
-    uva->size = size;
-    uva->prev = RCuvaListTail;
-    uva->next = NULL;
-    if (!RCuvaListTop) { // uva will be the 1st entry.
-        RCuvaListTop = uva;
-    } else {
-        RCuvaListTail->next = uva;
-    }
-    RCuvaListTail = uva;
-}
-
-RCuva *
-RCuvaQuery(void *adr)
-{
-    RCuva *uva = RCuvaListTop;
-    unsigned long ladr = (unsigned long)dscudaAdrOfUva(adr);
-    int devid = dscudaDevidOfUva(adr);
-
-    //    fprintf(stderr, ">>>> adr:0x%016llx  ladr:0x%016llx  devid:%d\n", adr, ladr, devid);
-
-    while (uva) {
-        if ((unsigned long)uva->adr[0] <= ladr &&
-            ladr < (unsigned long)uva->adr[0] + uva->size &&
-            uva->devid == devid) {
-            return uva;
-        }
-        uva = uva->next;
-    }
-    return NULL; // uva not found in the list.
-}
-
-void
-RCuvaUnregister(void *adr)
-{
-    RCuva *uva = RCuvaQuery(adr);
-
-    if (!uva) return;
-
-    if (uva->prev) { // reconnect the linked list.
-        uva->prev->next = uva->next;
-    } else { // uva was the 1st entry.
-        RCuvaListTop = uva->next;
-        if (uva->next) {
-            uva->next->prev = NULL;
-        }
-    }
-    if (!uva->next) { // uva was the last entry.
-        RCuvaListTail = uva->prev;
-    }
-    free(uva);
-}
-
-static char*
-readServerConf(char *fname)
-{
+static char* readServerConf(char *fname) {
     FILE *fp = fopen(fname, "r");
     char linebuf[1024];
     int len;
@@ -1143,7 +1068,7 @@ void ClientState_t::initProgress( ClntInitStat stat ) {
  */
 void*
 ClientState_t::periodicCheckpoint( void *arg ) {
-    int devid, d, i, j, m, n;
+    int devid, d, i;
     int errcheck = 1;
     cudaError_t cuerr;
     int pmem_devid;
@@ -1160,8 +1085,6 @@ ClientState_t::periodicCheckpoint( void *arg ) {
     int  snapshot_count = 0;
     void *dst_cand[RC_NREDUNDANCYMAX];
     int  dst_color[RC_NREDUNDANCYMAX], next_color;
-
-    dscudaMemcpyD2HResult *rp;
 
     //
     // Wait for all connections established, invoked 1st call of initClient().
@@ -1182,7 +1105,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 	WARN( 10, "%s\n", __func__ );
 #if 1
 	for ( d=0; d < Nvdev; d++ ) { /* Sweep all virtual GPUs */
-	    pmem = Vdev[d].bkupmemlist.head ;
+	    pmem = Vdev[d].memlist_vir.head ;
 	    while ( pmem != NULL ) {
 		cudaSetDevice_clnt( d, errcheck );
 		
@@ -1386,8 +1309,8 @@ ClientState_t::~ClientState_t(void) {
 	WARN( 1, "[ERRORSTATICS]  Virtual[%2d]\n", i );
 	for ( int j=0; j<Vdev[i].nredundancy; j++ ) {
 	    svr = &Vdev[i].server[j];
-	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d\n",
-		  j, svr->ip, svr->hostname, svr->errcount );
+	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: stat_error= %d\n",
+		  j, svr->ip, svr->hostname, svr->stat_error);
 	}
     }
     WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
@@ -1407,8 +1330,7 @@ void invalidateModuleCache(void) {
  * public functions
  */
 
-int dscudaNredundancy(void)
-{
+int dscudaNredundancy(void) {
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     return vdev->nredundancy;
 }
@@ -1583,11 +1505,11 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
     
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 #warning fill this part in dscudaFuncGetAttributesWrapper().
         } else {
-            rp = dscudafuncgetattributesid_1(moduleid[i], (char*)func, Clnt[Vdevid[vdevidIndex()]][sp->id]);
+            rp = dscudafuncgetattributesid_1(moduleid[i], (char*)func, sp[i].Clnt);
             checkResult(rp, sp);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
@@ -1655,7 +1577,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
         args.count = count;
         args.offset = offset;
         args.kind = kind;
-        HISTREC.add(dscudaMemcpyToSymbolH2DId, (void *)&args);
+        //HISTREC.add(dscudaMemcpyToSymbolH2DId, (void *)&args);
     }
 
     return err;
@@ -1664,8 +1586,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
 cudaError_t
 dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
                              size_t count, size_t offset,
-                             enum cudaMemcpyKind kind)
-{
+                             enum cudaMemcpyKind kind) {
     cudaError_t err = cudaSuccess;
     int nredundancy;
     void *dstbuf;
@@ -1818,8 +1739,7 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
 }
 
 static void
-setTextureParams(RCtexture *texbufp, const struct textureReference *tex, const struct cudaChannelFormatDesc *desc)
-{
+setTextureParams(RCtexture *texbufp, const struct textureReference *tex, const struct cudaChannelFormatDesc *desc) {
     texbufp->normalized = tex->normalized;
     texbufp->filterMode = tex->filterMode;
     texbufp->addressMode[0] = tex->addressMode[0];
@@ -1846,8 +1766,7 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
                         const struct textureReference *tex,
                         const void *devPtr,
                         const struct cudaChannelFormatDesc *desc,
-                        size_t size)
-{
+                        size_t size) {
     cudaError_t err = cudaSuccess;
     dscudaBindTextureResult *rp;
     RCtexture texbuf;
@@ -1860,14 +1779,14 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
 
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
 #warning fill this part in dscudaBindTextureWrapper().
         }
         else {
             rp = dscudabindtextureid_1(moduleid[i], texname,
-                                       (RCadr)devPtr, size, (RCtexture)texbuf, Clnt[Vdevid[vdevidIndex()]][sp->id]);
+                                       (RCadr)devPtr, size, (RCtexture)texbuf, sp[i].Clnt);
             checkResult(rp, sp);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
@@ -1891,8 +1810,7 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
                           const struct textureReference *tex,
                           const void *devPtr,
                           const struct cudaChannelFormatDesc *desc,
-                          size_t width, size_t height, size_t pitch)
-{
+                          size_t width, size_t height, size_t pitch) {
     cudaError_t err = cudaSuccess;
     dscudaBindTexture2DResult *rp;
     RCtexture texbuf;
@@ -1905,14 +1823,14 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
 
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
 #warning fill this part in dscudaBindTexture2DWrapper().
         } else {
 
             rp = dscudabindtexture2did_1(moduleid[i], texname,
-                                         (RCadr)devPtr, width, height, pitch, (RCtexture)texbuf, Clnt[Vdevid[vdevidIndex()]][sp->id]);
+                                         (RCadr)devPtr, width, height, pitch, (RCtexture)texbuf, sp[i].Clnt);
             checkResult(rp, sp);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
@@ -1934,8 +1852,7 @@ cudaError_t
 dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
                                const struct textureReference *tex,
                                const struct cudaArray *array,
-                               const struct cudaChannelFormatDesc *desc)
-{
+                               const struct cudaChannelFormatDesc *desc) {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     RCtexture texbuf;
@@ -1953,13 +1870,13 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
 
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     RCServer_t *sp = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++, sp++) {
+    for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
 #warning fill this part in dscudaBindTextureToArrayWrapper().
         } else {
 
-            rp = dscudabindtexturetoarrayid_1(moduleid[i], texname, (RCadr)ca->ap[i], (RCtexture)texbuf, Clnt[Vdevid[vdevidIndex()]][sp->id]);
+            rp = dscudabindtexturetoarrayid_1(moduleid[i], texname, (RCadr)ca->ap[i], (RCtexture)texbuf, sp[i].Clnt);
             checkResult(rp, sp);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
@@ -1970,7 +1887,6 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
     WARN(3, "done.\n");
     return err;
 }
-
 
 cudaError_t cudaGetDevice(int *device) {
     cudaError_t err = cudaSuccess;
@@ -1984,13 +1900,12 @@ cudaError_t cudaGetDevice(int *device) {
 
 /*********************************************************************
  * cudaSetDevice()
- *    
  */
 cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
     cudaError_t cuerr = cudaSuccess;
     int vi = vdevidIndex();
     
-    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device, St.isAutoVerb(), HISTREC.rec_en);
+    WARN(3, "%s(%d)...\n", __func__, device);
     if ( 0 <= device && device < St.Nvdev ) {
         Vdevid[vi] = device;
     } else {
@@ -2003,17 +1918,24 @@ cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
     WARN(3, "+--- done.\n");
     return cuerr;
 }
+
 cudaError_t cudaSetDevice( int device ) {
     cudaError_t cuerr = cudaSuccess;
     int errcheck = 0; 
 
     St.cudaCalled();
-    WARN(3, "%s(%d), verb=%d, history=%d...\n", __func__, device, St.isAutoVerb(), HISTREC.rec_en);
-    if ( HISTREC.rec_en > 0 ) {
+    WARN(3, "%s(%d)...\n", __func__, device);
+    
+#if 0
+    // cudaSetDevice() is not needed on CUDA called record.
+    // active target device is recorded on each cuda*() funcitons.
+    if (HISTREC.rec_en > 0) {
         cudaSetDeviceArgs args;
         args.device = device;
-        HISTREC.add(dscudaSetDeviceId, (void *)&args);
+        //HISTREC.add(dscudaSetDeviceId, (void *)&args);
     }
+#endif
+    
     cuerr = cudaSetDevice_clnt( device, errcheck );
     WARN(3, "+--- done.\n");
     return cuerr;
@@ -2031,8 +1953,7 @@ cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     return err;
 }
 
-cudaError_t cudaGetDeviceCount(int *count)
-{
+cudaError_t cudaGetDeviceCount(int *count) {
     cudaError_t err = cudaSuccess;
 
     St.cudaCalled();
@@ -2059,8 +1980,7 @@ cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevi
     return err;
 }
 
-cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
-{
+cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags) {
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceEnablePeer(%d, %d)...", peerDevice, flags);
@@ -2072,8 +1992,7 @@ cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
     return err;
 }
 
-cudaError_t cudaDeviceDisablePeerAccess(int peerDevice)
-{
+cudaError_t cudaDeviceDisablePeerAccess(int peerDevice) {
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceDisablePeer(%d)...", peerDevice);
@@ -2087,10 +2006,9 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice)
 
 /*
  * MEMO: BkupMemList_t::reallocDeviceRegion(RCServer_t *svr)
- * 
  */
 void VirDev_t::remallocRegionsGPU(int num_svr) {
-    BkupMem *mem = head;
+    BkupMem *mem = memlist_vir.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;
@@ -2100,12 +2018,11 @@ void VirDev_t::remallocRegionsGPU(int num_svr) {
     St.unsetAutoVerb();
     while ( mem != NULL ) {
 	/* TODO: select migrateded virtual device, not all region. */
-	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_regio, mem->size);
+	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_region, mem->size);
 	dscudaVerbMalloc(&mem->d_region, mem->size, svr);
 	mem = mem->next;
 	i++;
     }
     St.setAutoVerb(verb);
     WARN(1, "+--- Done.\n");
-
 }
