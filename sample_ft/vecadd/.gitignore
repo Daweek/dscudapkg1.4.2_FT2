@@ -1,0 +1,4 @@
+*.log
+vecadd_rpc
+dscudautil.h
+dscudatmp/

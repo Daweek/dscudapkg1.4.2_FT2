@@ -1,0 +1,14 @@
+# object files
+*.o
+*~
+
+# generate source code.
+dscudarpc.h
+dscudarpc_svc.c
+dscudarpc_xdr.c
+
+# generated binary.
+dscudad
+dscudasvr
+dscudasvr_fault
+

@@ -1,0 +1,10 @@
+# soft link files.
+dscuda.h
+dscudamacros.h
+dscudaverb.h
+dscudadefs.h
+dscudarpc.h
+libdscuda.h
+sockutil.h
+
+

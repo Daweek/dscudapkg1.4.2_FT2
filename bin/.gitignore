@@ -1,0 +1,6 @@
+*.o
+*~
+# Generated files.
+dscudad
+dscudasvr
+dscudacpp.0
