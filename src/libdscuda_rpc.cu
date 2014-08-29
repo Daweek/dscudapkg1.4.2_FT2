@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 23:51:51
+// Last Modified On : 2014-08-29 12:15:57
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -87,17 +87,18 @@ void RCServer_t::dupServer( RCServer_t *dup ) {
     dup->id   = this->id;
     dup->cid  = this->cid;
     dup->uniq = this->uniq;
-    dup->errcount = this->errcount;
+    dup->stat_error   = this->stat_error;
+    dup->stat_correct = this->stat_correct;
     strcpy( dup->ip, this->ip );
     strcpy( dup->hostname, this->hostname );
 }
 
 void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
-    dupServer( broken );
-    newone->dupServer( this );
+    dupServer(broken);
+    newone->dupServer(this);
 
-    WARN( 3, "Reconnect to new physical device %s from old device %s\n"
-	  this->ip,f broken->ip ); 
+    WARN(3, "Reconnect to new physical device %s from old device %s\n",
+	 this->ip, broken->ip); 
     setupConnection();
 
     return;
@@ -105,7 +106,7 @@ void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
 
 
 cudaError_t
-RCServer::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
+RCServer::cudaMemcpyH2D(void *dst, void *src, size_t count) {
     dscudaResult *rp;
     RCbuf srcbuf;
     cudaError_t err = cudaSuccess;
@@ -574,7 +575,7 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
 	exit(EXIT_FAILURE);
     }
     if (rp->err != cudaSuccess) {
-	err = (cudaError_t)rp->err;
+	cuerr = (cudaError_t)rp->err;
     }
     
     *d_ptr = (void*)rp->devAdr;
@@ -584,11 +585,11 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
      * Automatic Recoverly
      */
     if ( St.isAutoVerb() ) {
-	cudaMallocArgs args( *devAdrPtr, size );
-	reclist_phy.addRegion(args.devPtr, args.size);
+	cudaMallocArgs args( *d_ptr, size );
+	reclist_phy.add(args.devPtr, args.size);
     }
 
-    return err;
+    return cuerr;
 }
 
 cudaError_t
@@ -783,8 +784,8 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev ) {
 	    memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
         } else {
 	    if ( bcmp( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len ) != 0 ) { // unmatched case
-		sp->errcount++; //count up error.
-		WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", sp->errcount );
+		sp->stat_error++; //count up error.
+		WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", sp->stat_error);
 		unmatched_count++;
 		//fail_flag[i]=1;
 		failed_1st = sp; // temporary
@@ -834,7 +835,7 @@ cudaMemcpyD2H( void *dst, void *src, size_t count, Vdev_t *vdev ) {
 	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA ||
 		  St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
 		St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
-		HISTREC.rec_en = 0; // <--- Must not record Historical call list.
+		//HISTREC.rec_en = 0; // <--- Must not record Historical call list.
 	    
 		//TODO: rewrite BKUPMEM.restructDeviceRegion();
 		
@@ -877,7 +878,7 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {
     //<--- oikawa moved to here from cudaMemcpy();
     if (St.isAutoVerb() > 0) {
 	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToDevice );
-	HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
+	//HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
     }
     //--->
     return err;
@@ -944,14 +945,14 @@ cudaError_t cudaMemcpy( void *dst, const void *src,
 	       ldst, lsrc, count, vdevid);
 	  // Avoid conflict between CheckPointing thread.
 	  pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-	  err = cudaMemcpyD2H( ldst, lsrc, count, vdev );
+	  err = vdev->cudaMemcpyD2H(dst, lsrc, count);
 	  pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
 	  break;
       case cudaMemcpyHostToDevice:
 	  WARN(3, "libdscuda:cudaMemcpy(%p, %p, %zu, HostToDevice) called\n", ldst, lsrc, count);
 	  // Avoid conflict with CheckPointing thread.	
 	  pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-	  err = cudaMemcpyH2D( ldst, lsrc, count, vdev );
+	  err = vdev->cudaMemcpyH2D(ldst, lsrc, count);
 	  pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	  break;
       case cudaMemcpyDeviceToDevice:

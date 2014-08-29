@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-29 00:29:53
+// Last Modified On : 2014-08-29 12:07:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -50,8 +50,10 @@ static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid in
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
 
+#if RC_SUPPORT_STREAM
 static RCstreamArray  *RCstreamArrayListTop   = NULL;
 static RCstreamArray  *RCstreamArrayListTail  = NULL;
+#endif
 
 static RCeventArray   *RCeventArrayListTop    = NULL;
 static RCeventArray   *RCeventArrayListTail   = NULL;
@@ -76,6 +78,9 @@ struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 
 struct ClientState_t St;
+int    ClientState_t::Nvdev;
+Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
+
 
 char *ClientState_t::getFtModeString( void ) {
     static char s[80];
@@ -218,6 +223,7 @@ void RCmappedMemUnregister(void *pHost) {
     free( mem );
 }
 
+#if RC_SUPPORT_STREAM
 /*
  * Register a stream array. each component is associated to a stream
  * on each Server[]. User see only the 1st element, streams[0].
@@ -290,7 +296,7 @@ void RCstreamArrayUnregister(cudaStream_t stream0) {
     free(st);
     //    showsta();
 }
-
+#endif
 
 
 /*
@@ -1086,25 +1092,10 @@ ClientState_t::periodicCheckpoint( void *arg ) {
     void *dst_cand[RC_NREDUNDANCYMAX];
     int  dst_color[RC_NREDUNDANCYMAX], next_color;
 
-    //
-    // Wait for all connections established, invoked 1st call of initClient().
-    //
-    WARN( 10, "%s() thread starts.\n", __func__ );
-
-    int passflag = 0;
-    while ( init_stat == ORIGIN ) {
-	if ( passflag == 0 ) {
-	    WARN(10, "%s() thread wait for INITIALIZED.\n", __func__);
-	}
-     	sleep(1);
-	passflag = 1;
-    }
-    WARN(10, "%s() thread detected INITIALIZED.\n", __func__);
-    
     for (;;) { /* infinite loop */
 	WARN( 10, "%s\n", __func__ );
 #if 1
-	for ( d=0; d < Nvdev; d++ ) { /* Sweep all virtual GPUs */
+	for (d=0; d < Nvdev; d++) { /* Sweep all virtual GPUs */
 	    pmem = Vdev[d].memlist_vir.head ;
 	    while ( pmem != NULL ) {
 		cudaSetDevice_clnt( d, errcheck );
@@ -1216,7 +1207,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 	    WARN(3, "***********************************\n");
 	    WARN(3, "*** Update checkpointing data(%d).\n", snapshot_count);
 	    WARN(3, "***********************************\n");
-	    pmem = BKUPMEM.head;
+	    //pmem = BKUPMEM.head;
 	    pmem_count = 0;
 	    while ( pmem != NULL ) { /* sweep all registered regions */
 		pmem->updateSafeRegion();
@@ -1227,8 +1218,8 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 	    WARN(3, "***********************************\n");
 	    WARN(3, "*** Clear following cuda API called history(%d).\n", snapshot_count);
 	    WARN(3, "***********************************\n");
-	    HISTREC.print();
-	    HISTREC.clear();
+	    //HISTREC.print();
+	    //HISTREC.clear();
 	    snapshot_count++;	    
 	} else {
 	    /*
@@ -2014,12 +2005,12 @@ void VirDev_t::remallocRegionsGPU(int num_svr) {
     int     i = 0;
     
     WARN(1, "%s(RCServer_t *sp).\n", __func__);
-    WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
+    //WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
     St.unsetAutoVerb();
     while ( mem != NULL ) {
 	/* TODO: select migrateded virtual device, not all region. */
 	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_region, mem->size);
-	dscudaVerbMalloc(&mem->d_region, mem->size, svr);
+	//dscudaVerbMalloc(&mem->d_region, mem->size, svr);
 	mem = mem->next;
 	i++;
     }

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-29 00:10:40
+// Last Modified On : 2014-08-29 12:02:30
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -50,7 +50,7 @@ typedef struct BkupMem_t {
 typedef struct BkupMemList_t {
 private:
 
-    static void* periodicCheckpoint( void *arg );
+
 public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
@@ -335,11 +335,12 @@ typedef enum {
 struct ClientState_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
+    static void *periodicCheckpoint(void *arg);
     void initEnv(void);
     void setFaultTolerantMode(void);
 public:
-    int          Nvdev;               // # of virtual devices available.
-    Vdev_t       Vdev[RC_NVDEVMAX];   // list of virtual devices.
+    static int    Nvdev;             // # of virtual devices available.
+    static Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
 
     ClntFtMode   ft_mode;
     ClntInitStat init_stat;
@@ -382,7 +383,7 @@ public:
     void initProgress(ClntInitStat stat);
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
 
-    static void periodicCheckpoint(void *arg);
+
 };
 extern struct ClientState_t St;
 
