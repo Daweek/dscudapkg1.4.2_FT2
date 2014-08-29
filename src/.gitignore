@@ -1,6 +1,5 @@
 # object files
 *.o
-*~
 
 # generate source code.
 dscudarpc.h
