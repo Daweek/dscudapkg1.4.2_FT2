@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 10:02:37
+// Last Modified On : 2014-08-31 10:32:25
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -25,6 +25,7 @@ typedef RCServer RCServer_t;
 //***    - migrate to another device and restore with clean data.
 //************************************************************************
 typedef struct BkupMem_t {
+    void  *v_region;        //UVA, Search index, and also Virtual device address.
     void  *d_region;        // server device memory space (UVA).
     void  *h_region;        //
     int    size;            // in Byte.
@@ -32,14 +33,12 @@ typedef struct BkupMem_t {
     struct BkupMem_t *next; // For double-linked-list prev.
     struct BkupMem_t *prev; // For double-linked-list next.
     
+    /*constructor/destructor.*/
+    BkupMem_t( void );
     //--- methods
     void   init( void *uva_ptr, int isize );
     int    isHead( void );
     int    isTail( void );
-    void   updateSafeRegion( void );
-    void   restoreSafeRegion( void );
-    /*constructor/destructor.*/
-    BkupMem_t( void );
 } BkupMem;
 
 //********************************************************************

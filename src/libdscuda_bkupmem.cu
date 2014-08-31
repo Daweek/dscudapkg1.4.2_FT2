@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-26 10:02:11
+// Last Modified On : 2014-08-31 10:32:00
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -18,9 +18,9 @@
  * Constructor of "Bkupmem_t" class.
  */
 BkupMem_t::BkupMem_t( void ) {
+    v_region      = NULL;
     d_region      = NULL;
-    h_region_tmp  = NULL; // Updated if partial region were matched.
-    h_region_safe = NULL; // Updated if all region in device were matched.
+    h_region      = NULL;
     size          = 0;
     update_rdy    = 0;
 }
@@ -53,36 +53,11 @@ void BkupMem_t::init( void *uva_ptr,   // Device pointer in UVA.
 	perror("BkupMem_t.init()");
 	exit( EXIT_FAILURE );
     }
-    
-    h_region_safe = (void *)malloc( isize );
-    if ( h_region_safe == NULL ) {
-	perror("BkupMem_t.init()");
-	exit( EXIT_FAILURE );
-    }
+
     prev = NULL;
     next = NULL;
 }
 
-/*
- * Copy client memory from "h_region" to "h_region_safe".
- */
-void BkupMem_t::updateSafeRegion( void ) {
-    memcpy( h_region_safe, h_region_tmp, size );
-}
-
-/*
- * Copy client memory to device memory from "h_region_safe" to "d_region".
- */
-void BkupMem_t::restoreSafeRegion( void ) {
-    cudaError_t cuerr;
-    
-    cuerr = cudaMemcpy( d_region, h_region_safe, size,
-			cudaMemcpyHostToDevice );
-    if ( cuerr != cudaSuccess ) {
-	fprintf( stderr, "%s():cudaMemcpy(H2D) failed.\n", __func__ );
-	exit( EXIT_FAILURE );
-    }
-}
 //========================================================================
 /*
  * Constuctor of "BkupMemList_t" class.
