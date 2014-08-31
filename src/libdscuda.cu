@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-29 12:07:34
+// Last Modified On : 2014-08-31 09:59:49
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1138,7 +1138,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 			    fprintf(stderr, "%s():malloc() failed.\n", __func__ );
 			    exit( EXIT_FAILURE );
 			}
-			cudaMemcpyD2H_redundant( dst_cand[i], pmem->d_region, size, i );
+			//cudaMemcpyD2H_redundant( dst_cand[i], pmem->d_region, size, i );
 		    }
 		    pthread_mutex_unlock( &cudaMemcpyD2H_mutex );/*mutex-unlock*/
 		    pthread_mutex_unlock( &cudaMemcpyH2D_mutex );/*mutex-unlock*/

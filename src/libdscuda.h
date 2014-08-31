@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-29 12:02:30
+// Last Modified On : 2014-08-31 10:02:37
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -48,9 +48,6 @@ typedef struct BkupMem_t {
 //***      - 
 //********************************************************************
 typedef struct BkupMemList_t {
-private:
-
-
 public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
@@ -231,8 +228,8 @@ struct RCServer {
     char        hostname[64]; // ex. "titan01"
     int         uniq;         // unique in all RCServer_t including svrCand[].
     
-    BkupMemList memlist_phy;  // GPU global memory mirroring region.
-    HistRecList reclist_phy;  // GPU CUDA function called history.
+    BkupMemList memlist;  // GPU global memory mirroring region.
+    HistRecList reclist;  // GPU CUDA function called history.
     
     int        *d_faultconf;  //
 
@@ -297,8 +294,8 @@ typedef struct VirDev_t {
     VdevConf    conf;                      //Infomation.
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
-    BkupMemList memlist_vir;              //part of Checkpoint data.
-    HistRecList reclist_vir;
+    BkupMemList memlist;              //part of Checkpoint data.
+    HistRecList reclist;
 
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
@@ -419,7 +416,6 @@ int *dscudaLoadModule(char *srcname, char *strdata);
 void
 checkResult(void *rp, RCServer_t *sp);
 cudaError_t cudaSetDevice_clnt( int device, int errcheck );
-cudaError_t cudaMemcpyD2H_redundant( void *dst, void *src_uva, size_t count, int redundant );
 
 cudaError_t
 dscudaMemcpyToSymbolH2D(int moduleid, char *symbol, const void *src,
