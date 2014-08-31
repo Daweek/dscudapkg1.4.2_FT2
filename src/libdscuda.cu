@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 09:59:49
+// Last Modified On : 2014-08-31 11:19:55
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1277,6 +1277,8 @@ ClientState_t::~ClientState_t(void) {
     time_t exe_time;
     char my_tfmt[64];	      
     struct tm *my_local;
+
+    pthread_cancel(tid);
     
     stop_time = time( NULL );
     exe_time = stop_time - start_time;

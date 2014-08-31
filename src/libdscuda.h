@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 10:32:25
+// Last Modified On : 2014-08-31 11:10:44
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -25,18 +25,17 @@ typedef RCServer RCServer_t;
 //***    - migrate to another device and restore with clean data.
 //************************************************************************
 typedef struct BkupMem_t {
-    void  *v_region;        //UVA, Search index, and also Virtual device address.
-    void  *d_region;        // server device memory space (UVA).
+    void  *v_region;        // UVA, Search index, and also Virtual device address.
+    void  *d_region;        //!UVA, server device memory space.
     void  *h_region;        //
     int    size;            // in Byte.
     int    update_rdy;      // 1:"*dst" has valid data, 0:invalid.
     struct BkupMem_t *next; // For double-linked-list prev.
     struct BkupMem_t *prev; // For double-linked-list next.
-    
     /*constructor/destructor.*/
     BkupMem_t( void );
     //--- methods
-    void   init( void *uva_ptr, int isize );
+    void   init(void *uva_ptr, void *d_ptr, int isize);
     int    isHead( void );
     int    isTail( void );
 } BkupMem;
@@ -56,14 +55,15 @@ public:
     BkupMemList_t(void);
     ~BkupMemList_t(void);
     //--- methods ---------------
-    void     add(void *dst, int size); // verbAllocatedMemRegister()
+    void     print(void);
+    BkupMem* query(void *uva_ptr);
+    void     add(void *uva_ptr, void *dst, int size);
     void     remove( void *dst );        // verbAllocatedMemUnregister()
     int      isEmpty(void);
     int      getLen(void);
     long     getTotalSize(void); // get total size of allocated memory.
     int      countRegion(void);
     int      checkSumRegion(void *targ, int size );
-    BkupMem* queryRegion(void *dst );
     void*    searchUpdateRegion(void *dst );
     void     updateRegion(void *dst, void *src, int size );
     void     reallocDeviceRegion( RCServer_t *svr );  /* ReLoad backups */
