@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 18:17:11
+// Last Modified On : 2014-09-01 19:01:32
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -50,10 +50,10 @@ static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid in
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
 
-#if RC_SUPPORT_STREAM
+//#if RC_SUPPORT_STREAM
 static RCstreamArray  *RCstreamArrayListTop   = NULL;
 static RCstreamArray  *RCstreamArrayListTail  = NULL;
-#endif
+//#endif
 
 static RCeventArray   *RCeventArrayListTop    = NULL;
 static RCeventArray   *RCeventArrayListTail   = NULL;
@@ -223,7 +223,7 @@ void RCmappedMemUnregister(void *pHost) {
     free( mem );
 }
 
-#if RC_SUPPORT_STREAM
+//#if RC_SUPPORT_STREAM
 /*
  * Register a stream array. each component is associated to a stream
  * on each Server[]. User see only the 1st element, streams[0].
@@ -296,7 +296,7 @@ void RCstreamArrayUnregister(cudaStream_t stream0) {
     free(st);
     //    showsta();
 }
-#endif
+//#endif
 
 
 /*
@@ -1490,8 +1490,7 @@ int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL termi
 }
 
 cudaError_t
-dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func)
-{
+dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func) {
     cudaError_t err = cudaSuccess;
     dscudaFuncGetAttributesResult *rp;
 
@@ -1505,7 +1504,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
 #warning fill this part in dscudaFuncGetAttributesWrapper().
         } else {
             rp = dscudafuncgetattributesid_1(moduleid[i], (char*)func, sp[i].Clnt);
-            checkResult(rp, sp);
+            checkResult(rp, sp[i]);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
             }
@@ -1782,7 +1781,7 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
         else {
             rp = dscudabindtextureid_1(moduleid[i], texname,
                                        (RCadr)devPtr, size, (RCtexture)texbuf, sp[i].Clnt);
-            checkResult(rp, sp);
+            checkResult(rp, sp[i]);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
             }
@@ -1826,7 +1825,7 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
 
             rp = dscudabindtexture2did_1(moduleid[i], texname,
                                          (RCadr)devPtr, width, height, pitch, (RCtexture)texbuf, sp[i].Clnt);
-            checkResult(rp, sp);
+            checkResult(rp, sp[i]);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
             }
@@ -1872,7 +1871,7 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
         } else {
 
             rp = dscudabindtexturetoarrayid_1(moduleid[i], texname, (RCadr)ca->ap[i], (RCtexture)texbuf, sp[i].Clnt);
-            checkResult(rp, sp);
+            checkResult(rp, sp[i]);
             if (rp->err != cudaSuccess) {
                 err = (cudaError_t)rp->err;
             }

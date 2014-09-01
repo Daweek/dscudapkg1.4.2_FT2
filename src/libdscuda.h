@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 17:37:03
+// Last Modified On : 2014-09-01 18:54:16
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -415,7 +415,7 @@ int  dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename,
 			   char *modulebuf, int vdevid, int raidid);
 int *dscudaLoadModule(char *srcname, char *strdata);
 void
-checkResult(void *rp, RCServer_t *sp);
+checkResult(void *rp, RCServer_t &sp);
 cudaError_t cudaSetDevice_clnt( int device, int errcheck );
 
 cudaError_t

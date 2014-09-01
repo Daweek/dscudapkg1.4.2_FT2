@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 17:39:18
+// Last Modified On : 2014-09-01 18:55:23
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ RCServer::cudaMemcpyH2D(void *dst, void *src, size_t count) {
 }
 
 
-void checkResult( void *rp, RCServer_t &sp ) {
+void checkResult(void *rp, RCServer_t &sp) {
     if ( rp != NULL ) {
 	return;
     } else {
@@ -377,7 +377,7 @@ cudaError_t cudaPeekAtLastError(void) {
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudapeekatlasterrorid_1( sp[i].Clnt );
-        checkResult(rp, sp);
+        checkResult(rp, sp[i]);
         if (rp->err != cudaSuccess) {
             err = (cudaError_t)rp->err;
         }
@@ -468,7 +468,7 @@ cudaError_t cudaRuntimeGetVersion(int *runtimeVersion) {
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaruntimegetversionid_1( sp[i].Clnt );
-        checkResult( rp, sp[i] );
+        checkResult(rp, sp[i]);
         if (rp->err != cudaSuccess) {
             err = (cudaError_t)rp->err;
         }
@@ -851,7 +851,7 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {
     RCServer_t *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamemcpyd2did_1((RCadr)dst, (RCadr)src, count, sp[i].Clnt );
-        checkResult( rp, sp[i] );
+        checkResult(rp, sp[i]);
         if (rp->err != cudaSuccess) {
             err = (cudaError_t)rp->err;
         }
@@ -979,7 +979,7 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device)
     RCServer_t *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudagetdevicepropertiesid_1(device, sp[i].Clnt );
-        checkResult(rp, sp[i] );
+        checkResult(rp, sp[i]);
         if (rp->err != cudaSuccess) {
             err = (cudaError_t)rp->err;
         }
@@ -1072,7 +1072,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
 	    break;
 	}
 	//--->
-        checkResult( rp, sp[i] );
+        checkResult(rp, sp[i]);
     }
 
     recoverClntError(sp, &(SvrSpare.svr[0]), &rpc_error );
