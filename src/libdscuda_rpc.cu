@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 18:55:23
+// Last Modified On : 2014-09-01 19:21:25
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -543,6 +543,7 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
  */
 cudaError_t
 RCServer::cudaMalloc(void **d_ptr, size_t size) {
+    WARN(3, "   + RCServer::cudaMalloc(%p, %zu) {\n", d_ptr, size);
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
     int vid = vdevidIndex();
@@ -568,38 +569,34 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
 	cudaMallocArgs args( *d_ptr, size );
 	//memlist.add( args.devPtr, args.size );
     }
-
+    
+    WARN(3, "   + } RCServer::cudaMalloc(%p, %zu)\n", d_ptr, size);
     return cuerr;
 }
 
 cudaError_t
-VirDev_t::cudaMalloc(void **devAdrPtr, size_t size) {
-    dscudaMallocResult *rp;
+VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
     cudaError_t cuerr = cudaSuccess;
-    int         vid = vdevidIndex();
     void       *adrs[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaMalloc( %p, %zu )...\n", devAdrPtr, size);
-    St.cudaCalled();
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
-    for ( int i = 0; i < vdev->nredundancy; i++ ) {
+    WARN(3, "   + Vdev_t::cudaMalloc(%p, %zu) {\n", d_ptr, size);
+
+    for (int i=0; i<nredundancy; i++) {
 	cuerr = server[i].cudaMalloc(&adrs[i], size);
-	
         adrs[i] = (void*)rp->devAdr;
-	WARN(3, "+--- redun[%d]: devAdrPtr=%p\n", i, adrs[i]);	
+	WARN(3, "+--- redun[%d]: d_ptr=%p\n", i, adrs[i]);	
     }
 
-    *devAdrPtr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
+    *d_ptr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
     /*
      * Automatic Recoverly
      */
     if ( St.isAutoVerb() ) {
-	cudaMallocArgs args( *devAdrPtr, size );
+	cudaMallocArgs args( *d_ptr, size );
 //	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
-    //WARN(3, "+--- done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
-
+    
+    WARN(3, "   + } Vdev_t::cudaMalloc(%p, %zu).\n", d_ptr, size);
     return cuerr;
 }
 
@@ -610,12 +607,15 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size) {
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
     void *adrs[RC_NREDUNDANCYMAX];
 
-    WARN(3, "cudaMalloc(%p, %zu )...\n", d_ptr, size);
-
+    WARN(3, "libdscuda:cudaMalloc(%p, %zu) {\n", d_ptr, size);
+    
+    St.cudaCalled();
     cuerr = vdev->cudaMalloc(d_ptr, size);
 
     *d_ptr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
-    
+
+    WARN(3, "} libdscuda:cudaMalloc(%p, %zu)\n", d_ptr, size);
+    WARN(3, "\n", d_ptr, size);
     return cuerr;
 }
 
