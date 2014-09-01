@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 17:22:47
+// Last Modified On : 2014-09-02 01:38:51
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -79,7 +79,7 @@ BkupMemList_t::BkupMemList_t(void) {
     tail       = NULL;
     length     = 0;
     total_size = 0;
-    WARN( 5, "The constructor %s() called.\n", __func__);
+    //WARN( 5, "The constructor %s() called.\n", __func__);
 }
 
 /*

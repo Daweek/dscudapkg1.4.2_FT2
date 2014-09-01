@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 19:01:32
+// Last Modified On : 2014-09-02 02:22:07
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -73,13 +73,14 @@ SvrList_t SvrBroken;
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 
-struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
+//struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
 ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 
+
 struct ClientState_t St;
-int    ClientState_t::Nvdev;
-Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
+//int    ClientState_t::Nvdev;
+//Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
 
 
 char *ClientState_t::getFtModeString( void ) {
@@ -1029,9 +1030,11 @@ void ClientState_t::initEnv(void) {
     /*
      * Create a thread of checkpointing.
      */
+#if 0
     if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
 	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
     }
+#endif
     
     return;
 }
@@ -1072,8 +1075,8 @@ void ClientState_t::initProgress( ClntInitStat stat ) {
  * after verifying between redundant physical GPUs every specified wall clock
  * time period. The period is defined in second.
  */
-void*
-ClientState_t::periodicCheckpoint( void *arg ) {
+//void* ClientState_t::periodicCheckpoint(void *arg) {
+void *periodicCheckpoint(void *arg) {
     int devid, d, i;
     int errcheck = 1;
     cudaError_t cuerr;
@@ -1095,8 +1098,8 @@ ClientState_t::periodicCheckpoint( void *arg ) {
     for (;;) { /* infinite loop */
 	WARN( 10, "%s\n", __func__ );
 #if 1
-	for (d=0; d < Nvdev; d++) { /* Sweep all virtual GPUs */
-	    pmem = Vdev[d].memlist.head ;
+	for (d=0; d < St.Nvdev; d++) { /* Sweep all virtual GPUs */
+	    pmem = St.Vdev[d].memlist.head ;
 	    while ( pmem != NULL ) {
 		cudaSetDevice_clnt( d, errcheck );
 		
@@ -1106,7 +1109,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 		pthread_mutex_lock( &cudaKernelRun_mutex );
 		WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
 
-		for ( i=0; i < Vdev[d].nredundancy; i++ ) {
+		for ( i=0; i < St.Vdev[d].nredundancy; i++ ) {
 		    
 		}
 
@@ -1119,14 +1122,14 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 
 	}//for
 #else	
-	for ( devid=0; devid < Nvdev; devid++ ) { /* All virtual GPUs */
+	for ( devid=0; devid < St.Nvdev; devid++ ) { /* All virtual GPUs */
 	    pmem = BKUPMEM.head;
 	    while ( pmem != NULL ) { /* sweep all registered regions */
 		pmem_devid = dscudaDevidOfUva( pmem->d_region );
 		size = pmem->size;
 		if ( devid == pmem_devid ) {
 		    cudaSetDevice_clnt( devid, errcheck );
-		    redun = Vdev[devid].nredundancy;
+		    redun = St.Vdev[devid].nredundancy;
 		    //<-- Mutex lock
 		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 		    pthread_mutex_lock( &cudaMemcpyH2D_mutex );
@@ -1262,6 +1265,7 @@ ClientState_t::ClientState_t(void) {
     for ( int i=0; i < Nvdev; i++ ) {
 	for ( int j=0; j < Vdev[i].nredundancy; j++ ) {
 	    Vdev[i].server[j].setupConnection();
+	    WARN(0, "setupConn. Vdev[%d].server[%d].Clnt=%p\n", i, j, Vdev[i].server[j].Clnt);
         }
     }
     struct sockaddr_in addrin;

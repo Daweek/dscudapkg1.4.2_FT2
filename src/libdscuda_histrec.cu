@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 17:47:05
+// Last Modified On : 2014-09-02 01:39:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -370,7 +370,7 @@ HistRecList_t::HistRecList_t(void) {
 	WARN(0, "%s():malloc() failed.\n", __func__);
 	exit(EXIT_FAILURE);
     }
-    WARN( 5, "The constructor %s() called.\n", __func__ );
+    //WARN( 5, "The constructor %s() called.\n", __func__ );
 }
 
 void

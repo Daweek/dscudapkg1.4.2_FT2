@@ -2,7 +2,7 @@
 
 export CUDAPATH=/usr/local/cuda-4.2
 export CUDASDKPATH=~/NVIDIA_GPU_Computing_SDK
-export DSCUDA_PATH=~/dscudapkg
+export DSCUDA_PATH=~/dscudapkg_FT
 export DSCUDA_WARNLEVEL=10
 export DSCUDA_REMOTECALL="rpc"
 

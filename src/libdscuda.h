@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 18:54:16
+// Last Modified On : 2014-09-02 02:32:44
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -298,7 +298,7 @@ typedef struct VirDev_t {
     BkupMemList memlist;              //part of Checkpoint data.
     HistRecList reclist;
 
-    cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaMalloc(void **h_ptr, size_t size, int devid);
     cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
@@ -330,15 +330,19 @@ typedef enum {
 //***  Description:
 //***      - DS-CUDA Client Status class.
 //*************************************************
+void *periodicCheckpoint(void *arg);
 struct ClientState_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
-    static void *periodicCheckpoint(void *arg);
+    //static void *periodicCheckpoint(void *arg);
     void initEnv(void);
     void setFaultTolerantMode(void);
 public:
-    static int    Nvdev;             // # of virtual devices available.
-    static Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
+    //static int    Nvdev;             // # of virtual devices available.
+    //static Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
+    int    Nvdev;             // # of virtual devices available.
+    Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
+
 
     ClntFtMode   ft_mode;
     ClntInitStat init_stat;
@@ -380,10 +384,11 @@ public:
 
     void initProgress(ClntInitStat stat);
     void cudaCalled(void) { initProgress( CUDA_CALLED ); }
-
-
 };
 extern struct ClientState_t St;
+//extern int    ClientState_t::Nvdev;
+//extern Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
+
 
 extern const char *DEFAULT_SVRIP;
 //extern RCServer_t svrCand[RC_NVDEVMAX];
@@ -391,7 +396,7 @@ extern const char *DEFAULT_SVRIP;
 extern SvrList_t SvrSpare;
 //extern RCServer_t svrBroken[RC_NVDEVMAX];
 extern int    Vdevid[RC_NPTHREADMAX];
-extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
+//extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void (*errorHandler)(void *arg);
 
 extern void *errorHandlerArg;

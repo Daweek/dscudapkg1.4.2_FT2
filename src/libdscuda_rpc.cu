@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 19:21:25
+// Last Modified On : 2014-09-02 02:47:20
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -21,7 +21,6 @@
 #include <pthread.h>
 #include "dscuda.h"
 #include "libdscuda.h"
-#include "dscudaverb.h"
 
 #define DEBUG 1
 
@@ -46,7 +45,7 @@ RCServer::RCServer(void) {
     Clnt = NULL;
 }
 
-void RCServer_t::setupConnection(void) {  // Physical Device pointer.
+void RCServer::setupConnection(void) {  // Physical Device pointer.
     int  pgid = DSCUDA_PROG;
     char msg[256];
 
@@ -63,13 +62,13 @@ void RCServer_t::setupConnection(void) {  // Physical Device pointer.
     }
     sockaddr = setupSockaddr( ip, sport );
 
-    Clnt = clnttcp_create(&sockaddr,
-			  pgid,
-			  DSCUDA_VER,
-			  &ssock,
-			  RC_BUFSIZE, RC_BUFSIZE);
+    this->Clnt = clnttcp_create(&sockaddr,
+				pgid,
+				DSCUDA_VER,
+				&ssock,
+				RC_BUFSIZE, RC_BUFSIZE);
 
-    sprintf( msg, "%s:%d (port %d) ", ip, cid, sport );
+    sprintf( msg, "Clnt=%p, %s:%d (port %d) ", Clnt, ip, cid, sport );
 
     if ( Clnt == NULL ) {
         clnt_pcreateerror( msg );
@@ -83,7 +82,7 @@ void RCServer_t::setupConnection(void) {  // Physical Device pointer.
     WARN(2, "Established a socket connection to %s...\n", msg);
 }
 
-void RCServer_t::dupServer( RCServer_t *dup ) {
+void RCServer::dupServer( RCServer_t *dup ) {
     dup->id   = this->id;
     dup->cid  = this->cid;
     dup->uniq = this->uniq;
@@ -93,7 +92,7 @@ void RCServer_t::dupServer( RCServer_t *dup ) {
     strcpy( dup->hostname, this->hostname );
 }
 
-void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
+void RCServer::migrateServer(RCServer_t *newone, RCServer_t *broken) {
     dupServer(broken);
     newone->dupServer(this);
 
@@ -105,7 +104,7 @@ void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
 }
 
 void
-RCServer_t::migrateReallocAllRegions(void) {
+RCServer::migrateReallocAllRegions(void) {
     BkupMem *mem_ptr = memlist.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
@@ -116,9 +115,8 @@ RCServer_t::migrateReallocAllRegions(void) {
     
     while (mem_ptr != NULL) {
 	/* TODO: select migrateded virtual device, not all region. */
-	WARN(5, "mem[%d]->dst = %p, size= %d\n",
-	     i, mem_ptr->d_region, mem_ptr->size);
-	this->cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
+	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem_ptr->d_region, mem_ptr->size);
+	cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
 	mem_ptr = mem_ptr->next;
 	i++;
     }
@@ -543,13 +541,11 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
  */
 cudaError_t
 RCServer::cudaMalloc(void **d_ptr, size_t size) {
-    WARN(3, "   + RCServer::cudaMalloc(%p, %zu) {\n", d_ptr, size);
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
-    int vid = vdevidIndex();
-    void *adrs[RC_NREDUNDANCYMAX];
 
     rp = dscudamallocid_1(size, Clnt);
+
     if (rp == NULL) {
 	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
 	clnt_perror(Clnt, ip);
@@ -558,7 +554,7 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
     if (rp->err != cudaSuccess) {
 	cuerr = (cudaError_t)rp->err;
     }
-    
+
     *d_ptr = (void*)rp->devAdr;
     xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
 
@@ -570,29 +566,32 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
 	//memlist.add( args.devPtr, args.size );
     }
     
-    WARN(3, "   + } RCServer::cudaMalloc(%p, %zu)\n", d_ptr, size);
     return cuerr;
 }
 
 cudaError_t
-VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
+VirDev_t::cudaMalloc(void **d_ptr, size_t size, int devid) {
     cudaError_t cuerr = cudaSuccess;
     void       *adrs[RC_NREDUNDANCYMAX];
 
-    WARN(3, "   + Vdev_t::cudaMalloc(%p, %zu) {\n", d_ptr, size);
+    WARN(3, "   + Vdev_t::cudaMalloc(%p, %zu) nredundancy=%d {\n",
+	 d_ptr, size, nredundancy);
 
     for (int i=0; i<nredundancy; i++) {
 	cuerr = server[i].cudaMalloc(&adrs[i], size);
-        adrs[i] = (void*)rp->devAdr;
-	WARN(3, "+--- redun[%d]: d_ptr=%p\n", i, adrs[i]);	
+	WARN(3, "+--- Physical[%d]: d_ptr=%p\n", i, adrs[i]);
     }
-
-    *d_ptr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
+    
+    *d_ptr = dscudaUvaOfAdr(adrs[0], devid);
     /*
      * Automatic Recoverly
      */
     if ( St.isAutoVerb() ) {
 	cudaMallocArgs args( *d_ptr, size );
+	for (int i=0; i<nredundancy; i++) {
+	    memlist.add(*d_ptr, adrs[i], size);	    
+	}
+
 //	BKUPMEM.addRegion(args.devPtr, args.size);  /* Allocate mirroring memory */
     }
     
@@ -605,14 +604,12 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size) {
     cudaError_t cuerr;
     int         vid  = vdevidIndex();
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    void *adrs[RC_NREDUNDANCYMAX];
+    void       *adrs;
 
-    WARN(3, "libdscuda:cudaMalloc(%p, %zu) {\n", d_ptr, size);
+    WARN(3, "libdscuda:cudaMalloc(%p, %zu) on Vdev[%d] {\n", d_ptr, size, Vdevid[vid]);
     
     St.cudaCalled();
-    cuerr = vdev->cudaMalloc(d_ptr, size);
-
-    *d_ptr = dscudaUvaOfAdr(adrs[0], Vdevid[vid]);
+    cuerr = vdev->cudaMalloc(d_ptr, size, Vdevid[vid]);
 
     WARN(3, "} libdscuda:cudaMalloc(%p, %zu)\n", d_ptr, size);
     WARN(3, "\n", d_ptr, size);
