@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 11:10:44
+// Last Modified On : 2014-08-31 11:33:12
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -246,6 +246,7 @@ struct RCServer {
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
 
+    void migrateReallocAll();
     /*CONSTRUCTOR*/
     RCServer();
 };  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
