@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 23:40:15
+// Last Modified On : 2014-09-01 17:47:05
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -14,7 +14,6 @@
 #include "dscuda.h"
 #include "dscudarpc.h"
 #include "libdscuda.h"
-#include "libdscuda_histrec.h"
 
 #define DEBUG
 
@@ -46,33 +45,6 @@ static int checkSum(void *targ, int size) {
     }
     return sum;
 }
-
-static cudaError_t
-dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
-    int      vid = vdevidIndex();
-    
-    void *adrs;
-    dscudaMallocResult *rp;
-    cudaError_t err = cudaSuccess;
-    
-    WARN(3, "%s(%p, %zu, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
-	 __func__, devAdrPtr, size, pSvr->id, pSvr->cid, pSvr->uniq);
-    //initClient();
-    rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][pSvr->id]);
-    checkResult(rp, pSvr);
-    if (rp->err != cudaSuccess) {
-            err = (cudaError_t)rp->err;
-    }
-    adrs = (void*)rp->devAdr;
-    WARN(3, "device : devAdrPtr:%p\n", adrs);	
-    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
-
-    *devAdrPtr = dscudaUvaOfAdr(adrs, Vdevid[vid]);
-    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
-
-    return err;
-}
-
 
 //stubs for store/release args, and recall functions.
 static void *(*storeArgsStub[DSCVMethodEnd])(void *);
@@ -294,18 +266,6 @@ static void releaseRpcLaunchKernel(void *argp) {
     free(argsrc);
 }
 
-#if !defined(RPC_ONLY)
-static void releaseIbvLaunchKernel(void *argp) {
-    DSCUDAVERB_SET_ARGS(IbvLaunchKernel);
-    free(argsrc->moduleid);
-    free(argsrc->kname);
-    free(argsrc->gdim);
-    free(argsrc->bdim);
-    free(argsrc->arg);
-    free(argsrc);
-}
-#endif
-
 //stubs for recall
 static
 void recallSetDevice(void *argp) {
@@ -395,32 +355,20 @@ void dscudaVerbInit(void) {
 	    exit(1);
 	}
     }
-    HISTREC.on();
-}
-
-void printRegionalCheckSum(void) {
-    BkupMem *pMem = BKUPMEM.head;
-    int length = 0;
-    while (pMem != NULL) {
-	fprintf(stderr, "Region[%d](dp=%p, size=%d): checksum=0x%08x\n",
-	       length, pMem->d_region, pMem->size, checkSum(pMem->h_region, pMem->size));
-	pMem = pMem->next;
-	length++;
-    }
+    //HISTREC.on();
 }
 
 /*
  *  
  */
 HistRecList_t::HistRecList_t(void) {
-    length      = 0;
-    recalling   = 0;
-    
+    length    = 0;
     max_len   = 32;
-    hist = (HistRec_t *)malloc( sizeof(HistRec) * max_len );
-    if ( hist == NULL ) {
-	WARN( 0, "%s():malloc() failed.\n", __func__ );
-	exit( EXIT_FAILURE );
+    
+    histrec = (HistRec_t *)malloc( sizeof(HistRec) * max_len );
+    if (histrec == NULL) {
+	WARN(0, "%s():malloc() failed.\n", __func__);
+	exit(EXIT_FAILURE);
     }
     WARN( 5, "The constructor %s() called.\n", __func__ );
 }
@@ -428,10 +376,10 @@ HistRecList_t::HistRecList_t(void) {
 void
 HistRecList_t::extendLen(void) {
     max_len += EXTEND_LEN;
-    hist = (HistRec *)realloc( hist, sizeof(HistRec) * max_len );
-    if ( hist == NULL ) {
+    histrec = (HistRec *)realloc( histrec, sizeof(HistRec) * max_len );
+    if (histrec == NULL) {
 	WARN( 0, "%s():realloc() failed.\n", __func__ );
-	exit( EXIT_FAILURE );
+	exit(EXIT_FAILURE);
     }
     return;
 }
@@ -442,21 +390,24 @@ HistRecList_t::extendLen(void) {
 void HistRecList_t::add( int funcID, void *argp ) {
     int DSCVMethodId;
 
+#if 0
     if ( rec_en==0 || recalling==1 ) {
        /* record-enable-flag is disabled, or in recalling process. */
        return;
     }
+#endif
     if ( length == max_len ) { /* Extend the existing memory region. */
 	extendLen();
     }
 
     DSCVMethodId = funcID2DSCVMethod(funcID);
-    hist[length].args   = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
-    hist[length].funcID = funcID;
+    histrec[length].args   = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
+    histrec[length].funcID = funcID;
     length++; /* Increment the count of cuda call */
 
+#if 0
     switch (funcID2DSCVMethod(funcID)) {
-    case DSCVMethodMemcpyD2D: { /* cudaMemcpy(DevicetoDevice) */
+    case DSCVMethodMemcpyD2D: /* cudaMemcpy(DevicetoDevice) */
 	cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
 	BkupMem *mem = BKUPMEM.queryRegion( args->d_region );
 	if (!mem) {
@@ -467,17 +418,18 @@ void HistRecList_t::add( int funcID, void *argp ) {
 	cudaMemcpy(mem->dst, args->src, args->count, cudaMemcpyDeviceToHost);
 	St.setAutoVerb(verb);
 	break;
-      }
+    default:
     }
+#endif
     return;
 }
 /*
  * Clear all hisotry of calling cuda functions.
  */
-void HistRecList_t::clear( void ) {
-   if ( hist != NULL ) {
+void HistRecList_t::clear(void) {
+   if (histrec != NULL) {
       for (int i=0; i < length; i++) {
-         (releaseArgsStub[funcID2DSCVMethod( hist[i].funcID)])(hist[i].args);
+         (releaseArgsStub[funcID2DSCVMethod( histrec[i].funcID)])(histrec[i].args);
       }
    }
    length = 0;
@@ -491,10 +443,6 @@ void HistRecList_t::clrRecallFlag(void) {
     recall_flag = 0;
 }
 
-void dscudaClearHist(void) {
-    HISTREC.clear();
-}
-
 void HistRecList_t::print(void) {
     WARN(1, "%s(): *************************************************\n", __func__);
     if ( length == 0 ) {
@@ -503,7 +451,7 @@ void HistRecList_t::print(void) {
     }
     for (int i=0; i < length; i++) { /* Print recall history. */
 	WARN(1, "%s(): Recall History[%d]> ", __func__, i);
-	switch (hist[i].funcID) { /* see "dscudarpc.h" */
+	switch (histrec[i].funcID) { /* see "dscudarpc.h" */
 	  case 305: WARN(1, "cudaSetDevice()\n");        break;
 	  case 504: WARN(1, "cudaEventRecord()\n");      break;
 	  case 505: WARN(1, "cudaEventSynchronize()\n"); break;
@@ -512,7 +460,7 @@ void HistRecList_t::print(void) {
 	  case 701: WARN(1, "cudaFree()\n");             break;
 	  case 703: WARN(1, "cudaMemcpy(H2D)\n");        break;
 	  case 704: WARN(1, "cudaMemcpy(D2H)\n");        break;
-	  default:  WARN(1, "/* %d */()\n", hist[i].funcID);
+	  default:  WARN(1, "/* %d */()\n", histrec[i].funcID);
 	}
     }
     WARN(1, "%s(): *************************************************\n", __func__);
@@ -539,7 +487,7 @@ int HistRecList_t::recall(void) {
        this->print();
        called_depth++;       
        for (int i=0; i< length; i++) { /* Do recall history */
-	   (recallStub[funcID2DSCVMethod( HISTREC.hist[i].funcID )])(HISTREC.hist[i].args); /* partially recursive */
+	   (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
        }
        called_depth=0;
        result = 0;
@@ -579,22 +527,4 @@ void dscudaVerbMigrateModule() {
     }
     printModuleList();
 }
-/*
- *
- */
-void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
-    WARN(1, "#**********************************************************************\n");
-    WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
-    WARN(1, "#**********************************************************************\n\n");
-    WARN(1, "Failed 1st= %s\n", from->ip);
-    replaceBrokenServer(from, to);
-    WARN(1, "Reconnecting to %s replacing %s\n", from->ip, to->ip);
-    setupConnection(Vdevid[vdevidIndex()], from);
 
-    BKUPMEM.reallocDeviceRegion(from);
-    BKUPMEM.restructDeviceRegion(); /* */
-    printModuleList();
-    invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
-    dscudaVerbMigrateModule(); // not good ;_;, or no need.
-    HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
-}

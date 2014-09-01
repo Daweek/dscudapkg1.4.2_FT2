@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 23:38:41
+// Last Modified On : 2014-09-01 17:38:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -47,44 +47,6 @@ checkSum(void *targ, int size) {
     }
     return sum;
 }
-
-void printRegionalCheckSum(void) {
-    BkupMem *pMem = BKUPMEM.head;
-    int length = 0;
-    while (pMem != NULL) {
-	fprintf(stderr, "Region[%d](dp=%p, size=%d): checksum=0x%08x\n",
-	       length, pMem->d_region, pMem->size, checkSum(pMem->h_region, pMem->size));
-	pMem = pMem->next;
-	length++;
-    }
-}
-
-static cudaError_t
-dscudaVerbMalloc(void **devAdrPtr, size_t size, RCServer_t *pSvr) {
-    int      vid = vdevidIndex();
-    
-    void *adrs;
-    dscudaMallocResult *rp;
-    cudaError_t err = cudaSuccess;
-    
-    WARN(3, "%s(%p, %zu, RCServer_t *pSvr{id=%d,cid=%d,uniq=%d})...",
-	 __func__, devAdrPtr, size, pSvr->id, pSvr->cid, pSvr->uniq);
-    //initClient();
-    rp = dscudamallocid_1(size, Clnt[Vdevid[vid]][pSvr->id]);
-    checkResult(rp, pSvr);
-    if (rp->err != cudaSuccess) {
-            err = (cudaError_t)rp->err;
-    }
-    adrs = (void*)rp->devAdr;
-    WARN(3, "device : devAdrPtr:%p\n", adrs);	
-    xdr_free((xdrproc_t)xdr_dscudaMallocResult, (char *)rp);
-
-    *devAdrPtr = dscudaUvaOfAdr(adrs, Vdevid[vid]);
-    WARN(3, "done. *devAdrPtr:%p, Length of Registered MemList: %d\n", *devAdrPtr, BKUPMEM.countRegion());
-
-    return err;
-}
-
 
 //stubs for store/release args, and recall functions.
 static void *(*storeArgsStub[DSCVMethodEnd])(void *);
@@ -489,24 +451,4 @@ void dscudaVerbMigrateModule() {
     }
     printModuleList();
 }
-/*
- *
- */
-#if 0
-void dscudaVerbMigrateDevice(RCServer_t *from, RCServer_t *to) {
-    WARN(1, "#**********************************************************************\n");
-    WARN(1, "# (._.) DS-CUDA will try GPU device migration.\n");
-    WARN(1, "#**********************************************************************\n\n");
-    WARN(1, "Failed 1st= %s\n", from->ip);
-    //replaceBrokenServer(from, to);
-    //WARN(1, "Reconnecting to %s replacing %s\n", from->ip, to->ip);
-    //setupConnection(Vdevid[vdevidIndex()], from);
 
-    BKUPMEM.reallocDeviceRegion(from);
-    BKUPMEM.restructDeviceRegion(); /* */
-    printModuleList();
-    invalidateModuleCache(); /* Clear cache of kernel module to force send .ptx to new hoSt. */
-    dscudaVerbMigrateModule(); // not good ;_;, or no need.
-    HISTREC.recall();  /* ----- Do redundant calculation(recursive) ----- */
-}
-#endif

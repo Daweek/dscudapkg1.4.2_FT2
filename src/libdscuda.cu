@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 11:19:55
+// Last Modified On : 2014-09-01 18:17:11
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1096,7 +1096,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 	WARN( 10, "%s\n", __func__ );
 #if 1
 	for (d=0; d < Nvdev; d++) { /* Sweep all virtual GPUs */
-	    pmem = Vdev[d].memlist_vir.head ;
+	    pmem = Vdev[d].memlist.head ;
 	    while ( pmem != NULL ) {
 		cudaSetDevice_clnt( d, errcheck );
 		
@@ -1201,6 +1201,7 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 #endif //replacing new code
 	
 	if (snapshot_match == 1) {
+#if 0
 	    /*****************************************
 	     * Update snapshot memories, and storage.
 	     */
@@ -1220,7 +1221,8 @@ ClientState_t::periodicCheckpoint( void *arg ) {
 	    WARN(3, "***********************************\n");
 	    //HISTREC.print();
 	    //HISTREC.clear();
-	    snapshot_count++;	    
+	    snapshot_count++;
+#endif
 	} else {
 	    /*
 	     * Rollback and retry cuda sequence.
@@ -2001,7 +2003,7 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice) {
  * MEMO: BkupMemList_t::reallocDeviceRegion(RCServer_t *svr)
  */
 void VirDev_t::remallocRegionsGPU(int num_svr) {
-    BkupMem *mem = memlist_vir.head;
+    BkupMem *mem = memlist.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;

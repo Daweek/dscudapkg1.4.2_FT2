@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 11:22:00
+// Last Modified On : 2014-09-01 17:22:47
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -57,7 +57,16 @@ void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz) {
     prev = NULL;
     next = NULL;
 }
+int BkupMem_t::calcSum(void) {
+    int sum=0;
+    int *ptr = (int *)h_region;
 
+    for (int i=0; i<size; i+=sizeof(int)) {
+	sum += *ptr;
+	ptr++;
+    }
+    return sum;
+}
 //========================================================================
 /*
  * Constuctor of "BkupMemList_t" class.
@@ -258,27 +267,6 @@ BkupMemList_t::updateRegion( void *dst, void *src, int size ) {
     }
 }
 
-
-void
-BkupMemList_t::reallocDeviceRegion(RCServer_t *svr) {
-    BkupMem *mem = head;
-    int     verb = St.isAutoVerb();
-    int     copy_count = 0;
-    int     i = 0;
-    
-    WARN(1, "%s(RCServer_t *sp).\n", __func__);
-    WARN(1, "Num. of realloc region = %d\n", length );
-    St.unsetAutoVerb();
-    while ( mem != NULL ) {
-	/* TODO: select migrateded virtual device, not all region. */
-	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_region, mem->size);
-	dscudaVerbMalloc(&mem->d_region, mem->size, svr);
-	mem = mem->next;
-	i++;
-    }
-    St.setAutoVerb(verb);
-    WARN(1, "+--- Done.\n");
-}
 /* 
  * Resore the all data of a GPU device with backup data on client node.
  */
@@ -295,8 +283,8 @@ BkupMemList_t::restructDeviceRegion(void) {
     St.unsetAutoVerb();
     while (mem != NULL) {
 	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
-	     copy_count++, mem->d_region, mem->h_region, mem->size, checkSum(mem->h_region_tmp, mem->size));
-	mem->restoreSafeRegion();
+	     copy_count++, mem->d_region, mem->h_region, mem->size, mem->calcSum());
+	//mem->restoreSafeRegion();
 	mem = mem->next;
     }
     St.setAutoVerb( verb );

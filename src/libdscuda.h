@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 11:33:12
+// Last Modified On : 2014-09-01 17:37:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -36,8 +36,9 @@ typedef struct BkupMem_t {
     BkupMem_t( void );
     //--- methods
     void   init(void *uva_ptr, void *d_ptr, int isize);
-    int    isHead( void );
-    int    isTail( void );
+    int    isHead(void);
+    int    isTail(void);
+    int    calcSum(void);
 } BkupMem;
 
 //********************************************************************
@@ -66,7 +67,6 @@ public:
     int      checkSumRegion(void *targ, int size );
     void*    searchUpdateRegion(void *dst );
     void     updateRegion(void *dst, void *src, int size );
-    void     reallocDeviceRegion( RCServer_t *svr );  /* ReLoad backups */
     void     restructDeviceRegion(void);              /* ReLoad backups */
 } BkupMemList;
 
@@ -239,14 +239,15 @@ struct RCServer {
 
     void setupConnection(void);
     void dupServer(RCServer_t *dup);
-    void migrateServer(RCServer_t *newone, RCServer_t *broken);
+
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
-
-    void migrateReallocAll();
+    //<--- Migration series
+    void migrateServer(RCServer_t *newone, RCServer_t *broken);
+    void migrateReallocAllRegions(void);
     /*CONSTRUCTOR*/
     RCServer();
 };  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */

@@ -34,7 +34,7 @@ libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
 	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
 
 libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
-                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o dscudaverb.o \
+                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o \
                         libdscuda_bkupmem.o libdscuda_histrec.o
 	ar rvu $@ $^
 	ranlib $@

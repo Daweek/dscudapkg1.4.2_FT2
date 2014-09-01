@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-31 10:08:11
+// Last Modified On : 2014-09-01 17:39:18
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -104,6 +104,26 @@ void RCServer_t::migrateServer(RCServer_t *newone, RCServer_t *broken) {
     return;
 }
 
+void
+RCServer_t::migrateReallocAllRegions(void) {
+    BkupMem *mem_ptr = memlist.head;
+    int     verb = St.isAutoVerb();
+    int     copy_count = 0;
+    int     i = 0;
+    
+    WARN(1, "%s(RCServer_t *sp).\n", __func__);
+    WARN(1, "Num. of realloc region = %d\n", memlist.length );
+    
+    while (mem_ptr != NULL) {
+	/* TODO: select migrateded virtual device, not all region. */
+	WARN(5, "mem[%d]->dst = %p, size= %d\n",
+	     i, mem_ptr->d_region, mem_ptr->size);
+	this->cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
+	mem_ptr = mem_ptr->next;
+	i++;
+    }
+    WARN(1, "+--- Done.\n");
+}
 
 cudaError_t
 RCServer::cudaMemcpyH2D(void *dst, void *src, size_t count) {
@@ -160,7 +180,7 @@ void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err
 	break;
     case RPC_TIMEDOUT: //=5
 	WARN(1, "Detected RPC:Timed Out in  %s().\n", __func__);
-	dscudaVerbMigrateDevice( failed, spare );
+	//dscudaVerbMigrateDevice( failed, spare );
 	break;
     case RPC_UNKNOWNHOST: //=13
 	break;
@@ -546,7 +566,7 @@ RCServer::cudaMalloc(void **d_ptr, size_t size) {
      */
     if ( St.isAutoVerb() ) {
 	cudaMallocArgs args( *d_ptr, size );
-	memlist.add( args.devPtr, args.size );
+	//memlist.add( args.devPtr, args.size );
     }
 
     return cuerr;
@@ -700,7 +720,7 @@ RCServer::cudaMemcpyD2H(void *dst, void *src, size_t count) {
 cudaError_t
 VirDev_t::cudaMemcpyD2H(void *dst, void *src, size_t count) {
     WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" {\n",
-	  __func__, St.getFtModeString(), vdev->info );
+	  __func__, St.getFtModeString(), info );
 
     int matched_count   = 0;
     int unmatched_count = 0;
@@ -740,7 +760,7 @@ VirDev_t::cudaMemcpyD2H(void *dst, void *src, size_t count) {
 	/*
 	 * Access to Physical GPU Device.
 	 */
-	server[i].cudaMemcpyD2H(dst, src, size);
+	server[i].cudaMemcpyD2H(dst, src, count);
 	
         if ( i==0 ) {
 	    memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
@@ -801,15 +821,15 @@ VirDev_t::cudaMemcpyD2H(void *dst, void *src, size_t count) {
 	    
 		//TODO: rewrite BKUPMEM.restructDeviceRegion();
 		
-		recall_result = HISTREC.recall();
+		//recall_result = HISTREC.recall();
 	    
 		if (recall_result != 0) {
 		    printModuleList();
 		    printVirtualDeviceList();
 		    //dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
-		    dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
+		    //dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
 		}
-		HISTREC.on();  // ---> restore recordHist enable.
+		//HISTREC.on();  // ---> restore recordHist enable.
 		St.setAutoVerb();    // ===> restore autoVerb enabled.
 	    }
 	}
@@ -1023,7 +1043,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         args2.smemsize = smemsize;
         args2.stream   = stream;
         args2.args     = args;
-        HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
+        //HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
     }
 
     st = RCstreamArrayQuery((cudaStream_t)stream);

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 23:53:00
+// Last Modified On : 2014-09-01 17:38:43
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -80,8 +80,6 @@ typedef struct {
 #endif
 
 void dscudaVerbInit(void);                /* Initializer    */
-void dscudaVerbMigrateDevice(RCServer_t *svr_from, RCServer_t *svr_to);
 void dscudaClearHist(void);
-void printRegionalCheckSum(void);
 
 #endif // __DSCUDAVERB_H__
