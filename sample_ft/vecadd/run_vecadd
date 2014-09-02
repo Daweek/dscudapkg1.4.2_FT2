@@ -1,13 +1,24 @@
 #!/bin/bash
 
+mode=${1}
+
+if [ "${mode}" = "MONO" ]; then
+    echo "MONO"
+    DSCUDA_SERVER="c4hdn:0"
+elif [ "${mode}" = "POLY" ]; then
+    echo "POLY"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1"
+else
+    echo "add MONO or POLY for 1st parameter"
+    exit 1
+fi
+export DSCUDA_SERVER
+
 export CUDAPATH=/usr/local/cuda-4.2
 export CUDASDKPATH=~/NVIDIA_GPU_Computing_SDK
 export DSCUDA_PATH=~/dscudapkg_FT
 export DSCUDA_WARNLEVEL=10
 export DSCUDA_REMOTECALL="rpc"
-
-#export DSCUDA_SERVER="stelletto2:0,c4hdn:0"
-export DSCUDA_SERVER="c4hdn:0"
 
 export DSCUDA_USEDAEMON=1
 export DSCUDA_AUTOVERB=0
