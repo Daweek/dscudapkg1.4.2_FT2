@@ -53,12 +53,21 @@ libcudart.so.3:	cudart_dummy.cu
 	$(NVCC) $(CUDAINCLUDES) -shared -Xcompiler -fPIC -o $@ $<
 
 libdscuda_bkupmem.o:  libdscuda_bkupmem.cu libdscuda.h
+	@echo "//***************************"
+	@echo "//**  libdscuda_bkupmem.o  **"
+	@echo "//***************************"		
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
 
 libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
+	@echo "//***************************"
+	@echo "//**  libdscuda_histrec.o  **"
+	@echo "//***************************"		
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
 
 dscudad :	dscudad.cu sockutil.c
+	@echo "//****************"
+	@echo "//**  dscudad  ***"
+	@echo "//****************"
 	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
 
 dscudad_rpc :	dscudad.cu sockutil.c
