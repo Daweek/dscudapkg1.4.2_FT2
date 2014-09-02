@@ -5,9 +5,12 @@
 dscudarpc.h
 dscudarpc_svc.c
 dscudarpc_xdr.c
+dscudarpc_clnt.c
 
 # generated binary.
 dscudad
 dscudasvr
 dscudasvr_fault
+libcudart.so.3
+libdscuda_rpc.a
 
