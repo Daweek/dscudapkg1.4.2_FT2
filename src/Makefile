@@ -31,6 +31,9 @@ rpconly:	$(TARGET_RPCONLY)
 libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
                         $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o \
                         libdscuda_bkupmem.o libdscuda_histrec.o
+	@echo "//************************"
+	@echo "//**  libdscuda_rpc.o  ***"
+	@echo "//************************"
 	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
 
 libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
@@ -69,9 +72,15 @@ dummyclient :	dummyclient.c
 # dscudasvr series
 # 
 dscudasvr :	   dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+	@echo "//******************"
+	@echo "//**  dscudasvr  ***"
+	@echo "//******************"
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
-dscudasvr.o:       dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
+dscudasvr.o:       dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
+	@echo "//********************"
+	@echo "//**  dscudasvr.o  ***"
+	@echo "//********************"
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
 dscudasvr_fault :  dscudasvr_fault.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
@@ -131,6 +140,9 @@ $(DSCUDAIF).x: dscudadefs.h
 .PHONY: clean install
 
 install:
+	@echo "//************************************************"
+	@echo "//**  Install dscuda files to bin/lib/include.  **"
+	@echo "//************************************************"
 	ln -fs ../src/dscuda.h       ../include/
 	ln -fs ../src/dscudadefs.h   ../include/
 	ln -fs ../src/dscudamacros.h ../include/
