@@ -1,6 +1,13 @@
 
-.PHONY: push2github push2bitbucket push2all
+.PHONY: src push2github push2bitbucket push2all
 push2all: push2bithub push2bitbucket
+
+###
+### ./src/
+###
+src:
+	(cd src && make clean && make)
+
 ###
 ### GitHub
 ###

@@ -144,4 +144,7 @@ install:
 	ln -fs ../src/dscudasvr_fault  ../bin/
 	ln -fs ../src/libdscuda_rpc.a ../lib/
 clean:
-	/bin/rm $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
+	@echo "//*********************************"
+	@echo "//**  Clean up generated files.  **"
+	@echo "//*********************************"
+	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
