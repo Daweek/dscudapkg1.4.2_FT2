@@ -4,6 +4,7 @@ dscudamacros.h
 dscudaverb.h
 dscudadefs.h
 dscudarpc.h
+dscudautil.h
 libdscuda.h
 sockutil.h
 
