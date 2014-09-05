@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-02 02:22:07
+// Last Modified On : 2014-09-05 19:37:15
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1004,7 +1004,7 @@ void ClientState_t::initEnv(void) {
         env = getenv("DSCUDA_SERVER");
     }
 
-    setFaultTolerantMode();
+
     
     resetServerUniqID();      /* set all unique ID to invalid(-1)*/
     
@@ -1038,7 +1038,7 @@ void ClientState_t::initEnv(void) {
     
     return;
 }
-
+#if 0
 void ClientState_t::initProgress( ClntInitStat stat ) {
     switch(stat) {
     case ORIGIN:
@@ -1069,7 +1069,7 @@ void ClientState_t::initProgress( ClntInitStat stat ) {
 	exit(1);
     }
 }
-
+#endif
 /*
  * Take the data backups of each virtualized GPU to client's host memory
  * after verifying between redundant physical GPUs every specified wall clock
@@ -1246,8 +1246,7 @@ ClientState_t::ClientState_t(void) {
     start_time = time( NULL );
     WARN( 1, "[ERRORSTATICS] start.\n" );
     
-    initProgress( ORIGIN );
-	
+    //initProgress( ORIGIN );
     WARN( 5, "The constructor %s() called.\n", __func__ );
 
     ip_addr     = 0;
@@ -1256,6 +1255,13 @@ ClientState_t::ClientState_t(void) {
     migration   = 0;
     daemon      = 0;
     historical_calling = 0;
+    
+    setFaultTolerantMode();
+    
+    for (int i=0; i<RC_NVDEVMAX; i++) { // Init Vdev.id.
+	Vdev[i].id      = i;
+	Vdev[i].ft_mode = this->ft_mode;
+    }
     
     initEnv();
 
@@ -1274,7 +1280,7 @@ ClientState_t::ClientState_t(void) {
 
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
     
-    initProgress( INITIALIZED );    
+    //initProgress( INITIALIZED );    
     WARN( 5, "The constructor %s() ends.\n", __func__);
 }
 
@@ -1921,7 +1927,7 @@ cudaError_t cudaSetDevice( int device ) {
     cudaError_t cuerr = cudaSuccess;
     int errcheck = 0; 
 
-    St.cudaCalled();
+    //St.cudaCalled();
     WARN(3, "%s(%d)...\n", __func__, device);
     
 #if 0
@@ -1954,7 +1960,7 @@ cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
 cudaError_t cudaGetDeviceCount(int *count) {
     cudaError_t err = cudaSuccess;
 
-    St.cudaCalled();
+    //St.cudaCalled();
     *count = St.Nvdev;
     WARN(3, "cudaGetDeviceCount(%p)  count:%d ...", count, *count);
     WARN(3, "done.\n");

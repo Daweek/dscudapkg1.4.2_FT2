@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-02 01:38:51
+// Last Modified On : 2014-09-05 22:44:12
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -182,7 +182,7 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size) {
     length++;
     total_size += size;
 
-    WARN(5, "+--- add BkupMemList[%d]: uva_ptr=%p d_ptr=%p, size=%d\n",
+    WARN(5, "      add BkupMemList[%d]: uva_ptr=%p d_ptr=%p, size=%d\n",
 	 length - 1, uva_ptr, d_ptr, size);
     if (getLen() < 0) {
 	WARN(0, "(+_+) Unexpected error in %s()\n", __func__);

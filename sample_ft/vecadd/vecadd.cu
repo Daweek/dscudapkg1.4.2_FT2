@@ -11,7 +11,7 @@
 #define N (8)
 
 int main(void) {
-    int i, t, t_total=100;
+    int i, t, t_total=3;
     float a[N], b[N], c[N];
     float *d_a, *d_b, *d_c;
 
@@ -21,9 +21,9 @@ int main(void) {
     //FAULT_CONF.overwrite_en = 1;
     //printf("The size of FAULT_CONF is %d Byte.\n", sizeof(FAULT_CONF));
 
-    cutilSafeCall(cudaMalloc((void**) &d_a, sizeof(float) * N));
-    cutilSafeCall(cudaMalloc((void**) &d_b, sizeof(float) * N));
-    cutilSafeCall(cudaMalloc((void**) &d_c, sizeof(float) * N));
+    cudaMalloc((void**) &d_a, sizeof(float) * N);
+    cudaMalloc((void**) &d_b, sizeof(float) * N);
+    cudaMalloc((void**) &d_c, sizeof(float) * N);
 
     for (t=0; t<t_total; t++) {
 	printf("#\n");

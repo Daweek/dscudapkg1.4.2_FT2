@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-02 02:32:44
+// Last Modified On : 2014-09-05 23:40:48
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -242,7 +242,7 @@ struct RCServer {
 
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
-    cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
+    cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
     //<--- Migration series
@@ -277,6 +277,14 @@ typedef struct SvrList {
 } SvrList_t;
 
 typedef enum {
+    //* Define basic behavior of Fault tolerant functions.
+    FT_PLAIN = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
+    FT_REDUN = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
+    FT_MIGRA = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
+    FT_BOTH  = 3   // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
+} FtMode;
+
+typedef enum VdevConf_e{
     VDEV_MONO = 0, //Vdev_t.nredundancy == 1
     VDEV_POLY = 1, //                   >= 2
     VDEV_INVALID = 8,
@@ -289,17 +297,19 @@ typedef enum {
 //***      - Virtualized GPU Device class.
 //*************************************************
 typedef struct VirDev_t {
+    int         id;
     RCServer_t  server[RC_NREDUNDANCYMAX]; //Physical Device array.
     int         nredundancy;               //Redundant count
-    
-    VdevConf    conf;                      //Infomation.
+
+    FtMode      ft_mode;
+    VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
     BkupMemList memlist;              //part of Checkpoint data.
     HistRecList reclist;
 
-    cudaError_t cudaMalloc(void **h_ptr, size_t size, int devid);
-    cudaError_t cudaMemcpyH2D(void *d_ptr, void *h_ptr, size_t size);
+    cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
     
@@ -309,15 +319,6 @@ typedef struct VirDev_t {
 /******************************************/
 /* Client Application Status/Information. */
 /******************************************/
-typedef enum {
-    /*
-     * Define basic behavior of Fault tolerant functions.
-     */
-    FT_PLAIN = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
-    FT_REDUN = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
-    FT_MIGRA = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
-    FT_BOTH  = 3   // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
-} ClntFtMode;
 
 typedef enum {
     ORIGIN      = 0,
@@ -344,7 +345,7 @@ public:
     Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
 
 
-    ClntFtMode   ft_mode;
+    FtMode       ft_mode;
     ClntInitStat init_stat;
     char *getFtModeString(void);    
                               /*** Static Information ***/
@@ -382,8 +383,8 @@ public:
     void unsetMigrateDevice() { migration = 0; }
     int  getMigrateDevice() { return migration; }
 
-    void initProgress(ClntInitStat stat);
-    void cudaCalled(void) { initProgress( CUDA_CALLED ); }
+//    void initProgress(ClntInitStat stat);
+//    void cudaCalled(void) { initProgress( CUDA_CALLED ); }
 };
 extern struct ClientState_t St;
 //extern int    ClientState_t::Nvdev;
