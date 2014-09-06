@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 14:19:33
+// Last Modified On : 2014-09-06 16:02:02
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -842,6 +842,7 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     }
 #endif
     int memcmp_ret;
+    int all_matched = 1;
     
     switch (conf) {
     case VDEV_MONO:
@@ -855,24 +856,28 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	    for (int k=i+1; k<nredundancy; k++) {
 		memcmp_ret = memcmp(server[i].memlist.queryHostPtr(src), server[k].memlist.queryHostPtr(src), count);
 		if (memcmp_ret == 0) {
+		    server[k].stat_correct++;
+		} else {
+		    server[k].stat_error++;
+		    all_matched = 0;
 		}
+		WARN(2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
 	    }
 	}
 	
-	if ( unmatched_count==0 && matched_count==(nredundancy-1)) {
+	if ( all_matched==1 ) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
 	    /*
 	     * Update backuped memory region.
 	     */
-	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA ||
-		  St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
+	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
 		WARN( 5, "checkpoint-0\n");
-		//TODO: rewrite BKUPMEM.updateRegion(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
+		//memlist.updateRegion(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
 		
 		WARN( 5, "checkpoint-1\n");
 	    }
-	} else { /* redundant failed */
+	} else {
 	    if ( unmatched_count>0 && matched_count<(nredundancy-1)) {
 		WARN( 1, " #   #\n");
 		WARN( 1, "  # #\n");
