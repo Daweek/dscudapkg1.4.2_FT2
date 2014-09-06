@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 00:10:09
+// Last Modified On : 2014-09-07 00:27:51
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -631,13 +631,15 @@ cudaError_t RCServer::cudaFree(void *v_ptr) {
     return err;
 }
 
-cudaError_t VirDev_t::cudaFree(void *d_ptr) {
+cudaError_t VirDev_t::cudaFree(void *v_ptr) {
     cudaError_t  err = cudaSuccess;
 
-    WARN(3, "   + Virtual[%d].cudaFree(%p) {\n", id, d_ptr);
+    WARN(3, "   + Virtual[%d].cudaFree(%p) {\n", id, v_ptr);
     for (int i=0; i<nredundancy; i++) {
-	err = server[i].cudaFree(d_ptr);
+	err = server[i].cudaFree(v_ptr);
+	server[i].memlist.remove(v_ptr);
     }
+    this->memlist.remove(v_ptr);
     /*
      * Automatic Recoverly
      */

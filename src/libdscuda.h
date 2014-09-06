@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 19:47:21
+// Last Modified On : 2014-09-07 00:24:50
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ public:
     void     print(void);
     BkupMem* query(void *uva_ptr);
     void     add(void *uva_ptr, void *dst, int size);
-    void     remove( void *dst );        // verbAllocatedMemUnregister()
+    void     remove(void *uva_ptr);        // verbAllocatedMemUnregister()
     int      isEmpty(void);
     int      getLen(void);
     long     getTotalSize(void); // get total size of allocated memory.
