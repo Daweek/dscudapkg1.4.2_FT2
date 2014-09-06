@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:42:40
+// Last Modified On : 2014-09-06 12:48:36
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -834,7 +834,7 @@ dscudaMallocResult *dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     err = cudaMemset( devadr, 0, size );
     check_cuda_error(err);
 #endif
-    WARN(3, "%p, %d) done. devadr:%p\n", &devadr, size, devadr);
+    WARN0(3, "%p, %d) done. devadr:%p\n", &devadr, size, devadr);
 
     return &res;
 }
@@ -850,7 +850,7 @@ dscudafreeid_1_svc(RCadr mem, struct svc_req *)
     err = cudaFree((void*)mem);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx) done.\n", (long long)mem);
+    WARN0(3, "0x%08llx) done.\n", (long long)mem);
 
     return &res;
 }
@@ -874,7 +874,7 @@ dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *s
     err = cudaMemcpy((void*)dst, srcbuf.RCbuf_val, count, cudaMemcpyHostToDevice);
     check_cuda_error(err);
     res.err = err;
-    WARN(3, "0x%08llx, 0x%08lx, %d, %s) done.\n",
+    WARN0(3, "0x%08llx, 0x%08lx, %d, %s) done.\n",
 	 (long long)dst, (unsigned long)srcbuf.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
@@ -897,7 +897,7 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, struct svc_req *sr )
     }
     res.buf.RCbuf_len = count;
     err = cudaMemcpy( res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost );
-    WARN( 3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
+    WARN0( 3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
          (unsigned long)res.buf.RCbuf_val, (long long)src, count, dscudaMemcpyKindName( cudaMemcpyDeviceToHost ));
     check_cuda_error(err);
     res.err = err;
