@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 17:30:13
+// Last Modified On : 2014-09-06 12:42:40
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -816,8 +816,7 @@ dscudafuncgetattributesid_1_svc(int moduleid, char *kname, struct svc_req *sr)
  * Memory Management
  */
 
-dscudaMallocResult * 
-dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
+dscudaMallocResult *dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     static dscudaMallocResult res;
     cudaError_t err;
     int *devadr;
@@ -835,7 +834,7 @@ dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     err = cudaMemset( devadr, 0, size );
     check_cuda_error(err);
 #endif
-    WARN(3, "0x%p, %d) done. devadr:0x%p\n", &devadr, size, devadr);
+    WARN(3, "%p, %d) done. devadr:%p\n", &devadr, size, devadr);
 
     return &res;
 }

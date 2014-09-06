@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-05 23:40:48
+// Last Modified On : 2014-09-06 12:06:32
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -39,6 +39,8 @@ typedef struct BkupMem_t {
     int    isHead(void);
     int    isTail(void);
     int    calcSum(void);
+    void  *translateAddrVtoD(const void *v_ptr);
+    void  *translateAddrVtoH(const void *v_ptr);
 } BkupMem;
 
 //********************************************************************
@@ -64,9 +66,9 @@ public:
     int      getLen(void);
     long     getTotalSize(void); // get total size of allocated memory.
     int      countRegion(void);
-    int      checkSumRegion(void *targ, int size );
-    void*    searchUpdateRegion(void *dst );
-    void     updateRegion(void *dst, void *src, int size );
+    int      checkSumRegion(void *targ, int size);
+    void*    queryHostPtr(const void *v_ptr);
+    void*    queryDevicePtr(const void *v_ptr);
     void     restructDeviceRegion(void);              /* ReLoad backups */
 } BkupMemList;
 
@@ -243,7 +245,7 @@ struct RCServer {
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
-    cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
+    cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
     //<--- Migration series
     void migrateServer(RCServer_t *newone, RCServer_t *broken);
@@ -310,7 +312,7 @@ typedef struct VirDev_t {
 
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
-    cudaError_t cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t size);
+    cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
     
     void remallocRegionsGPU(int num_svr);

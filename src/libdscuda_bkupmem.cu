@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-05 22:44:12
+// Last Modified On : 2014-09-06 12:06:17
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -39,6 +39,32 @@ int BkupMem_t::isTail( void ) {
     if (next == NULL) { return 1; }
     else              { return 0; }
 }
+void *BkupMem_t::translateAddrVtoD(const void *v_ptr) {
+    char *v_cptr       = (char *)v_ptr;
+    char *v_region_end = (char *)v_region + size;
+    long  d_offset;
+    char *d_ret;
+    if ((v_cptr >= v_region) && (v_cptr < v_region_end)) {
+	d_offset = v_cptr - (char *)v_region;
+	d_ret = (char *)d_region + d_offset;
+	return (void *)d_ret;
+    } else {
+	return NULL;
+    }
+}
+void *BkupMem_t::translateAddrVtoH(const void *v_ptr) {
+    char *v_cptr       = (char *)v_ptr;
+    char *v_region_end = (char *)v_region + size;
+    long  h_offset;
+    char *h_ret;
+    if ((v_cptr >= v_region) && (v_cptr < v_region_end)) {
+	h_offset = v_cptr - (char *)v_region;
+	h_ret = (char *)h_region + h_offset;
+	return (void *)h_ret;
+    } else {
+	return NULL;
+    }
+}
 /*
  * 
  */
@@ -72,7 +98,6 @@ int BkupMem_t::calcSum(void) {
  * Constuctor of "BkupMemList_t" class.
  */
 BkupMemList_t::BkupMemList_t(void) {
-    char *env;
     int   autoverb;
 
     head       = NULL;
@@ -146,7 +171,7 @@ BkupMem*
 BkupMemList_t::query(void *uva_ptr) {
     BkupMem *mem = head;
     int i = 0;
-    while (mem != NULL) { // Search in list
+    while (mem != NULL) { // Search the target from head to tail in the list.
 	if (mem->v_region == uva_ptr) { /* tagged by its address on GPU */
 	    WARN(10, "---> %s(%p): return %p\n", __func__, uva_ptr, mem);
 	    return mem;
@@ -223,48 +248,38 @@ void BkupMemList_t::remove(void *uva_ptr) {
     }
 }
 
-void*
-BkupMemList_t::searchUpdateRegion(void *dst) {
+void *BkupMemList_t::queryHostPtr(const void *v_ptr) {
     BkupMem *mem = head;
-    char *d_targ  = (char *)dst;
-    char *d_begin;
-    char *h_begin;
-    char *h_p     = NULL;
+    void *h_ptr = NULL;
     int   i = 0;
     
     while (mem) { /* Search */
-	d_begin = (char *)mem->d_region;
-	h_begin = (char *)mem->h_region;
-	
-	if (d_targ >= d_begin &&
-	    d_targ < (d_begin + mem->size)) {
-	    h_p = h_begin + (d_targ - d_begin);
-	    break;
+	h_ptr = mem->translateAddrVtoH(v_ptr);
+	if (h_ptr != NULL) {
+	    return h_ptr;
 	}
 	mem = mem->next;
 	i++;
     }
-    return (void *)h_p;
+    WARN(0, "%s():not found host pointer.\n", __func__);
+    return NULL;
 }
 
-void
-BkupMemList_t::updateRegion( void *dst, void *src, int size ) {
-// dst : GPU device memory region
-// src : HOST memory region
-    BkupMem *mem;
-    void    *src_mirrored;
+void *BkupMemList_t::queryDevicePtr(const void *v_ptr) {
+    BkupMem *mem = head;
+    void *d_ptr = NULL;
+    int   i = 0;
     
-    if ( src == NULL ) {
-	WARN(0, "(+_+) not found backup target memory region (%p).\n", dst);
-	exit(1);
-    } else {
-	//mem = BkupMem.query(dst);
-	//src_mirrored = mem->src;
-	src_mirrored = searchUpdateRegion(dst);
-	memcpy(src_mirrored, src, size); // update historical memory region.
-	WARN(3, "+--- Also copied to backup region (%p), checksum=%d.\n",
-	     dst, checkSumRegion(src, size));
+    while (mem) { /* Search */
+	d_ptr = mem->translateAddrVtoH(v_ptr);
+	if (d_ptr != NULL) {
+	    return d_ptr;
+	}
+	mem = mem->next;
+	i++;
     }
+    WARN(0, "%s():not found device pointer.\n", __func__);
+    return NULL;
 }
 
 /* 

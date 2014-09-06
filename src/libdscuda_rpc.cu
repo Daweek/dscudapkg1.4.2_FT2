@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-05 23:53:43
+// Last Modified On : 2014-09-06 12:04:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -727,15 +727,10 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
 /*
  * cudaMemcpy( DeviceToHost )
  */
-cudaError_t
-RCServer::cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t count) {
+cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count) {
     cudaMemcpyArgs args;
-    BkupMem *mem;
-    cudaError_t err = cudaSuccess;
 
-    //<-- Translate virtual d_ptr to real d_ptr.
-    mem = memlist.query(d_ptr);
-    //--> Translate virtual d_ptr to real d_ptr.
+    cudaError_t err = cudaSuccess;
 
     switch ( St.ft_mode ) {
     case FT_PLAIN: //thru
@@ -743,7 +738,7 @@ RCServer::cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t count) {
     case FT_MIGRA: //thru
     case FT_BOTH:
 	args.dst   = (void *)h_ptr;
-	args.src   = (void *)mem->d_region;// d_ptr;
+	args.src   = (void *)v_ptr;// d_ptr;
 	args.count = count;
 	args.kind  = cudaMemcpyDeviceToHost;
 	//reclist.add(dscudaMemcpyD2HId, (void *)&args);
@@ -755,7 +750,20 @@ RCServer::cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t count) {
     
     //<-- RPC communication.
     dscudaMemcpyD2HResult *rp;
-    rp = dscudamemcpyd2hid_1((RCadr)mem->d_region, count, Clnt);
+    //<-- Translate virtual d_ptr to real d_ptr.
+    void *d_ptr  = memlist.queryDevicePtr(v_ptr);
+    void *h_lptr = memlist.queryHostPtr(v_ptr);
+    if (d_ptr == NULL) {
+	WARN(0, "%s():d_ptr = NULL.\n", __func__);
+	exit(1);
+    }
+    if (h_lptr == NULL) {
+	WARN(0, "%s():h_lptr = NULL.\n", __func__);
+	exit(1);
+    }
+    //--> Translate virtual d_ptr to real d_ptr.
+
+    rp = dscudamemcpyd2hid_1((RCadr)d_ptr, count, Clnt);
     if (rp == NULL) {
 	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
 	clnt_perror(Clnt, ip);
@@ -765,14 +773,14 @@ RCServer::cudaMemcpyD2H(void *h_ptr, void *d_ptr, size_t count) {
     if (rp->err != cudaSuccess) {
 	err = (cudaError_t)rp->err;
     }
-    memcpy(h_ptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
+    memcpy(h_lptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
     xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
     //--> RPC communication.
 
     return err;
 }
 
-cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, void *src, size_t count) {
+cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     WARN( 4, "   libdscuda:%s() called with \"%s(%s)\" {\n",
 	  __func__, St.getFtModeString(), info );
 
@@ -809,30 +817,28 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, void *src, size_t count) {
     /* Get the data from remote GPU(s), then verify */
     for (int i=0; i<nredundancy; i++) {
 	WARN(4, "      + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n", i, dst, src, count);
-	/*
-	 * Access to Physical GPU Device.
-	 */
 	server[i].cudaMemcpyD2H(dst, src, count);
 	
-        if ( i==0 ) {
-	    memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
-        } else {
-	    if ( bcmp( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len ) != 0 ) { // unmatched case
-		server[i].stat_error++; //count up error.
-		WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", server[i].stat_error);
-		unmatched_count++;
-		//fail_flag[i]=1;
-		failed_1st = &server[i]; // temporary
-		WARN(2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
-	    } else { /* Matched case */
-		matched_count++;
-		//fail_flag[i]=0;
-		WARN(3, "   Matched   reduncant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
-		memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len); // overwrite matched data
-	    }
-	}
-	xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
     }
+#if 0
+    if ( i==0 ) {
+	memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
+    } else {
+	if ( bcmp( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len ) != 0 ) { // unmatched case
+	    server[i].stat_error++; //count up error.
+	    WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", server[i].stat_error);
+	    unmatched_count++;
+	    //fail_flag[i]=1;
+	    failed_1st = &server[i]; // temporary
+	    WARN(2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
+	} else { /* Matched case */
+	    matched_count++;
+	    //fail_flag[i]=0;
+	    WARN(3, "   Matched   reduncant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
+	    memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len); // overwrite matched data
+	}
+    }
+#endif
 
     switch ( conf ) {
     case VDEV_MONO:
