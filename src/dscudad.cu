@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-21 17:44:34
+// Last Modified On : 2014-09-07 00:32:09
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -72,9 +72,7 @@ static Server *ServerListTop = NULL;
 static Server *ServerListTail = NULL;
 static char LogFileName[1024] = "dscudad.log";
 
-static int
-create_daemon_socket(in_port_t port, int backlog)
-{
+static int create_daemon_socket(in_port_t port, int backlog) {
     struct sockaddr_in me;
     int sock;
 
@@ -103,10 +101,7 @@ create_daemon_socket(in_port_t port, int backlog)
     return sock;
 }
 
-
-static void
-register_server(pid_t pid, int port)
-{
+static void register_server(pid_t pid, int port) {
     WARN(3, "register_server(%d, %d).\n", pid, port);
     Server *svr = (Server *)malloc(sizeof(Server));
     if (!svr) {
@@ -125,9 +120,7 @@ register_server(pid_t pid, int port)
     WARN(3, "register_server done.\n");
 }
 
-static
-void unregister_server(pid_t pid)
-{
+static void unregister_server(pid_t pid) {
     WARN(3, "unregister_server(%d).\n", pid);
     Server *svr = server_with_pid(pid);
     if (!svr) {
@@ -158,9 +151,7 @@ void unregister_server(pid_t pid)
     free(svr);
 }
 
-static Server *
-server_with_pid(pid_t pid)
-{
+static Server *server_with_pid(pid_t pid) {
     Server *svr = ServerListTop;
     while (svr) {
         if (svr->pid == pid) {
