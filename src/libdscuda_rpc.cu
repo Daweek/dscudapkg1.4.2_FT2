@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 22:57:37
+// Last Modified On : 2014-09-06 23:08:08
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -600,12 +600,17 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size) {
     WARN(3, "\n", d_ptr, size);
     return cuerr;
 }
-
-cudaError_t RCServer::cudaFree(void *d_ptr) {
+/*
+ * cudaFree() series.
+ */
+cudaError_t RCServer::cudaFree(void *v_ptr) {
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
+    void *d_ptr;
 
-    rp = dscudafreeid_1( (RCadr)dscudaAdrOfUva(d_ptr), Clnt);
+    d_ptr = memlist.queryDevicePtr(v_ptr);
+
+    rp = dscudafreeid_1((RCadr)d_ptr, Clnt);
     if (rp == NULL) {
 	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
 	clnt_perror(Clnt, ip);
@@ -629,9 +634,9 @@ cudaError_t RCServer::cudaFree(void *d_ptr) {
 cudaError_t VirDev_t::cudaFree(void *d_ptr) {
     cudaError_t  err = cudaSuccess;
 
-    WARN(3, "cudaFree(%p) {", d_ptr);
+    WARN(3, "   VDev[%d].cudaFree(%p) {", id, d_ptr);
     for (int i=0; i<nredundancy; i++) {
-	server[i].cudaFree(d_ptr);
+	err = server[i].cudaFree(d_ptr);
     }
     /*
      * Automatic Recoverly
@@ -640,15 +645,13 @@ cudaError_t VirDev_t::cudaFree(void *d_ptr) {
 	 St.ft_mode==FT_BOTH ) {
 	//TODO: rewrite BKUPMEM.removeRegion(mem);
     }
-    WARN(3, "} cudaFree(%p)\n", d_ptr);
-    WARN(3, "\n", d_ptr);
+    WARN(3, "   }\n");
     return err;
 }
 
-cudaError_t cudaFree( void *d_ptr) {
+cudaError_t cudaFree(void *d_ptr) {
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;
-    dscudaResult *rp;
 
     WARN(3, "cudaFree(%p) {", d_ptr);
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
@@ -662,8 +665,8 @@ cudaError_t cudaFree( void *d_ptr) {
 	 St.ft_mode==FT_BOTH ) {
 	//TODO: rewrite BKUPMEM.removeRegion(mem);
     }
-    WARN(3, "} cudaFree(%p)\n", d_ptr);
-    WARN(3, "\n", d_ptr);
+    WARN(3, "}\n");
+    WARN(3, "\n");
     return err;
 }
 

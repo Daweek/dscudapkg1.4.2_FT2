@@ -3,15 +3,15 @@
 
 #define RC_NSERVERMAX     32 // max # of servers per node.
 #define RC_NDEVICEMAX     32 // max # of GPU devices per node.
-#define RC_NREDUNDANCYMAX 4  // max redundancy per server.
+#define RC_NREDUNDANCYMAX 256 // max redundancy per server.
 #define RC_NVDEVMAX       64 // max # of virtual devices per client.
 #define RC_NPTHREADMAX    64 // max # of pthreads which use virtual devices.
 #define RC_UNIQ_CANDBASE  65536
 #define RC_UNIQ_INVALID   -1
 
 #define RC_BUFSIZE (1024*1024) // size (in byte) of send/receive buffers for rpc.
-#define RC_NKMODULEMAX 8 // 128  // max # of kernel modules to be stored.
-#define RC_NKFUNCMAX   8 // 128  // max # of kernel functions to be stored.
+#define RC_NKMODULEMAX 128  // max # of kernel modules to be stored.
+#define RC_NKFUNCMAX   128  // max # of kernel functions to be stored.
 #define RC_KARGMAX     64   // max size (in byte) for one argument of a kernel.
 #define RC_KMODULENAMELEN 64   // max length of a kernel-module name.
 #define RC_KNAMELEN       64   // max length of a kernel-function name.
