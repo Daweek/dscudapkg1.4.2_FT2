@@ -14,6 +14,9 @@ elif [ "${mode}" = "POLY3" ]; then
 elif [ "${mode}" = "POLY4" ]; then
     echo "POLY4"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3"
+elif [ "${mode}" = "POLY8" ]; then
+    echo "POLY8"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3,c5hdn:0,c5hdn:1,c5hdn:2,c5hdn:3"
 else
     echo "add MONO or POLYn for 1st parameter"
     exit 1

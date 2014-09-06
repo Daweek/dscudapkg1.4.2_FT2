@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 23:08:08
+// Last Modified On : 2014-09-07 00:10:09
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -606,9 +606,9 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size) {
 cudaError_t RCServer::cudaFree(void *v_ptr) {
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
-    void *d_ptr;
-
-    d_ptr = memlist.queryDevicePtr(v_ptr);
+    void *d_ptr = memlist.queryDevicePtr(v_ptr);
+    
+    WARN(3, "      + Physical[%d].cudaFree(%p) { }\n", id, d_ptr);
 
     rp = dscudafreeid_1((RCadr)d_ptr, Clnt);
     if (rp == NULL) {
@@ -634,7 +634,7 @@ cudaError_t RCServer::cudaFree(void *v_ptr) {
 cudaError_t VirDev_t::cudaFree(void *d_ptr) {
     cudaError_t  err = cudaSuccess;
 
-    WARN(3, "   VDev[%d].cudaFree(%p) {", id, d_ptr);
+    WARN(3, "   + Virtual[%d].cudaFree(%p) {\n", id, d_ptr);
     for (int i=0; i<nredundancy; i++) {
 	err = server[i].cudaFree(d_ptr);
     }
@@ -645,7 +645,7 @@ cudaError_t VirDev_t::cudaFree(void *d_ptr) {
 	 St.ft_mode==FT_BOTH ) {
 	//TODO: rewrite BKUPMEM.removeRegion(mem);
     }
-    WARN(3, "   }\n");
+    WARN(3, "   + }\n");
     return err;
 }
 
@@ -653,7 +653,7 @@ cudaError_t cudaFree(void *d_ptr) {
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;
 
-    WARN(3, "cudaFree(%p) {", d_ptr);
+    WARN(3, "cudaFree(%p) {\n", d_ptr);
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
 
     err = vdev->cudaFree(d_ptr);
@@ -1103,6 +1103,17 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
 			    RCstream stream, RCargs args) {
     struct rpc_err rpc_error;
     
+    RCargs lo_args;
+    lo_args.RCargs_len = args.RCargs_len;
+    lo_args.RCargs_val = (RCarg *)malloc(args.RCargs_len * sizeof(RCarg));
+    if (lo_args.RCargs_val == NULL) {
+	WARN(0, "%s():malloc() failed.\n", __func__);
+	exit(1);
+    }
+    for (int k=0; k<lo_args.RCargs_len; k++) {
+	lo_args.RCargs_val[k] = args.RCargs_val[k];
+    }
+    
     RCstreamArray *st = RCstreamArrayQuery((cudaStream_t)stream);
     if (!st) {
         WARN(0, "invalid stream : %p\n", stream);
@@ -1115,18 +1126,19 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
     RCarg *argp;
     void  *v_ptr;
     void  *d_ptr;
-    for (int i = 0; i < args.RCargs_len; i++) {
-        argp = &(args.RCargs_val[i]);
+    for (int i=0; i<lo_args.RCargs_len; i++) {
+        argp = &(lo_args.RCargs_val[i]);
 	if (argp->val.type == dscudaArgTypeP) {
             v_ptr = (void*)(argp->val.RCargVal_u.address);
 	    d_ptr = memlist.queryDevicePtr(v_ptr);
-	    WARN(10, "%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", __func__, i, v_ptr, d_ptr);
+	    WARN(10, "Physical[%d].%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", id, __func__, i, v_ptr, d_ptr);
 	    argp->val.RCargVal_u.address = (RCadr)d_ptr;
 	}
     }
 
     void *rp = dscudalaunchkernelid_1(moduleid[id], kid, kname, gdim, bdim,
-				      smemsize, (RCstream)st->s[id], args, Clnt);
+				      smemsize, (RCstream)st->s[id], lo_args, Clnt);
+
     //<--- Timed Out
     clnt_geterr(Clnt, &rpc_error );
     if ( rpc_error.re_status != RPC_SUCCESS ) {
@@ -1138,12 +1150,12 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
 	clnt_perror(Clnt, ip);
 	exit( EXIT_FAILURE );
     }
+    free(lo_args.RCargs_val);
 }
 
 void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
-
     /*     
      * Automatic Recovery, Register to the called history.
      */
@@ -1161,11 +1173,9 @@ void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
     }
 
     for (int i=0; i<nredundancy; i++) {
-        server[i].launchKernel(moduleid, kid, kname,	gdim,
+        server[i].launchKernel(moduleid, kid, kname, gdim,
 			       bdim, smemsize, stream, args);
     }
-
-
 }
 
 void
