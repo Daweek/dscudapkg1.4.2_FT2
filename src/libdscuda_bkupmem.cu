@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:06:17
+// Last Modified On : 2014-09-06 13:20:20
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -76,6 +76,8 @@ void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz) {
 	perror("BkupMem_t.init()");
 	exit(EXIT_FAILURE);
     }
+    WARN(10, "%s():v_region=%p, d_region=%p, h_region=%p\n",
+	 __func__, v_region, d_region, h_region);
 
     size       = sz;
     update_rdy = 0;
@@ -271,7 +273,7 @@ void *BkupMemList_t::queryDevicePtr(const void *v_ptr) {
     int   i = 0;
     
     while (mem) { /* Search */
-	d_ptr = mem->translateAddrVtoH(v_ptr);
+	d_ptr = mem->translateAddrVtoD(v_ptr);
 	if (d_ptr != NULL) {
 	    return d_ptr;
 	}

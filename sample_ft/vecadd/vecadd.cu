@@ -25,6 +25,10 @@ int main(void) {
     cudaMalloc((void**) &d_b, sizeof(float) * N);
     cudaMalloc((void**) &d_c, sizeof(float) * N);
 
+    fprintf(stderr, "d_a = %p\n", d_a);
+    fprintf(stderr, "d_b = %p\n", d_b);
+    fprintf(stderr, "d_c = %p\n", d_c);
+
     for (t=0; t<t_total; t++) {
 	printf("#\n");
 	printf("# Try: %d/%d\n", t+1, t_total);

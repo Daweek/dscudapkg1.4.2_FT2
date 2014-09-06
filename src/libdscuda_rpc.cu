@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:04:03
+// Last Modified On : 2014-09-06 14:19:33
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -563,6 +563,7 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
 	WARN(3, "      server[%d].memlist.add(%p, %p, %zu)\n",
 	     i, uva_ptr, adrs[i], size);
     }
+    this->memlist.add( uva_ptr, NULL, size);
     
     *d_ptr = uva_ptr; // Return UVA address of physical[0].
     /*
@@ -729,7 +730,6 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
  */
 cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count) {
     cudaMemcpyArgs args;
-
     cudaError_t err = cudaSuccess;
 
     switch ( St.ft_mode ) {
@@ -751,8 +751,11 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
     //<-- RPC communication.
     dscudaMemcpyD2HResult *rp;
     //<-- Translate virtual d_ptr to real d_ptr.
-    void *d_ptr  = memlist.queryDevicePtr(v_ptr);
     void *h_lptr = memlist.queryHostPtr(v_ptr);
+    void *d_ptr  = memlist.queryDevicePtr(v_ptr);
+    WARN(4, "      + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n",
+	 id, h_lptr, d_ptr, count);
+
     if (d_ptr == NULL) {
 	WARN(0, "%s():d_ptr = NULL.\n", __func__);
 	exit(1);
@@ -816,10 +819,9 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 
     /* Get the data from remote GPU(s), then verify */
     for (int i=0; i<nredundancy; i++) {
-	WARN(4, "      + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n", i, dst, src, count);
 	server[i].cudaMemcpyD2H(dst, src, count);
-	
     }
+    
 #if 0
     if ( i==0 ) {
 	memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
@@ -839,14 +841,24 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	}
     }
 #endif
-
-    switch ( conf ) {
+    int memcmp_ret;
+    
+    switch (conf) {
     case VDEV_MONO:
-	if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
+	memcpy( dst, server[0].memlist.queryHostPtr(src), count );
+	if (( ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
 	    //BKUPMEM.updateRegion( src, dst, count );
 	}
 	break;
     case VDEV_POLY:
+	for (int i=0; i<nredundancy-1; i++) {
+	    for (int k=i+1; k<nredundancy; k++) {
+		memcmp_ret = memcmp(server[i].memlist.queryHostPtr(src), server[k].memlist.queryHostPtr(src), count);
+		if (memcmp_ret == 0) {
+		}
+	    }
+	}
+	
 	if ( unmatched_count==0 && matched_count==(nredundancy-1)) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
