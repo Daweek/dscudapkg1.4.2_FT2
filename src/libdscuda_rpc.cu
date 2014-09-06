@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 21:16:21
+// Last Modified On : 2014-09-06 22:57:37
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1106,8 +1106,24 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
         exit(1);
     }
 
+    /*
+     * TODO: insert codes that replace v_ptr to d_ptr int args.
+     */
+    RCarg *argp;
+    void  *v_ptr;
+    void  *d_ptr;
+    for (int i = 0; i < args.RCargs_len; i++) {
+        argp = &(args.RCargs_val[i]);
+	if (argp->val.type == dscudaArgTypeP) {
+            v_ptr = (void*)(argp->val.RCargVal_u.address);
+	    d_ptr = memlist.queryDevicePtr(v_ptr);
+	    WARN(10, "%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", __func__, i, v_ptr, d_ptr);
+	    argp->val.RCargVal_u.address = (RCadr)d_ptr;
+	}
+    }
+
     void *rp = dscudalaunchkernelid_1(moduleid[id], kid, kname, gdim, bdim,
-					  smemsize, (RCstream)st->s[id], args, Clnt);
+				      smemsize, (RCstream)st->s[id], args, Clnt);
     //<--- Timed Out
     clnt_geterr(Clnt, &rpc_error );
     if ( rpc_error.re_status != RPC_SUCCESS ) {

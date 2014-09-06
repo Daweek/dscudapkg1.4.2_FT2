@@ -940,7 +940,10 @@ END_OF_ARGVTMP_IBV
       case argtype
       when /\A dscudaArgTypeP \z/x
         str = argptmp
-        str = str.gsub(/%argname%/, "dscudaAdrOfUva(#{argname})")
+# <-- oikawa
+#       str = str.gsub(/%argname%/, "dscudaAdrOfUva(#{argname})")
+        str = str.gsub(/%argname%/, argname)
+# --> oikawa
       when /\A dscudaArgTypeF \z/x
         str = argftmp
         str = str.gsub(/%argname%/, argname)
