@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:06:32
+// Last Modified On : 2014-09-06 19:47:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -246,6 +246,8 @@ struct RCServer {
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
+    void  launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
+		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
     cudaError_t cudaFree(void *d_ptr);
     //<--- Migration series
     void migrateServer(RCServer_t *newone, RCServer_t *broken);
@@ -314,6 +316,9 @@ typedef struct VirDev_t {
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
+    void  launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
+		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
+    
     
     void remallocRegionsGPU(int num_svr);
 } Vdev_t;

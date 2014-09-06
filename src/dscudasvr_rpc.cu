@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:53:14
+// Last Modified On : 2014-09-06 19:36:37
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -55,8 +55,7 @@ rpcWatchDisconnection(void *arg) {
     return NULL;
 }
 
-static int
-rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
+static int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     CUresult cuerr;
     CUfunction kfunc = *kfuncp;
     int ival;

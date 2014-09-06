@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 16:02:02
+// Last Modified On : 2014-09-06 21:16:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -868,6 +868,7 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	if ( all_matched==1 ) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
+	    memcpy( dst, server[0].memlist.queryHostPtr(src), count );
 	    /*
 	     * Update backuped memory region.
 	     */
@@ -1094,17 +1095,36 @@ dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *mo
  * launch a kernel function of id 'kid', defined in a module of id 'moduleid'.
  * 'kid' must be unique inside a single module.
  */
-
-void
-rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
-                             RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
-                             RCargs args)
-{
-    WARN(5, "%s().\n", __func__)
-    RCmappedMem *mem;
-    RCstreamArray *st;
+void RCServer::launchKernel(int *moduleid, int kid, char *kname,
+			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+			    RCstream stream, RCargs args) {
+    struct rpc_err rpc_error;
     
-    pthread_mutex_lock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.p
+    RCstreamArray *st = RCstreamArrayQuery((cudaStream_t)stream);
+    if (!st) {
+        WARN(0, "invalid stream : %p\n", stream);
+        exit(1);
+    }
+
+    void *rp = dscudalaunchkernelid_1(moduleid[id], kid, kname, gdim, bdim,
+					  smemsize, (RCstream)st->s[id], args, Clnt);
+    //<--- Timed Out
+    clnt_geterr(Clnt, &rpc_error );
+    if ( rpc_error.re_status != RPC_SUCCESS ) {
+	//recoverClntError(sp, &(SvrSpare.svr[0]), &rpc_error );
+    }
+    //--->
+    if ( rp == NULL ) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit( EXIT_FAILURE );
+    }
+}
+
+void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
+			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+			    RCstream stream, RCargs args) {
+
     /*     
      * Automatic Recovery, Register to the called history.
      */
@@ -1121,45 +1141,30 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
         //HISTREC.add( dscudaLaunchKernelId, (void *)&args2 );
     }
 
-    st = RCstreamArrayQuery((cudaStream_t)stream);
-    if (!st) {
-        WARN(0, "invalid stream : %p\n", stream);
-        exit(1);
+    for (int i=0; i<nredundancy; i++) {
+        server[i].launchKernel(moduleid, kid, kname,	gdim,
+			       bdim, smemsize, stream, args);
     }
 
-    mem = RCmappedMemListTop;
-    while (mem) {
-        cudaMemcpy(mem->pDevice, mem->pHost, mem->size, cudaMemcpyHostToDevice);
-        mem = mem->next;
-    }
 
-    Vdev_t     *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp   = vdev->server;
-    struct rpc_err rpc_error;
+}
 
-    for ( int i = 0; i < vdev->nredundancy; i++ ) {
-        void *rp = dscudalaunchkernelid_1(moduleid[i], kid, kname,
-                                          gdim, bdim, smemsize, (RCstream)st->s[i],
-                                          args, sp[i].Clnt );
-	//<--- Timed Out
-	clnt_geterr( sp[i].Clnt, &rpc_error );
-	if ( rpc_error.re_status != RPC_SUCCESS ) {
-	    break;
-	}
-	//--->
-        checkResult(rp, sp[i]);
-    }
-
-    recoverClntError(sp, &(SvrSpare.svr[0]), &rpc_error );
+void
+rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
+                             RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
+                             RCargs args)
+{
+    WARN(5, "%s() {\n", __func__);
+    Vdev_t *vdev;
     
-    mem = RCmappedMemListTop;
-    while (mem) {
-        cudaMemcpy(mem->pHost, mem->pDevice, mem->size, cudaMemcpyDeviceToHost);
-        mem = mem->next;
-    }
-    //---> Avoid conflict with CheckPointing.
+    pthread_mutex_lock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.p
+
+    vdev = St.Vdev + Vdevid[vdevidIndex()];
+    vdev->launchKernel(moduleid, kid, kname, gdim, bdim, smemsize, stream, args);
+    
     pthread_mutex_unlock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.
-    WARN(5, "+--- done. %s().\n", __func__)
+    WARN(5, "} %s().\n", __func__)
+    WARN(5, "\n")
 }
 
 cudaError_t
