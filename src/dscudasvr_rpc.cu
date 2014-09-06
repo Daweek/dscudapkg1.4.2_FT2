@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 12:48:36
+// Last Modified On : 2014-09-06 12:53:14
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ rpcWatchDisconnection(void *arg) {
     char buf[16];
 
 #if 0 // oikawa, temporary
-    sleep(3); // wait long enough so that connection is certainly establised.
+    sleep(5); // wait long enough so that connection is certainly establised.
 #else
     sleep(35); // wait long enough so that connection is certainly establised.
 #endif
