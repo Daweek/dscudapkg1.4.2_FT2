@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 21:19:15
+// Last Modified On : 2014-09-07 23:30:30
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -57,8 +57,10 @@ void RCServer::setupConnection(void) {
 
     St.useRpc();
     if ( St.daemon > 0 ) { // access to the server via daemon.
+	WARN(1, "Access port number is informed by daemon.\n");
         sport = requestDaemonForDevice( ip, cid, St.isIbv() );
     } else { // directly access to the server.
+	WARN(1, "Access port number is self-defined by client.\n");
         sport = RC_SERVER_IP_PORT + cid;
     }
     sockaddr = setupSockaddr( ip, sport );
@@ -162,6 +164,8 @@ void checkResult(void *rp, RCServer_t &sp) {
 
 //void rpcErrorHook(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
 void RCServer::rpcErrorHook(struct rpc_err *err) {
+    RCServer *sp;
+    
     WARN(1, "********************************************************\n");
     WARN(1, "***  detected rpc communication error; ");
     switch (err->re_status) {// *refer to /usr/include/rpc/clnt.h.
@@ -207,8 +211,16 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
     case FT_MIGRA:
 	WARN0(1, "\"FT_MIGRA\"\n");
 	WARN(1, "***  I am going to migrate to another device.\n");
-	migrateServer(&SvrSpare.svr[0]);
-	setupConnection();
+	sp = SvrSpare.findSpare();
+	if (sp==NULL) {
+	    WARN(0, "*** Not found any spare servers.\n");
+	    exit(EXIT_FAILURE);
+	} else {
+	    WARN(0, "*** Found spare server.\n");
+	    WARN(0, "***    + ip = %s:%d\n", sp->ip, sp->cid);
+	    migrateServer(sp);
+	    setupConnection();
+	}
 	break;
     case FT_BOTH:
 	WARN0(1, "\"FT_BOTH\"\n");

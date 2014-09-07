@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 20:47:21
+// Last Modified On : 2014-09-07 23:33:56
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -99,6 +99,26 @@ int SvrList::add(const char *ip, int ndev, const char *hname) {
     return 0;
 }
 
+RCServer *SvrList::findSpare(void) {
+    RCServer *sp = NULL;
+    for (int i=0; i<num; i++) {
+	if (svr[i].ft_mode == FT_SPARE) {
+	    sp = &svr[i];
+	}
+    }
+    return sp;
+}
+
+RCServer *SvrList::findBroken(void) {
+    RCServer *sp = NULL;
+    for (int i=0; i<num; i++) {
+	if (svr[i].ft_mode == FT_BROKEN) {
+	    sp = &svr[i];
+	}
+    }
+    return sp;
+}
+
 char *ClientState_t::getFtModeString( void ) {
     static char s[80];
     switch ( ft_mode ) {
@@ -113,14 +133,13 @@ char *ClientState_t::getFtModeString( void ) {
     return s;
 }
 
-int requestDaemonForDevice(char *ipaddr,  // ex.)"192.168.0.101"
-			   int devid, int useibv) {
+int requestDaemonForDevice(char *ip, int devid, int useibv) {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
     struct sockaddr_in sockaddr;
 
-    sockaddr = setupSockaddr( ipaddr, RC_DAEMON_IP_PORT );
+    sockaddr = setupSockaddr( ip, RC_DAEMON_IP_PORT );
     dsock = socket(AF_INET, SOCK_STREAM, 0);
     if (dsock < 0) {
         perror("socket");
@@ -134,14 +153,16 @@ int requestDaemonForDevice(char *ipaddr,  // ex.)"192.168.0.101"
         exit(1);
     }
     sprintf(msg, "deviceid:%d", devid);
+    WARN(1, "<--- Send message: \"%s\".\n", msg);
     sendMsgBySocket(dsock, msg);
 
     memset(msg, 0, strlen(msg));
     recvMsgBySocket(dsock, msg, sizeof(msg));
+    WARN(1, "---> Recv message: \"%s\".\n", msg);    
     sscanf(msg, "sport:%d", &sport);
 
     if (sport < 0) {
-        WARN(0, "max possible ports on %s already in use.\n", ipaddr);
+        WARN(0, "max possible ports on %s already in use.\n", ip);
         exit(1);
     }
 

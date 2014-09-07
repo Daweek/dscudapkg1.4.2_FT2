@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 11:49:13
+// Last Modified On : 2014-09-07 23:40:00
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -62,7 +62,7 @@ static void signal_from_child(int sig);
 static void register_server(pid_t pid, int port);
 static void unregister_server(pid_t pid);
 static Server *server_with_pid(pid_t pid);
-static int unused_server_port(void);
+static int unused_server_port(int devid);
 static void initEnv(void);
 static void* response_to_search( void *arg );
 
@@ -162,14 +162,14 @@ static Server *server_with_pid(pid_t pid) {
     return NULL; // server with pid not found in the list.
 }
 
-static int unused_server_port(void) {
+static int unused_server_port(int devid) {
     int inuse;
-    int p;
     Server *s;
 
     WARN(3, "unused_server_port().\n");
 
-    for (p = RC_SERVER_IP_PORT; p < RC_SERVER_IP_PORT + RC_NSERVERMAX; p++) {
+//  for (int p=RC_SERVER_IP_PORT; p<RC_SERVER_IP_PORT + RC_NSERVERMAX; p++) {
+    for (int p=RC_SERVER_IP_PORT+devid; p<RC_SERVER_IP_PORT + RC_NSERVERMAX; p++) {
         inuse = 0;
         for (s = ServerListTop; s; s = s->next) {
             if (p == s->port) {
@@ -187,7 +187,7 @@ static int unused_server_port(void) {
     return -1;
 }
 
-static void spawn_server( int listening_sock ) {
+static void spawn_server(int listening_sock) {
     int len, dev, sock, sport;
     pid_t pid;
     char *argv[16];
@@ -195,17 +195,19 @@ static void spawn_server( int listening_sock ) {
     char portstr[128], devstr[128], sockstr[128];
 
     WARN(3, "listening request from client...\n");
-    sock = accept( listening_sock, NULL, NULL );
+    sock = accept(listening_sock, NULL, NULL);
     if (sock == -1) {
         WARN(0, "accept() error\n");
         exit(1);
     }
     recvMsgBySocket(sock, msg, sizeof(msg));
     sscanf(msg, "deviceid:%d", &dev); // deviceid to be handled by the server.
+    WARN(3, "---> Recv message \"%s\"\n", msg);
 
-    sport = unused_server_port();
+    sport = unused_server_port(dev);
     sprintf(msg, "sport:%d", sport); // server port to be connected by the client.
     sendMsgBySocket(sock, msg);
+    WARN(3, "<--- Send message \"%s\"\n", msg);        
 
     if (sport < 0) {
         WARN(0, "spawn_server: max possible ports already in use.\n");
