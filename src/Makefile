@@ -121,9 +121,9 @@ dscudautil.o:	dscudautil.cu dscudautil.h
 ###
 ### source file include dependancy.
 ###
-libdscuda.cu:      dscuda.h libdscuda.h dscudaverb.h
-libdscuda_rpc.cu:  dscuda.h libdscuda.h dscudaverb.h
-libdscuda_ibv.cu:  dscuda.h libdscuda.h dscudaverb.h ibv_rdma.h
+libdscuda.cu:      dscuda.h libdscuda.h
+libdscuda_rpc.cu:  dscuda.h libdscuda.h
+libdscuda_ibv.cu:  dscuda.h libdscuda.h ibv_rdma.h
 dscudad.cu :       dscudadefs.h sockutil.h dscudarpc.h
 dscudaverb.cu:     dscuda.h libdscuda.h dscudaverb.h dscudarpc.h
 dscudatest.cu:     dscuda.h ibv_rdma.h

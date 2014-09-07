@@ -4,13 +4,67 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 00:24:50
+// Last Modified On : 2014-09-07 16:48:11
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
+
+typedef struct CudaSetDeviceArgs_t { /* cudaSetDevice() */
+    int device;
+} cudaSetDeviceArgs;
+
+struct CudaMallocArgs_t {
+    void *devPtr;
+    size_t size;
+    CudaMallocArgs_t( void ) { devPtr = NULL, size = 0; }
+    CudaMallocArgs_t( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
+};
+
+typedef struct CudaMemcpyArgs_t {                        /* cudaMemcpy() */
+    void *dst;
+    void *src;
+    size_t count;
+    enum cudaMemcpyKind kind;
+    CudaMemcpyArgs_t( void ) { dst = src = NULL; count = 0; }
+    CudaMemcpyArgs_t( void *d, void *s, size_t c, enum cudaMemcpyKind k ) {
+	dst = d; src = s; count = c; kind = k;
+    }
+} cudaMemcpyArgs;
+
+typedef struct {                        /* cudaMemcpyToSymbol */
+    int *moduleid;
+    char *symbol;
+    void *src;
+    size_t count;
+    size_t offset;
+    enum cudaMemcpyKind kind;
+} cudaMemcpyToSymbolArgs;
+
+struct CudaFreeArgs_t {
+    void *devPtr;
+};
+
+typedef struct CudaLoadModuleArgs_t {
+    char *name;
+    char *strdata;
+} cudaLoadModuleArgs;
+
+typedef struct CudaRpcLaunchKernelArgs_t {
+    int     *moduleid;
+    int      kid;
+    char    *kname;
+    RCdim3   gdim;
+    RCdim3   bdim;
+    RCsize   smemsize;
+    RCstream stream;
+    RCargs   args;
+} cudaRpcLaunchKernelArgs;
+
+//void dscudaVerbInit(void);                /* Initializer    */
+//void dscudaClearHist(void);
 
 struct RCServer;
 typedef RCServer RCServer_t;
@@ -73,14 +127,35 @@ public:
 } BkupMemList;
 
 //********************************************************************
+//***
+//*** CUDA API call record stub.
+//***
+//********************************************************************
+typedef enum {
+    DSCVMethodNone = 0,
+    DSCVMethodSetDevice,
+    //DSCVMethodGetDeviceProperties,
+    DSCVMethodMalloc,
+    DSCVMethodMemcpyH2D,
+    DSCVMethodMemcpyD2D,
+    DSCVMethodMemcpyD2H,
+    DSCVMethodMemcpyToSymbolH2D,
+    DSCVMethodMemcpyToSymbolD2D,
+    DSCVMethodFree,
+    //DSCVMethodLoadModule,
+    DSCVMethodRpcLaunchKernel,
+    //DSCVMethodIbvLaunchKernel,
+    DSCVMethodEnd
+} DSCVMethod;
+//********************************************************************
 //***  Class Name: "HistRec_t"
 //***  Description:
 //***      - Recording the sequential CUDA-call.
 //********************************************************************
 typedef struct HistRec_t {
-    int      funcID;   // Recorded cuda*() function.
-    void    *args;     // And its arguments.
-    int      dev_id;   // The Device ID, set by last cudaSetDevice().
+    int    funcID;   // Recorded cuda*() function.
+    void  *args;     // And its arguments.
+    int    dev_id;   // The Device ID, set by last cudaSetDevice().
 } HistRec;
 
 //********************************************************************
@@ -92,10 +167,17 @@ typedef struct HistRecList_t {
     HistRec *histrec;
     int      length;    /* # of recorded function calls to be recalled */
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
+
+    // stubs for store/release args, and recall functions.
+    // pointer array to arbitary functions.
+    void *(*storeArgsStub[DSCVMethodEnd])(void *);
+    void (*releaseArgsStub[DSCVMethodEnd])(void *);
+    void (*recallStub[DSCVMethodEnd])(void *);
+    
     // Constructor.
     HistRecList_t(void);
     //
-    void add(int funcID, void *argp); /* Add */
+    void add(int funcID, void *argp);
     void clear(void);           /* Clear */
     void print(void);           /* Print to stdout */
     int  recall(void);          /* Recall */
@@ -323,16 +405,6 @@ typedef struct VirDev_t {
     void remallocRegionsGPU(int num_svr);
 } Vdev_t;
 
-/******************************************/
-/* Client Application Status/Information. */
-/******************************************/
-
-typedef enum {
-    ORIGIN      = 0,
-    INITIALIZED,
-    CUDA_CALLED
-} ClntInitStat;
-
 //*************************************************
 //***  Class Name: "ClientState_t"
 //***  Description:
@@ -353,7 +425,6 @@ public:
 
 
     FtMode       ft_mode;
-    ClntInitStat init_stat;
     char *getFtModeString(void);    
                               /*** Static Information ***/
     unsigned int ip_addr;     // Client IP address.
@@ -389,9 +460,6 @@ public:
     void setMigrateDevice(int val=1) { migration = val; }
     void unsetMigrateDevice() { migration = 0; }
     int  getMigrateDevice() { return migration; }
-
-//    void initProgress(ClntInitStat stat);
-//    void cudaCalled(void) { initProgress( CUDA_CALLED ); }
 };
 extern struct ClientState_t St;
 //extern int    ClientState_t::Nvdev;
@@ -412,18 +480,12 @@ extern ClientModule  CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 extern RCmappedMem    *RCmappedMemListTop;
 extern RCmappedMem    *RCmappedMemListTail;
 
-/* <-- Redundant APIs */
-void dscudaRecordHistOn(void);  // add by oikawa
-void dscudaRecordHistOff(void); // add by oikawa
-void dscudaAutoVerbOff(void);
-void dscudaAutoVerbOn(void);
-/* --> Redundant APIs */
 void printModuleList(void);
 void printVirtualDeviceList();
 void invalidateModuleCache(void);
 int  requestDaemonForDevice(char *ipaddr, int devid, int useibv);
 int  vdevidIndex(void);
-void setupConnection(int idev, RCServer_t *sp);
+
 int  dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename,
 			   char *modulebuf, int vdevid, int raidid);
 int *dscudaLoadModule(char *srcname, char *strdata);

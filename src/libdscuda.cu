@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-05 19:37:15
+// Last Modified On : 2014-09-07 16:46:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -23,9 +23,10 @@
 #include <ctype.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <pthread.h>
 #include "dscuda.h"
 #include "libdscuda.h"
-#include "dscudaverb.h"
+//#include "dscudaverb.h"
 
 ClientModule_t::ClientModule_t(void) {
     WARN( 5, "The constructor %s() called.\n", __func__ );
@@ -1003,8 +1004,6 @@ void ClientState_t::initEnv(void) {
     } else {
         env = getenv("DSCUDA_SERVER");
     }
-
-
     
     resetServerUniqID();      /* set all unique ID to invalid(-1)*/
     
@@ -1018,19 +1017,19 @@ void ClientState_t::initEnv(void) {
     WARN(2, "method of remote procedure call: ");
     switch ( dscudaRemoteCallType() ) {
     case RC_REMOTECALL_TYPE_RPC:
-	WARN(2, "RPC\n");
+	WARN0(2, "RPC\n");
 	break;
     case RC_REMOTECALL_TYPE_IBV:
-	WARN(2, "InfiniBand Verbs\n");
+	WARN0(2, "InfiniBand Verbs\n");
 	break;
     default:
-	WARN(0, "(Unkown)\n"); exit(1);
+	WARN0(0, "(Unkown)\n"); exit(1);
     }
 
     /*
      * Create a thread of checkpointing.
      */
-#if 0
+#if 1
     if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
 	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
     }
@@ -1038,38 +1037,7 @@ void ClientState_t::initEnv(void) {
     
     return;
 }
-#if 0
-void ClientState_t::initProgress( ClntInitStat stat ) {
-    switch(stat) {
-    case ORIGIN:
-	init_stat = ORIGIN;
-	break;
-    case INITIALIZED:
-	if (init_stat==ORIGIN) {
-	    WARN(5, "init_stat is set to INITIALIZED from ORIGIN.\n")
-	    init_stat = INITIALIZED;
-	} else {
-	    fprintf(stderr, "%s(): unexpected state transition to INITIALIZED.\n",
-		    __func__);
-	    exit(1);
-	}
-	break;
-    case CUDA_CALLED:
-	if (init_stat==INITIALIZED || init_stat==CUDA_CALLED) {
-	    WARN(5, "init_stat is set to CUDA_CALLED from %d.\n", init_stat)
-	    init_stat = CUDA_CALLED;
-	} else {
-	    fprintf(stderr, "%s(): unexpected state transition from %d to CUDA_CALLED.\n",
-		    __func__, init_stat);
-	    exit(1);
-	}
-	break;
-    default:
-	fprintf(stderr, "%s(): unexpected state transition to UNKNOWN.\n", __func__);
-	exit(1);
-    }
-}
-#endif
+
 /*
  * Take the data backups of each virtualized GPU to client's host memory
  * after verifying between redundant physical GPUs every specified wall clock
@@ -1246,7 +1214,6 @@ ClientState_t::ClientState_t(void) {
     start_time = time( NULL );
     WARN( 1, "[ERRORSTATICS] start.\n" );
     
-    //initProgress( ORIGIN );
     WARN( 5, "The constructor %s() called.\n", __func__ );
 
     ip_addr     = 0;
@@ -1280,7 +1247,6 @@ ClientState_t::ClientState_t(void) {
 
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
     
-    //initProgress( INITIALIZED );    
     WARN( 5, "The constructor %s() ends.\n", __func__);
 }
 
@@ -1905,7 +1871,7 @@ cudaError_t cudaGetDevice(int *device) {
 /*********************************************************************
  * cudaSetDevice()
  */
-cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
+cudaError_t cudaSetDevice_clnt(int device, int errcheck) {
     cudaError_t cuerr = cudaSuccess;
     int vi = vdevidIndex();
     
@@ -1923,11 +1889,10 @@ cudaError_t cudaSetDevice_clnt( int device, int errcheck ) {
     return cuerr;
 }
 
-cudaError_t cudaSetDevice( int device ) {
+cudaError_t cudaSetDevice(int device) {
     cudaError_t cuerr = cudaSuccess;
     int errcheck = 0; 
 
-    //St.cudaCalled();
     WARN(3, "%s(%d)...\n", __func__, device);
     
 #if 0
@@ -1960,7 +1925,6 @@ cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
 cudaError_t cudaGetDeviceCount(int *count) {
     cudaError_t err = cudaSuccess;
 
-    //St.cudaCalled();
     *count = St.Nvdev;
     WARN(3, "cudaGetDeviceCount(%p)  count:%d ...", count, *count);
     WARN(3, "done.\n");

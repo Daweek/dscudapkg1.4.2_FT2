@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-28 23:53:59
+// Last Modified On : 2014-09-07 13:36:23
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -21,7 +21,7 @@
 #include "dscudarpc.h"
 #include "dscudadefs.h"
 #include "dscudamacros.h"
-#include "dscudaverb.h"
+//#include "dscudaverb.h"
 #include "libdscuda.h"
 
 typedef unsigned long DscudaUva_t; /* Global virtual address type */

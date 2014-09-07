@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 13:20:20
+// Last Modified On : 2014-09-07 13:22:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -71,14 +71,17 @@ void *BkupMem_t::translateAddrVtoH(const void *v_ptr) {
 void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz) {
     v_region   = uva_ptr;
     d_region   = d_ptr;
-    h_region = (void *)malloc( sz );
+    h_region = (void *)malloc(sz);
     if (h_region == NULL) {
 	perror("BkupMem_t.init()");
 	exit(EXIT_FAILURE);
     }
+    
+#if 0
     WARN(10, "%s():v_region=%p, d_region=%p, h_region=%p\n",
 	 __func__, v_region, d_region, h_region);
-
+#endif
+    
     size       = sz;
     update_rdy = 0;
 
@@ -209,8 +212,11 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size) {
     length++;
     total_size += size;
 
+#if 0
     WARN(5, "      add BkupMemList[%d]: uva_ptr=%p d_ptr=%p, size=%d\n",
 	 length - 1, uva_ptr, d_ptr, size);
+#endif
+    
     if (getLen() < 0) {
 	WARN(0, "(+_+) Unexpected error in %s()\n", __func__);
 	exit(EXIT_FAILURE);
