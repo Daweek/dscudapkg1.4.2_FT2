@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 16:42:57
+// Last Modified On : 2014-09-07 17:02:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ RCServer::RCServer(void) {
     Clnt = NULL;
 }
 
-void RCServer::setupConnection(void) {  // Physical Device pointer.
+void RCServer::setupConnection(void) {
     int  pgid = DSCUDA_PROG;
     char msg[256];
 
@@ -79,7 +79,7 @@ void RCServer::setupConnection(void) {  // Physical Device pointer.
         }
         exit( EXIT_FAILURE );
     }
-    WARN(2, "Established a socket connection to %s...\n", msg);
+    WARN(2, "Established a socket connection between %s...\n", msg);
 }
 
 void RCServer::dupServer( RCServer_t *dup ) {

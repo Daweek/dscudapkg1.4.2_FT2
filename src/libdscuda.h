@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 16:48:11
+// Last Modified On : 2014-09-07 17:00:56
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -12,7 +12,13 @@
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
 
-typedef struct CudaSetDeviceArgs_t { /* cudaSetDevice() */
+
+//**************************************************************************
+//*** "Cuda*Args_t"
+//*** CUDA API arguments packing list.
+//***
+//**************************************************************************
+typedef struct CudaSetDeviceArgs_t {
     int device;
 } cudaSetDeviceArgs;
 
@@ -23,7 +29,7 @@ struct CudaMallocArgs_t {
     CudaMallocArgs_t( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
 };
 
-typedef struct CudaMemcpyArgs_t {                        /* cudaMemcpy() */
+typedef struct CudaMemcpyArgs_t {
     void *dst;
     void *src;
     size_t count;
@@ -34,7 +40,7 @@ typedef struct CudaMemcpyArgs_t {                        /* cudaMemcpy() */
     }
 } cudaMemcpyArgs;
 
-typedef struct {                        /* cudaMemcpyToSymbol */
+typedef struct CudaMemcpyToSymbolArgs_t {
     int *moduleid;
     char *symbol;
     void *src;
@@ -63,11 +69,6 @@ typedef struct CudaRpcLaunchKernelArgs_t {
     RCargs   args;
 } cudaRpcLaunchKernelArgs;
 
-//void dscudaVerbInit(void);                /* Initializer    */
-//void dscudaClearHist(void);
-
-struct RCServer;
-typedef RCServer RCServer_t;
 //************************************************************************
 //***  Class Name: "BkupMem_t"
 //***  Description:
@@ -301,29 +302,27 @@ typedef struct RCuva_t {
 //***  Description:
 //***      - Physical GPU Device Class.
 //********************************************************************
-struct RCServer {
+typedef struct RCServer {
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
                       // clients specify the server using this num preceded
                       // by an IP address & colon, e.g.,
                       // export DSCUDA_SERVER="192.168.1.123:2"
-    char        ip[512];      // ex. "192.168.0.92"
-    char        hostname[64]; // ex. "titan01"
+    char        ip[512];      // IP address. ex. "192.168.0.92"
+    char        hostname[64]; // Hostname.   ex. "titan01"
     int         uniq;         // unique in all RCServer_t including svrCand[].
     
-    BkupMemList memlist;  // GPU global memory mirroring region.
-    HistRecList reclist;  // GPU CUDA function called history.
+    BkupMemList memlist;      // GPU global memory mirroring region.
+    HistRecList reclist;      // GPU CUDA function called history.
     
     int        *d_faultconf;  //
 
-    int         stat_error; // Error and Fault statics results.
-    int         stat_correct;
-
-    CLIENT     *Clnt;         // RPC client
+    int         stat_error;   // Error  statics in redundant calculation.
+    int         stat_correct; // Corrct statics in redundant calculation.
+    CLIENT     *Clnt;         // RPC client pointer.
 
     void setupConnection(void);
-    void dupServer(RCServer_t *dup);
-
+    void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
@@ -332,11 +331,11 @@ struct RCServer {
 		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
     cudaError_t cudaFree(void *d_ptr);
     //<--- Migration series
-    void migrateServer(RCServer_t *newone, RCServer_t *broken);
+    void migrateServer(struct RCServer *newone, struct RCServer *broken);
     void migrateReallocAllRegions(void);
     /*CONSTRUCTOR*/
     RCServer();
-};  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
+} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
 //***  Class Name: "SvrList"
