@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 10:42:05
+// Last Modified On : 2014-09-07 11:21:07
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ rpcWatchDisconnection(void *arg) {
         // nrecvd = recv(clientsock, buf, 1, MSG_PEEK | MSG_DONTWAIT);
         nrecvd = recv(clientsock, buf, 1, MSG_PEEK);
 #if 1 // debug
-	WARN(3, "(WARN-3) recv(clientsock, buf, 1, MSG_PEEK);\n");
+	WARN(3, "recv(clientsock, buf, 1, MSG_PEEK);\n");
 #endif
         if (nrecvd == 0) {
             WARN(2, "disconnected.\n");
