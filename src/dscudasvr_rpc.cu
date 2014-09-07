@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 11:21:07
+// Last Modified On : 2014-09-07 11:42:01
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -263,8 +263,7 @@ dscudathreadgetlimitid_1_svc(int limit, struct svc_req *sr) {
 }
 
 dscudaResult *
-dscudathreadsetcacheconfigid_1_svc(int cacheConfig, struct svc_req *sr)
-{
+dscudathreadsetcacheconfigid_1_svc(int cacheConfig, struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -279,8 +278,7 @@ dscudathreadsetcacheconfigid_1_svc(int cacheConfig, struct svc_req *sr)
 }
 
 dscudaThreadGetCacheConfigResult *
-dscudathreadgetcacheconfigid_1_svc(struct svc_req *sr)
-{
+dscudathreadgetcacheconfigid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     static dscudaThreadGetCacheConfigResult res;
     int cacheConfig;
@@ -302,8 +300,7 @@ dscudathreadgetcacheconfigid_1_svc(struct svc_req *sr)
  */
 
 dscudaResult *
-dscudagetlasterrorid_1_svc(struct svc_req *sr)
-{
+dscudagetlasterrorid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 

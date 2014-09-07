@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 10:53:24
+// Last Modified On : 2014-09-07 11:49:13
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -162,9 +162,7 @@ static Server *server_with_pid(pid_t pid) {
     return NULL; // server with pid not found in the list.
 }
 
-static int
-unused_server_port(void)
-{
+static int unused_server_port(void) {
     int inuse;
     int p;
     Server *s;
@@ -189,8 +187,7 @@ unused_server_port(void)
     return -1;
 }
 
-static
-void spawn_server( int listening_sock ) {
+static void spawn_server( int listening_sock ) {
     int len, dev, sock, sport;
     pid_t pid;
     char *argv[16];
@@ -256,9 +253,7 @@ void spawn_server( int listening_sock ) {
 /*
  *
  */
-static
-void signal_from_child( int sig )
-{
+static void signal_from_child( int sig ) {
     int status;
     int pid = waitpid(-1, &status, WNOHANG);
 
@@ -284,10 +279,9 @@ void signal_from_child( int sig )
 }
 
 /*
- *
+ * Run in separated thread by pthread_create();
  */
-static void*
-response_to_search( void *arg ) {
+static void *response_to_search( void *arg ) {
     char sendbuf[ SEARCH_BUFLEN_TX ];
     char recvbuf[ SEARCH_BUFLEN_RX ];
 
@@ -356,10 +350,8 @@ response_to_search( void *arg ) {
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
 
-  /* statement unreachable
     close(sock);
     return NULL;
-  */
 }
 
 /*
@@ -397,8 +389,7 @@ static void showUsage(char *command) {
 
 extern char *optarg;
 extern int optind;
-static void parseArgv( int argc, char **argv )
-{
+static void parseArgv( int argc, char **argv ) {
     int c;
     char *param = "dfl:h";
 
