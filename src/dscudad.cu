@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 00:32:09
+// Last Modified On : 2014-09-07 10:50:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ static int CallFaultServer = 0;
 	char tfmt[16];						\
 	strftime( tfmt, 16, "%T", local );			\
 	fprintf(stderr, "[%s]", tfmt);				\
-	fprintf(stderr, "dscudad: " fmt, ## args);		\
+	fprintf(stderr, "(dscudad) " fmt, ## args);		\
     }
 
 typedef struct Server_t {

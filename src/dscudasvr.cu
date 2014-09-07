@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 10:45:21
+// Last Modified On : 2014-09-07 10:50:46
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -104,7 +104,7 @@ static cudaError_t setTextureParams(CUtexref texref, RCtexture texbuf, char *tex
 	char tfmt[16];							\
 	strftime( tfmt, 16, "%T", local );				\
 	fprintf(stderr, "[%s]", tfmt);					\
-	fprintf(stderr, "(DSCSVR[%d]-%d) : " fmt, lv, TcpPort - RC_SERVER_IP_PORT, ## args); \
+	fprintf(stderr, "(SVR[%d]-%d) " fmt, TcpPort - RC_SERVER_IP_PORT, lv, ## args); \
     }
 
 #if 0
