@@ -4,12 +4,11 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-06 19:36:37
+// Last Modified On : 2014-09-07 10:42:05
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 extern void dscuda_prog_1(struct svc_req *rqstp, register SVCXPRT *transp);
-
 static int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp);
 static void setupRpc(void);
 

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-08-27 17:47:58
+// Last Modified On : 2014-09-07 10:45:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -99,13 +99,12 @@ static cudaError_t setTextureParams(CUtexref texref, RCtexture texbuf, char *tex
 #undef WARN
 #define WARN(lv, fmt, args...)						\
     if ( lv <= dscudaWarnLevel() ) {					\
-    time_t now = time(NULL);						\
-    struct tm *local = localtime( &now );				\
-    char tfmt[16];							\
-    strftime( tfmt, 16, "%T", local );					\
-    fprintf(stderr, "[%s]", tfmt);					\
-    fprintf(stderr, "dscudasvr[%d] : " fmt, TcpPort - RC_SERVER_IP_PORT, ## args); \
-    fflush(stderr);							\
+	time_t now = time(NULL);					\
+	struct tm *local = localtime( &now );				\
+	char tfmt[16];							\
+	strftime( tfmt, 16, "%T", local );				\
+	fprintf(stderr, "[%s]", tfmt);					\
+	fprintf(stderr, "(DSCSVR[%d]-%d) : " fmt, lv, TcpPort - RC_SERVER_IP_PORT, ## args); \
     }
 
 #if 0

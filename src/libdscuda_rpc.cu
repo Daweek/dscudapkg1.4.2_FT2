@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 00:27:51
+// Last Modified On : 2014-09-07 00:36:25
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -127,9 +127,8 @@ void checkResult(void *rp, RCServer_t &sp) {
 	return;
     } else {
 	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-//	clnt_perror( Clnt[Vdevid[vdevidIndex()]][sp->id], sp->ip );
 	clnt_perror( sp.Clnt, sp.ip );
-	exit( EXIT_FAILURE );
+	exit(EXIT_FAILURE);
     }
 }
 
@@ -146,7 +145,7 @@ void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err
     case RPC_CANTRECV: //=4
 	break;
     case RPC_TIMEDOUT: //=5
-	WARN(1, "Detected RPC:Timed Out in  %s().\n", __func__);
+	WARN(1, "*** RPC:Timed Out in %s().\n", __func__);
 	//dscudaVerbMigrateDevice( failed, spare );
 	break;
     case RPC_UNKNOWNHOST: //=13
