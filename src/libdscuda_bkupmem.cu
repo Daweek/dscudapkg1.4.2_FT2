@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 13:22:03
+// Last Modified On : 2014-09-07 17:09:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //--------------------------------------------------------------------
@@ -178,7 +178,7 @@ BkupMemList_t::query(void *uva_ptr) {
     int i = 0;
     while (mem != NULL) { // Search the target from head to tail in the list.
 	if (mem->v_region == uva_ptr) { /* tagged by its address on GPU */
-	    WARN(10, "---> %s(%p): return %p\n", __func__, uva_ptr, mem);
+	    //WARN(10, "---> %s(%p): return %p\n", __func__, uva_ptr, mem);
 	    return mem;
 	}
 	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, uva_ptr, i, mem->v_region);

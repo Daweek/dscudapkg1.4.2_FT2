@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 16:46:31
+// Last Modified On : 2014-09-07 20:47:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -69,7 +69,6 @@ int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
  */
 SvrList_t SvrCand;
 SvrList_t SvrSpare;
-SvrList_t SvrBroken;
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
@@ -82,7 +81,23 @@ ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
 struct ClientState_t St;
 //int    ClientState_t::Nvdev;
 //Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
+SvrList::SvrList(void) {
+    num = 0;
+}
 
+int SvrList::add(const char *ip, int ndev, const char *hname) {
+    if ( num >= (RC_NVDEVMAX - 1) ) {
+	WARN(0, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n",
+	     RC_NVDEVMAX);
+	exit(EXIT_FAILURE);
+    }
+    strcpy(svr[num].ip, ip);
+    strcpy(svr[num].hostname, hname);
+    svr[num].cid  = ndev;
+    svr[num].uniq = RC_UNIQ_CANDBASE + num;
+    num++;
+    return 0;
+}
 
 char *ClientState_t::getFtModeString( void ) {
     static char s[80];
@@ -697,7 +712,7 @@ int dscudaSearchDaemon(void) {
 		 * Updata SvrCand;
 		 */
 		for (int d=0; d<num_eachdev; d++) {
-		    SvrCand.cat( ipaddr, d, host_name );
+		    SvrCand.add(ipaddr, d, host_name);
 		}
 		num_daemon += 1;
 		num_device += num_eachdev;
@@ -854,19 +869,18 @@ void initVirtualServerList(const char *env) {
     }
 }
 static
-void updateSpareServerList(void) //TODO: need more good algorithm.
-{
+void updateSpareServerList(void) { //TODO: need more good algorithm.
     int         spare_count = 0;;
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
-    int i, j, k;
 
-    for ( i=0; i < SvrCand.num; i++ ) {
+    // Sweep all Vdev.server[] and compare.
+    for (int i=0; i<SvrCand.num; i++) {
 	int found = 0;
 	pVdev = St.Vdev;
-	for ( j=0; j<St.Nvdev; j++) {
+	for (int j=0; j<St.Nvdev; j++) {
 	    pSvr = pVdev->server;
-	    for ( k=0; k < pVdev->nredundancy; k++) {
+	    for (int k=0; k < pVdev->nredundancy; k++) {
 		if ( strcmp( SvrCand.svr[i].ip,  pSvr->ip  )==0 &&
 		     SvrCand.svr[i].cid==pSvr->cid ) { /* check same IP */
 		    found=1;
@@ -879,6 +893,7 @@ void updateSpareServerList(void) //TODO: need more good algorithm.
 	    SvrSpare.svr[spare_count].id   = SvrCand.svr[i].id;
 	    SvrSpare.svr[spare_count].cid  = SvrCand.svr[i].cid;
 	    SvrSpare.svr[spare_count].uniq = SvrCand.svr[i].uniq;
+	    SvrSpare.svr[spare_count].ft_mode = FT_SPARE;
 	    strcpy(SvrSpare.svr[spare_count].ip, SvrCand.svr[i].ip);
 	    spare_count++;
 	}
@@ -1029,7 +1044,7 @@ void ClientState_t::initEnv(void) {
     /*
      * Create a thread of checkpointing.
      */
-#if 1
+#if 0
     if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
 	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
     }
@@ -1225,9 +1240,9 @@ ClientState_t::ClientState_t(void) {
     
     setFaultTolerantMode();
     
-    for (int i=0; i<RC_NVDEVMAX; i++) { // Init Vdev.id.
-	Vdev[i].id      = i;
-	Vdev[i].ft_mode = this->ft_mode;
+    for (int i=0; i<RC_NVDEVMAX; i++) {
+	Vdev[i].id = i;
+	Vdev[i].setFaultMode(this->ft_mode);
     }
     
     initEnv();

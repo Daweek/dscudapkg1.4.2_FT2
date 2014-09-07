@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 17:00:56
+// Last Modified On : 2014-09-07 20:47:58
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -297,6 +297,17 @@ typedef struct RCuva_t {
     RCuva_t *next;
 } RCuva;
 
+typedef enum FtMode_e {
+    //* Define basic behavior of Fault tolerant functions.
+    FT_PLAIN  = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
+    FT_REDUN  = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
+    FT_MIGRA  = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
+    FT_BOTH   = 3,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
+    //
+    FT_INIT   = 4,  // 
+    FT_SPARE  = 5,  // Flag of alternate GPU
+    FT_BROKEN = 6   // Flag of No more use.
+} FtMode;
 //********************************************************************
 //***  Class Name: "RCServer"
 //***  Description:
@@ -317,24 +328,29 @@ typedef struct RCServer {
     
     int        *d_faultconf;  //
 
+    FtMode      ft_mode;      // Fault Tolerant mode.
     int         stat_error;   // Error  statics in redundant calculation.
     int         stat_correct; // Corrct statics in redundant calculation.
+    
     CLIENT     *Clnt;         // RPC client pointer.
 
+    /*CONSTRUCTOR*/
+    RCServer();
+    /*METHODS*/
     void setupConnection(void);
+    void rpcErrorHook(struct rpc_err *err);
     void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
-    void  launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
-		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
     cudaError_t cudaFree(void *d_ptr);
+    void        launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
+		RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
+
     //<--- Migration series
-    void migrateServer(struct RCServer *newone, struct RCServer *broken);
+    void migrateServer(struct RCServer *spare);
     void migrateReallocAllRegions(void);
-    /*CONSTRUCTOR*/
-    RCServer();
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
@@ -345,29 +361,12 @@ typedef struct RCServer {
 typedef struct SvrList {
     int num;                      /* # of server candidates.         */
     RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
+    /*CONSTRUCTOR*/
+    SvrList(void);
     /* methods */
-    int cat( const char *ipaddr, int ndev, const char *hname ) {
-	if ( num >= (RC_NVDEVMAX - 1) ) {
-	    fprintf(stderr, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n", RC_NVDEVMAX);
-	    exit( EXIT_FAILURE );
-	}
-	strcpy( svr[num].ip, ipaddr );
-	svr[num].cid  = ndev;
-	svr[num].uniq = RC_UNIQ_CANDBASE + num;
-	strcpy( svr[num].hostname, hname );
-	
-	num++;
-	return 0;
-    }
+    int add(const char *ip, int ndev, const char *hname);
 } SvrList_t;
 
-typedef enum {
-    //* Define basic behavior of Fault tolerant functions.
-    FT_PLAIN = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
-    FT_REDUN = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
-    FT_MIGRA = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
-    FT_BOTH  = 3   // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
-} FtMode;
 
 typedef enum VdevConf_e{
     VDEV_MONO = 0, //Vdev_t.nredundancy == 1
@@ -393,6 +392,7 @@ typedef struct VirDev_t {
     BkupMemList memlist;              //part of Checkpoint data.
     HistRecList reclist;
 
+    void        setFaultMode(enum FtMode_e fault_mode);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
@@ -466,10 +466,9 @@ extern struct ClientState_t St;
 
 
 extern const char *DEFAULT_SVRIP;
-//extern RCServer_t svrCand[RC_NVDEVMAX];
-//extern RCServer_t svrSpare[RC_NVDEVMAX];
+
 extern SvrList_t SvrSpare;
-//extern RCServer_t svrBroken[RC_NVDEVMAX];
+
 extern int    Vdevid[RC_NPTHREADMAX];
 //extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 extern void (*errorHandler)(void *arg);

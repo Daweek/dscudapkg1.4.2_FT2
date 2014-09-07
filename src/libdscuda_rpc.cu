@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 17:02:31
+// Last Modified On : 2014-09-07 21:19:15
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ RCServer::RCServer(void) {
     id   = -1;
     cid  = -1;
     uniq = -1;
+    ft_mode = FT_INIT;
     strcpy(ip,       "empty");
     strcpy(hostname, "empty");
     stat_error   = 0;
@@ -82,23 +83,42 @@ void RCServer::setupConnection(void) {
     WARN(2, "Established a socket connection between %s...\n", msg);
 }
 
-void RCServer::dupServer( RCServer_t *dup ) {
+void RCServer::dupServer(RCServer_t *dup) {
     dup->id   = this->id;
     dup->cid  = this->cid;
     dup->uniq = this->uniq;
+    dup->ft_mode = this->ft_mode;
     dup->stat_error   = this->stat_error;
     dup->stat_correct = this->stat_correct;
     strcpy( dup->ip, this->ip );
     strcpy( dup->hostname, this->hostname );
 }
 
-void RCServer::migrateServer(RCServer_t *newone, RCServer_t *broken) {
-    dupServer(broken);
-    newone->dupServer(this);
+void RCServer::migrateServer(RCServer_t *spare) {
+    RCServer_t tmp;
 
-    WARN(3, "Reconnect to new physical device %s from old device %s\n",
-	 this->ip, broken->ip); 
-    setupConnection();
+    WARN(0, "spare->cid= %d\n", spare->cid);
+    WARN(0, "this->cid=  %d\n", this->cid);
+    
+    dupServer(&tmp);
+
+    this->cid = spare->cid;
+    this->stat_error = spare->stat_error;
+    this->stat_correct = spare->stat_correct;
+    strcpy(this->ip, spare->ip);
+    strcpy(this->hostname, spare->hostname);
+
+    spare->ft_mode = FT_BROKEN;
+    spare->cid = tmp.cid;
+    spare->stat_error = tmp.stat_error;
+    spare->stat_correct = tmp.stat_correct;
+    strcpy(spare->ip, tmp.ip);
+    strcpy(spare->hostname, tmp.hostname);
+
+    WARN(1, "Reconnect to new physical device\n");
+    WARN(1, "Old physical device: ip=%s, port=%d\n", spare->ip, spare->cid);
+    WARN(1, "New physical device: ip=%s, port=%d\n", this->ip,  this->cid); 
+
 
     return;
 }
@@ -122,6 +142,14 @@ void RCServer::migrateReallocAllRegions(void) {
     WARN(1, "+--- Done.\n");
 }
 
+void VirDev_t::setFaultMode(enum FtMode_e fault_mode) {
+    this->ft_mode = fault_mode;
+    for (int i=0; i<RC_NREDUNDANCYMAX; i++) {
+	server[i].ft_mode = fault_mode;
+    }
+    return;
+}
+
 void checkResult(void *rp, RCServer_t &sp) {
     if ( rp != NULL ) {
 	return;
@@ -132,31 +160,64 @@ void checkResult(void *rp, RCServer_t &sp) {
     }
 }
 
-static
-void recoverClntError(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
-    switch ( err->re_status ) {
-	/* re_status is "clnt_stat" type.
-	 * refer to /usr/include/rpc/clnt.h.
-	 */
+//void rpcErrorHook(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
+void RCServer::rpcErrorHook(struct rpc_err *err) {
+    WARN(1, "********************************************************\n");
+    WARN(1, "***  detected rpc communication error; ");
+    switch (err->re_status) {// *refer to /usr/include/rpc/clnt.h.
     case RPC_SUCCESS: //=0
+	WARN0(1, "\"RPC_SUCCESS\".\n");
 	break;
     case RPC_CANTSEND: //=3
+	WARN0(1, "\"RPC_CANTSEND\".\n");
 	break;
     case RPC_CANTRECV: //=4
+	WARN0(1, "\"RPC_CANTRECV\".\n");
 	break;
     case RPC_TIMEDOUT: //=5
-	WARN(1, "*** RPC:Timed Out in %s().\n", __func__);
-	//dscudaVerbMigrateDevice( failed, spare );
+	WARN0(1, "\"RPC_TIMEDOUT\".\n");
 	break;
     case RPC_UNKNOWNHOST: //=13
+	WARN0(1, "\"RPC_UNKNOWNHOST\".\n");
 	break;
     case RPC_UNKNOWNPROTO: //=17
+	WARN0(1, "\"RPC_UNKNOWNPROTO\".\n");
 	break;
     case RPC_UNKNOWNADDR: //=19
+	WARN0(1, "\"RPC_UNKNOWNADDR\".\n");
 	break;
     default:
+	WARN0(1, "\"RPC_(UNKNOWN-KIND).\n");
 	break;
     }
+    WARN(1, "***  hostname=\"%s\", ip=%s, server[%d]\n", hostname, ip, id);
+    WARN(1, "***  FAULT_TOLERANT_MODE= ");
+    
+    switch(ft_mode) {
+    case FT_PLAIN:
+	WARN0(1, "\"FT_PLAIN\"\n");
+	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
+	WARN(1, "********************************************************\n");
+	exit(1);
+    case FT_REDUN:
+	WARN0(1, "\"FT_REDUN\"\n");
+	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
+	WARN(1, "********************************************************\n");
+	exit(1);
+    case FT_MIGRA:
+	WARN0(1, "\"FT_MIGRA\"\n");
+	WARN(1, "***  I am going to migrate to another device.\n");
+	migrateServer(&SvrSpare.svr[0]);
+	setupConnection();
+	break;
+    case FT_BOTH:
+	WARN0(1, "\"FT_BOTH\"\n");
+	break;
+    default:
+	WARN0(1, "FT_(UNKNOWN)\n");
+    }
+    
+    WARN(1, "********************************************************\n");
 }
 
 /*
@@ -673,7 +734,8 @@ cudaError_t RCServer::cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t count
     dscudaResult *rp;
     RCbuf srcbuf;
     BkupMem *dst;
-    cudaError_t err = cudaSuccess;
+    cudaError_t cuda_error;
+
 
     srcbuf.RCbuf_len = count;
     srcbuf.RCbuf_val = (char *)h_ptr;
@@ -686,19 +748,27 @@ cudaError_t RCServer::cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t count
     WARN(5, "%s():v_region=%p, d_region=%p, size=%zu\n",
 	 __func__, d_ptr, dst->d_region, count);
     rp = dscudamemcpyh2did_1((RCadr)dst->d_region, srcbuf, count, Clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
+    
+    //<-- RPC fault check.
+    struct rpc_err rpc_error;
+    
+    clnt_geterr(Clnt, &rpc_error);
+    if (rpc_error.re_status == RPC_SUCCESS) { /*Got response from remote client*/
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    cuda_error = (cudaError_t)rp->err;
+	}
+    } else { /*In any trouble in RPC communication*/
+	rpcErrorHook(&rpc_error);	
     }
-    if (rp->err != cudaSuccess) {
-	err = (cudaError_t)rp->err;
-    }
+    //--> RPC fault check.
     xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     //--> RPC communication.
-    WARN(5, "%s():comm. completed\n", __func__);
 
-    return err;
+    return cuda_error;
 }
 
 cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
@@ -739,7 +809,6 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
  */
 cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count) {
     cudaMemcpyArgs args;
-    cudaError_t err = cudaSuccess;
 
     switch ( St.ft_mode ) {
     case FT_PLAIN: //thru
@@ -776,20 +845,29 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
     //--> Translate virtual d_ptr to real d_ptr.
 
     rp = dscudamemcpyd2hid_1((RCadr)d_ptr, count, Clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
+
+    //<--- RPC fault check.
+    struct rpc_err rpc_error;
+    cudaError_t    cuda_error;
+    clnt_geterr(Clnt, &rpc_error);
+    if (rpc_error.re_status == RPC_SUCCESS) {
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    cuda_error = (cudaError_t)rp->err;
+	}
+    } else {
+	rpcErrorHook(&rpc_error);	
     }
-    err = (cudaError_t)rp->err;
-    if (rp->err != cudaSuccess) {
-	err = (cudaError_t)rp->err;
-    }
+    //--> RPC fault check.
+
     memcpy(h_lptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
     xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
     //--> RPC communication.
 
-    return err;
+    return cuda_error;
 }
 
 cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
@@ -1135,7 +1213,7 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
     //<--- Timed Out
     clnt_geterr(Clnt, &rpc_error );
     if ( rpc_error.re_status != RPC_SUCCESS ) {
-	//recoverClntError(sp, &(SvrSpare.svr[0]), &rpc_error );
+	rpcErrorHook( &rpc_error );
     }
     //--->
     if ( rp == NULL ) {

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 mode=${1}
+ft=${2}
 
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
@@ -23,6 +24,13 @@ else
 fi
 export DSCUDA_SERVER
 
+if [ "${ft}" = "MIGRA" ]; then
+    DSCUDA_MIGRATION=1
+else
+    DSCUDA_MIGRATION=0
+fi
+export DSCUDA_MIGRATION
+
 export CUDAPATH=/usr/local/cuda-4.2
 export CUDASDKPATH=~/NVIDIA_GPU_Computing_SDK
 export DSCUDA_PATH=~/dscudapkg_FT
@@ -31,7 +39,7 @@ export DSCUDA_REMOTECALL="rpc"
 
 export DSCUDA_USEDAEMON=1
 export DSCUDA_AUTOVERB=0
-export DSCUDA_MIGRATION=0
+
 export LD_LIBRARY_PATH=$DSCUDA_PATH/lib:$CUDAPATH/lib64:$CUDAPATH/lib:$LD_LIBRARY_PATH
 export PATH=$DSCUDA_PATH/src:$CUDAPATH/bin:$PATH
 export OMP_NUM_THREADS=1
