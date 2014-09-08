@@ -4,14 +4,13 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 18:08:43
+// Last Modified On : 2014-09-09 00:13:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
 #include "sockutil.h"
-
 
 //**************************************************************************
 //*** "Cuda*Args_t"
@@ -199,7 +198,7 @@ private:
 typedef struct PtxRecord_t {
     int  valid;   //1:valid, 0:invalid.
     char name[RC_KMODULENAMELEN];
-    char ptx_image[RC_KMODULEIMAGELEN];
+    char ptx_image[RC_KMODULEIMAGELEN]; //!Caution; may be Large size.
     /*CONSTRUCTOR*/
     PtxRecord_t(void);
     /*METHODS*/
@@ -215,6 +214,7 @@ typedef struct PtxStore_t {
     /*METHODS*/
     PtxRecord_t *add(char *name0, char *ptx_image0);
     PtxRecord_t *query(char *name0);
+    void         print(int n);
     // Never remove items.
 } PtxStore_t;
 
@@ -226,8 +226,6 @@ typedef struct ClientModule_t {
     int    index;  
     int    id;     /*  that consists of the virtual one, returned from server. */
     int    valid;  /* 1=>alive, 0=>cache out, -1=>init val. */
-    //char   name[RC_KMODULENAMELEN];
-    //char   ptx_image[RC_KMODULEIMAGELEN]; /* needed for RecallHist(). */
     PtxRecord_t *ptx_data;
     time_t sent_time;
     /*CONSTRUCTOR*/
@@ -238,13 +236,6 @@ typedef struct ClientModule_t {
     
     int  isValid(void);
     int  isInvalid(void);
-//    void setPtxPath(char *ptxpath) {
-//	strncpy(name, ptxpath, RC_KMODULENAMELEN);
-//    }
-//    void setPtxImage(char *ptxstr) {
-//	strncpy(ptx_image, ptxstr, RC_KMODULEIMAGELEN);
-//    }
-    void linkPtxData(char *ptxpath, char *ptxstr, PtxStore_t *ptxstore);
     int  isAlive() {
 	if( (time(NULL) - sent_time) < RC_CLIENT_CACHE_LIFETIME ) {
 	    return 1;
@@ -374,6 +365,7 @@ typedef struct RCServer {
     void migrateReallocAllRegions(void);
     void migrateDeliverAllRegions(void);
     void migrateDeliverAllModules(void);
+    void migrateRebuildModulelist(void);
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************

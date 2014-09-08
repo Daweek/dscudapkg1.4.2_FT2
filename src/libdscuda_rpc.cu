@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 18:10:31
+// Last Modified On : 2014-09-09 00:32:15
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -169,6 +169,45 @@ void RCServer::migrateDeliverAllModules(void) {
     WARN(1, "\n");
 }
 
+void RCServer::migrateRebuildModulelist(void) {
+    WARN(5, "RCServer::%s(void) {\n", __func__);
+    dscudaLoadModuleResult *rp;
+    int module_id;
+    struct rpc_err rpc_error;
+    
+    for (int i=0; i<RC_NKMODULEMAX; i++) {
+	if (modulelist[i].valid != 1) {
+	    continue;
+	}
+	WARN(0,"i=%d,checkpoint-0\n", i);
+	rp = dscudaloadmoduleid_1(St.getIpAddress(),
+				  getpid(),
+				  modulelist[i].ptx_data->name,
+				  modulelist[i].ptx_data->ptx_image,
+				  Clnt);
+	WARN(0,"i=%d,checkpoint-1\n",i);
+	//<--- RPC Error Hook
+	clnt_geterr(Clnt, &rpc_error);
+	if (rpc_error.re_status == RPC_SUCCESS) {
+	    if (rp == NULL) {
+		WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+		clnt_perror(Clnt, ip);
+		exit(EXIT_FAILURE);
+	    }
+	} else {
+	    rpcErrorHook(&rpc_error);
+	}
+	//---> RPC Error Hook.
+	
+	module_id = rp->id;
+	xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
+	
+	modulelist[i].id        = module_id;
+	modulelist[i].sent_time = time(NULL);
+    }
+    WARN(5, "} //RCServer::%s(void).\n", __func__);
+}
+
 void VirDev_t::setFaultMode(enum FtMode_e fault_mode) {
     this->ft_mode = fault_mode;
     for (int i=0; i<RC_NREDUNDANCYMAX; i++) {
@@ -247,6 +286,7 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	    setupConnection();
 	    migrateReallocAllRegions();
 	    migrateDeliverAllRegions();
+	    migrateRebuildModulelist();
 	}
 	break;
     case FT_BOTH:
@@ -1198,8 +1238,7 @@ int RCServer::findModuleOpen(void) {
 }
 
 int RCServer::queryModuleID(int module_index) {
-    int i;
-    for (i=0; i<RC_NKMODULEMAX; i++) {
+    for (int i=0; i<RC_NKMODULEMAX; i++) {
 	if ( modulelist[i].index == module_index ) {
 	    return modulelist[i].id;
 	}
@@ -1221,14 +1260,12 @@ int VirDev_t::findModuleOpen(void) { //TODO: almost same as above func.
 
 int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
 			 char *modulebuf, int module_index) {
-    //WARN(10, "<---Entering %s()\n", __func__);
-    //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
-    
-    int module_id;
+    WARN(5, "      + RCServer::%s(modulename=%s, module_index=%d) { \n",
+	 __func__, modulename, module_index);
     
     /* send to virtual GPU */
     dscudaLoadModuleResult *rp;
-    rp = dscudaloadmoduleid_1(St.getIpAddress(), getpid(), modulename, modulebuf, Clnt);
+    rp = dscudaloadmoduleid_1(ipaddr, getpid(), modulename, modulebuf, Clnt);
 
     //<--- RPC Error Hook
     struct rpc_err rpc_error;
@@ -1244,7 +1281,7 @@ int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
     }
     //---> RPC Error Hook.
 
-    module_id = rp->id;
+    int module_id = rp->id;
     xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
 
     // register a new module into the list,
@@ -1254,32 +1291,28 @@ int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
     modulelist[n].index     = module_index;
     modulelist[n].id        = module_id;
     modulelist[n].sent_time = time(NULL);
-//    modulelist[n].setPtxPath( modulename );
-//    modulelist[n].setPtxImage( modulebuf );
-    modulelist[n].linkPtxData( modulename, modulebuf, &PtxStore );
-    
-    WARN(5, "New client module item was registered. id:%d\n", module_id);
+    modulelist[n].ptx_data  = PtxStore.query(modulename);
+    WARN(5, "RCServer[%d]: New client module item was registered. id:%d\n", id, module_id);
     
     if (St.isAutoVerb() ) {
 	/*Nop*/
     }
 
-    //WARN(10, "--->Exiting  %s()\n", __func__);
+    WARN(5, "      + } // RCServer::%s()\n", __func__);
     return module_id;
 }
 
 int VirDev_t::loadModule(char *name, char *strdata) {
-    int mid;
+    WARN(5, "   + VirDev_t::loadModule( name=%p(%s), strdata=%p ) {\n", name, name, strdata);
 
     if (name != NULL) {
-	WARN(5, "VirDev_t::loadModule(%p) modulename:%s  ...\n", name, name);
 #if RC_CACHE_MODULE
 	// look for modulename in the module list.
 	for (int i=0; i<RC_NKMODULEMAX; i++) {
 	    if ( modulelist[i].isInvalid() ) {
 		continue;
 	    }
-	    if ( !strcmp(name, modulelist[i].ptx_data->name) ) {
+	    if ( strcmp(name, modulelist[i].ptx_data->name) == 0 ) { //Found
 		if ( modulelist[i].isAlive() ) {
 		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
 			 modulelist[i].index, time(NULL) - modulelist[i].sent_time, modulelist[i].ptx_data->name);
@@ -1317,21 +1350,30 @@ int VirDev_t::loadModule(char *name, char *strdata) {
 
     // module not found in the module list.
     // really need to send it to the server.
+
+    // <-- If target .ptx is not registered to PtxStore, then register first.
+    PtxRecord_t *ptxrecord_ptr = PtxStore.query(name_found);
+    if (ptxrecord_ptr == NULL) {
+	PtxStore.add( name_found, strdata_found );
+    }
+    // --> If target .ptx is not registered to PtxStore, then register first.
+    
     int j = this->findModuleOpen();
     this->modulelist[j].index     = j;
     this->modulelist[j].id        = j; //dummy; not used.
     this->modulelist[j].valid     = 1;
     this->modulelist[j].sent_time = time(NULL);
-//    this->modulelist[j].setPtxPath(name_found);
-//    this->modulelist[j].setPtxImage(strdata_found);
-    this->modulelist[j].linkPtxData(name_found, strdata_found, &PtxStore);
-    WARN(5, "New client module item was registered. id:%d\n", mid);
-    
+    this->modulelist[j].ptx_data  = PtxStore.query(name_found);
+    PtxStore.print(4);
+    WARN(5, "      + New client-module item was registered. index=%d\n", j);
+
+    int mid;
     for (int i=0; i<nredundancy; i++) {
 	mid = server[i].loadModule(St.getIpAddress(), getpid(), name_found, strdata_found, j);
         WARN(3, "(info) server[%d].loadModule() returns mid=%d.\n", i, mid);
     }
 
+    WARN(5, "   + } // VirDev_t::loadModule().\n");
     return modulelist[j].index;
 }//VirDev_t::loadModule(
 
@@ -1342,6 +1384,7 @@ int VirDev_t::loadModule(char *name, char *strdata) {
 void RCServer::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
+    WARN(5, "      + RCServer[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
     lo_args.RCargs_val = (RCarg *)malloc(args.RCargs_len * sizeof(RCarg));
@@ -1370,7 +1413,7 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
 	if (argp->val.type == dscudaArgTypeP) {
             v_ptr = (void*)(argp->val.RCargVal_u.address);
 	    d_ptr = memlist.queryDevicePtr(v_ptr);
-	    WARN(10, "Physical[%d].%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", id, __func__, i, v_ptr, d_ptr);
+	    WARN(9, "Physical[%d].%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", id, __func__, i, v_ptr, d_ptr);
 	    argp->val.RCargVal_u.address = (RCadr)d_ptr;
 	}
     }
@@ -1385,7 +1428,7 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     //<--- Timed Out
     struct rpc_err rpc_error;
     
-    clnt_geterr(Clnt, &rpc_error );
+    clnt_geterr(Clnt, &rpc_error);
     if (rpc_error.re_status == RPC_SUCCESS) {
 	if (rp == NULL) {
 	    WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
@@ -1397,11 +1440,13 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     }
     //--->
     free(lo_args.RCargs_val);
+    WARN(5, "      + } RCServer[%d]::%s()\n", id, __func__);
 }
 
 void VirDev_t::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
+    WARN(5, "   + VirDev_t::%s() {\n", __func__);
     /*     
      * Automatic Recovery, Register to the called history.
      */
@@ -1422,6 +1467,7 @@ void VirDev_t::launchKernel(int module_index, int kid, char *kname,
         server[i].launchKernel(module_index, kid, kname, gdim,
 			       bdim, smemsize, stream, args);
     }
+    WARN(5, "   + } // VirDev_t::%s()\n", __func__);
 }
 
 void
@@ -1429,11 +1475,9 @@ rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* modulei
                              RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
                              RCargs args) {
     WARN(5, "%s() {\n", __func__);
-    Vdev_t *vdev;
-    
     pthread_mutex_lock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.p
 
-    vdev = St.Vdev + Vdevid[vdevidIndex()];
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     vdev->launchKernel(module_index, kid, kname, gdim, bdim, smemsize, stream, args);
     
     pthread_mutex_unlock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.

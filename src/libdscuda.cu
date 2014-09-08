@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 18:07:28
+// Last Modified On : 2014-09-08 23:44:10
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -130,15 +130,22 @@ PtxRecord_t *PtxStore_t::query(char *name0) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	ptx_ptr = &ptx_record[i];
 	if ( strcmp(name0, ptx_ptr->name)==0 ) {/*found*/
+	    WARN(9, "      +PtxStore_t::query(): Found ptx.\n")
 	    return ptx_ptr;
 	}
     }
-    WARN(5, "%s(): Not Found Ptx.\n");
+    WARN(5, "      + PtxStore_t::query(): Not found ptx.\n");
     return NULL;
+}
+void PtxStore_t::print(int n) {
+    for (int i=0; i<n; i++) {
+	WARN(1, "ptx_record[%d]: valid=%d, name=%s.\n",
+	     i, ptx_record[i].valid, ptx_record[i].name); 
+    }
 }
 
 ClientModule_t::ClientModule_t(void) {
-    WARN( 5, "The constructor %s() called.\n", __func__ );
+    //WARN( 5, "The constructor %s() called.\n", __func__ );
     valid  = -1;
     id     = -1;
     ptx_data = NULL;
@@ -163,16 +170,6 @@ int ClientModule_t::isInvalid(void) {
 	return 0;
     } else {
 	return 1;
-    }
-}
-
-void ClientModule_t::linkPtxData(char *ptxpath, char *ptxstr, PtxStore_t *ptxstore) {
-    PtxRecord_t *ptx_ptr;
-    ptx_ptr = ptxstore->query( ptxpath );
-    if (ptx_ptr != NULL) {
-	ptx_data = ptx_ptr;
-    } else {
-	ptx_ptr = ptxstore->add( ptxpath, ptxstr );
     }
 }
 
@@ -671,6 +668,8 @@ void VirDev_t::printModuleList(void) {
     int valid_cnt = 0;
     
     WARN(5, "====================================================\n");
+    WARN(5, "===  VirDev_t::%s(void)\n", __func__ );
+    WARN(5, "====================================================\n");
     WARN(5, "RC_NKMODULEMAX= %d\n", RC_NKMODULEMAX);
     
     for (int i=0; i<RC_NKMODULEMAX; i++) {
@@ -678,8 +677,8 @@ void VirDev_t::printModuleList(void) {
 	    WARN( 5, "Virtual[%d]:modulelist[%d]:\n", id, i);
 	    WARN( 5, "    + name= %s\n", modulelist[i].ptx_data->name);
 	    //printf("    + send_time= \n", sent_time., sent_time.);
-	    strncpy(printbuf, modulelist[i].ptx_data->ptx_image, len - 1 );
-	    printbuf[255]='\0';
+	    //strncpy(printbuf, modulelist[i].ptx_data->ptx_image, len - 1 );
+	    //printbuf[255]='\0';
 	    //printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
 	    valid_cnt++;
 	}
@@ -1495,14 +1494,16 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  */
 
 int dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
+    WARN(5, "dscudaLoadModule( name=%p(%s), strdata=%p ) {\n", name, name, strdata);
     int idx = vdevidIndex();
     Vdev_t *vdev = St.Vdev + Vdevid[idx];
     int module_index;
 
     module_index = vdev->loadModule(name, strdata);
     
-    printModuleList();
-
+    //printModuleList();
+    WARN(5, "} //dscudaLoadModule() returned %d.\n", module_index);
+    WARN(5, "\n");
     return module_index;
 }
 
