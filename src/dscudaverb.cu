@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-01 17:38:34
+// Last Modified On : 2014-09-09 00:49:08
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -427,28 +427,4 @@ void dscudaVerbInit(void) {
     HISTREC.on();
 }
 
-void dscudaClearHist(void) {
-    HISTREC.clear();
-}
-
-/*
- *
- */
-void dscudaVerbMigrateModule() {
-    // module not found in the module list.
-    // really need to send it to the server.
-    int vi = vdevidIndex();
-    Vdev_t *vdev = St.Vdev + Vdevid[vi];
-    int i, mid;
-    char *ptx_path, *ptx_data;
-
-    ptx_path = CltModulelist[0].name;      // 0 is only for test
-    ptx_data = CltModulelist[0].ptx_image; // 0 is only for test
-    
-    for (i=0; i<vdev->nredundancy; i++) { /* Reload to all redundant devices. */
-	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), ptx_path, ptx_data, Vdevid[vi], i);
-        WARN(3, "dscudaLoadModuleLocal returns %d\n", mid);
-    }
-    printModuleList();
-}
 

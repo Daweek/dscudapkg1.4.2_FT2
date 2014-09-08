@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 00:32:15
+// Last Modified On : 2014-09-09 00:56:23
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1058,8 +1058,6 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 		if (recall_result != 0) {
 		    printModuleList();
 		    printVirtualDeviceList();
-		    //dscudaVerbMigrateDevice(failed_1st, &svrSpare[0]);
-		    //dscudaVerbMigrateDevice(failed_1st, &(SvrSpare.svr[0]));
 		}
 		//HISTREC.on();  // ---> restore recordHist enable.
 		St.setAutoVerb();    // ===> restore autoVerb enabled.
