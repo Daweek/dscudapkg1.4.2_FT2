@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 00:09:19
+// Last Modified On : 2014-09-08 09:21:07
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1152,6 +1152,7 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
     return err;
 }
 
+#if 0 // original version
 int
 dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *modulebuf, int vdevid, int raidid) {
     //WARN(10, "<---Entering %s()\n", __func__);
@@ -1163,6 +1164,34 @@ dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *mo
     /* send to virtual GPU */
     dscudaLoadModuleResult *rp = dscudaloadmoduleid_1( St.getIpAddress(), getpid(), modulename, modulebuf, sp[raidid].Clnt );
     checkResult(rp, sp[raidid]);
+    ret = rp->id;
+    xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
+    
+    if (St.isAutoVerb() ) {
+	/*Nop*/
+    }
+
+    //WARN(10, "--->Exiting  %s()\n", __func__);
+    return ret;
+}
+#endif
+
+int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
+			 char *modulebuf) {
+    //WARN(10, "<---Entering %s()\n", __func__);
+    //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
+    dscudaLoadModuleResult *rp;
+    
+    int ret;
+    
+    /* send to virtual GPU */
+    rp = dscudaloadmoduleid_1(St.getIpAddress(), getpid(), modulename, modulebuf, Clnt);
+    if (rp == NULL) {
+	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	clnt_perror(Clnt, ip);
+	exit(EXIT_FAILURE);
+    }
+
     ret = rp->id;
     xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
     

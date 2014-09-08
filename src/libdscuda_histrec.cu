@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 16:21:00
+// Last Modified On : 2014-09-08 09:27:38
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -499,6 +499,7 @@ void dscudaVerbMigrateModule() {
     // really need to send it to the server.
     int     vi   = vdevidIndex();
     Vdev_t *vdev = St.Vdev + Vdevid[vi];
+    RCServer *sp = vdev->server;
     int i, mid;
     char *ptx_path, *ptx_data;
 
@@ -506,7 +507,8 @@ void dscudaVerbMigrateModule() {
     ptx_data = CltModulelist[0].ptx_image; // 0 is only for test
     
     for (i=0; i<vdev->nredundancy; i++) { /* Reload to all redundant devices. */
-	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), ptx_path, ptx_data, Vdevid[vi], i);
+	//mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), ptx_path, ptx_data, Vdevid[vi], i);
+	mid = sp[i].loadModule(St.getIpAddress(), getpid(), ptx_path, ptx_data);
         WARN(3, "dscudaLoadModuleLocal returns %d\n", mid);
     }
     printModuleList();

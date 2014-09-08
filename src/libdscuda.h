@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 00:39:45
+// Last Modified On : 2014-09-08 09:20:13
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -347,6 +347,8 @@ typedef struct RCServer {
     cudaError_t cudaFree(void *d_ptr);
     void        launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
 		RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
+    int         loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
+			   char *modulebuf);
 
     //<--- Migration series
     void migrateServer(struct RCServer *spare);

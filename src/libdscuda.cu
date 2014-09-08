@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 00:28:45
+// Last Modified On : 2014-09-08 09:23:50
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1468,10 +1468,12 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
     // really need to send it to the server.
     idx = vdevidIndex();
     Vdev_t *vdev = St.Vdev + Vdevid[idx];
+    RCServer *sp = vdev->server;
 
     for (i=0; i < vdev->nredundancy; i++) {
 	// mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name, strdata, Vdevid[vi], i);
-	mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name_found, strdata_found, Vdevid[idx], i);
+	// mid = dscudaLoadModuleLocal(St.getIpAddress(), getpid(), name_found, strdata_found, Vdevid[idx], i);
+	mid = sp[i].loadModule(St.getIpAddress(), getpid(), name_found, strdata_found);
         WARN(3, "(info) dscudaLoadModuleLocal() returns mid=%d as Vdevid[%d], Redun[%d].\n", mid, idx, i);
 
         // register a new module into the list,
