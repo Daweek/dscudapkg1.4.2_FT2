@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 10:50:46
+// Last Modified On : 2014-09-08 00:20:32
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -486,7 +486,7 @@ printSvrModuleList(ServerModule *module_list)
 
 static CUresult
 getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
-    WARN(10, "<---Entering %s(kname=%s)\n", __func__, kname);
+    WARN(10, "   + %s(kname=%s) {\n", __func__, kname);
     CUresult cuerr;
     ServerModule *mp = SvrModulelist + moduleid;
 
@@ -496,8 +496,7 @@ getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
 	WARN(3, "(^_^) moduleid=%d, valid=%d, id=%d, name=%s\n",
 	     moduleid, mp->valid, mp->id, mp->name);
 	printSvrModuleList(SvrModulelist);
-    }
-    else {
+    } else {
         WARN(0, "(;_;) cuModuleGetFunction() : function:'%s'. %s\n",
              kname, cudaGetErrorString((cudaError_t)cuerr));
 	WARN(0, "(;_;) moduleid=%d, valid=%d, id=%d, name=%s\n",
@@ -520,7 +519,7 @@ getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
 	}
         fatal_error(1);
     }
-    WARN(10, "--->Exiting %s()\n", __func__);
+    WARN(10, "   + }\n");
     return cuerr;
 }
 

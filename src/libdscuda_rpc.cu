@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 23:30:30
+// Last Modified On : 2014-09-08 00:09:19
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -99,9 +99,6 @@ void RCServer::dupServer(RCServer_t *dup) {
 void RCServer::migrateServer(RCServer_t *spare) {
     RCServer_t tmp;
 
-    WARN(0, "spare->cid= %d\n", spare->cid);
-    WARN(0, "this->cid=  %d\n", this->cid);
-    
     dupServer(&tmp);
 
     this->cid = spare->cid;
@@ -117,10 +114,9 @@ void RCServer::migrateServer(RCServer_t *spare) {
     strcpy(spare->ip, tmp.ip);
     strcpy(spare->hostname, tmp.hostname);
 
-    WARN(1, "Reconnect to new physical device\n");
-    WARN(1, "Old physical device: ip=%s, port=%d\n", spare->ip, spare->cid);
-    WARN(1, "New physical device: ip=%s, port=%d\n", this->ip,  this->cid); 
-
+    WARN(1, "***  Reconnect to new physical device\n");
+    WARN(1, "***  Old physical device: ip=%s, port=%d\n", spare->ip, spare->cid);
+    WARN(1, "***  New physical device: ip=%s, port=%d\n", this->ip,  this->cid); 
 
     return;
 }
@@ -131,13 +127,13 @@ void RCServer::migrateReallocAllRegions(void) {
     int     copy_count = 0;
     int     i = 0;
     
-    WARN(1, "%s(RCServer_t *sp).\n", __func__);
+    WARN(1, "%s(void).\n", __func__);
     WARN(1, "Num. of realloc region = %d\n", memlist.length );
     
     while (mem_ptr != NULL) {
 	/* TODO: select migrateded virtual device, not all region. */
 	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem_ptr->d_region, mem_ptr->size);
-	cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
+	this->cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
 	mem_ptr = mem_ptr->next;
 	i++;
     }
@@ -220,6 +216,7 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	    WARN(0, "***    + ip = %s:%d\n", sp->ip, sp->cid);
 	    migrateServer(sp);
 	    setupConnection();
+	    migrateReallocAllRegions();
 	}
 	break;
     case FT_BOTH:
@@ -1184,8 +1181,6 @@ dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *mo
 void RCServer::launchKernel(int *moduleid, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
-    struct rpc_err rpc_error;
-    
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
     lo_args.RCargs_val = (RCarg *)malloc(args.RCargs_len * sizeof(RCarg));
@@ -1223,16 +1218,19 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
 				      smemsize, (RCstream)st->s[id], lo_args, Clnt);
 
     //<--- Timed Out
+    struct rpc_err rpc_error;
+    
     clnt_geterr(Clnt, &rpc_error );
-    if ( rpc_error.re_status != RPC_SUCCESS ) {
-	rpcErrorHook( &rpc_error );
+    if (rpc_error.re_status == RPC_SUCCESS) {
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	    clnt_perror(Clnt, ip);
+	    exit( EXIT_FAILURE );
+	}
+    } else {
+	rpcErrorHook(&rpc_error);
     }
     //--->
-    if ( rp == NULL ) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit( EXIT_FAILURE );
-    }
     free(lo_args.RCargs_val);
 }
 

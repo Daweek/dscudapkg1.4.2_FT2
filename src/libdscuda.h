@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 22:49:03
+// Last Modified On : 2014-09-08 00:39:45
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -476,7 +476,7 @@ extern int    Vdevid[RC_NPTHREADMAX];
 extern void (*errorHandler)(void *arg);
 
 extern void *errorHandlerArg;
-extern ClientModule  CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
+extern ClientModule  CltModulelist[RC_NKMODULEMAX];
 extern RCmappedMem    *RCmappedMemListTop;
 extern RCmappedMem    *RCmappedMemListTail;
 

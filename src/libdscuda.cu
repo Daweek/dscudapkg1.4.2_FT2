@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 23:33:56
+// Last Modified On : 2014-09-08 00:28:45
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1413,8 +1413,7 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  * returns id for the module.
  * the module is cached and sent only once for a certain period.
  */
-int* dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated.
-{
+int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
     int i, j, mid;
     ClientModule *mp;
     int idx;
