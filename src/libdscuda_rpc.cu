@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 00:56:23
+// Last Modified On : 2014-09-09 01:18:16
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -813,6 +813,7 @@ cudaError_t cudaFree(void *d_ptr) {
  * cudaMemcpy( HostToDevice )
  */
 cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
+
     dscudaResult *rp;
     RCbuf srcbuf;
     void *d_ptr;
@@ -825,10 +826,10 @@ cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
     //<-- Translate virtual v_ptr to real d_ptr.
     d_ptr = memlist.queryDevicePtr(v_ptr);
     //--> Translate virtual v_ptr to real d_ptr.
+    WARN(5, "      + Physical[%d]:%s(v_ptr=%p ==> d_ptr=%p, size=%zu)\n",
+	 id, __func__, v_ptr, d_ptr, count);
 
     //<-- RPC communication.
-    WARN(5, "%s():v_region=%p, d_region=%p, size=%zu\n",
-	 __func__, v_ptr, d_ptr, count);
     rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, Clnt);
     
     //<-- RPC fault check.
@@ -858,7 +859,7 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
     cudaError_t    err = cudaSuccess;
 	
     for (int i=0; i<nredundancy; i++) {
-	WARN( 4, "      + Physical[%d] v_ptr=%p\n", i, v_ptr);
+
 	server[i].cudaMemcpyH2D(v_ptr, h_ptr, count);
 	if ( ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH ) {
 	    
@@ -1411,7 +1412,7 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
 	if (argp->val.type == dscudaArgTypeP) {
             v_ptr = (void*)(argp->val.RCargVal_u.address);
 	    d_ptr = memlist.queryDevicePtr(v_ptr);
-	    WARN(9, "Physical[%d].%s():arg[%d]:v_ptr=%p -> d_ptr=%p\n", id, __func__, i, v_ptr, d_ptr);
+	    WARN(6, "      +    Virtual Address Translate: arg[%d]:v_ptr=%p -> d_ptr=%p\n", i, v_ptr, d_ptr);
 	    argp->val.RCargVal_u.address = (RCadr)d_ptr;
 	}
     }
