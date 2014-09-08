@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 00:20:32
+// Last Modified On : 2014-09-08 13:17:22
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -41,9 +41,14 @@
 #define FAULT_INJECTION_LEN (32)
 //--> oikawa
 
-typedef struct {
+//********************************************************************
+//***  Class Name: "ServerModule_t"
+//***  Description:
+//***      - CUDA Kernel function module management for Server.
+//********************************************************************
+typedef struct ServerModule_t {
     unsigned int id;          /* Static and Serial Identical Number */
-    int          valid;       /* 1 or 0 */
+    int          valid;       /* 1:valid, 0:invalid */
     unsigned int ipaddr;
     unsigned int pid;
     time_t       loaded_time;

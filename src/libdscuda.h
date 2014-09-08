@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 09:20:13
+// Last Modified On : 2014-09-08 18:08:43
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ typedef struct CudaLoadModuleArgs_t {
 } cudaLoadModuleArgs;
 
 typedef struct CudaRpcLaunchKernelArgs_t {
-    int     *moduleid;
+    int      moduleid;
     int      kid;
     char    *kname;
     RCdim3   gdim;
@@ -194,53 +194,65 @@ private:
 //********************************************************************
 //***  Class Name: "ClientModule_t"
 //***  Description:
-//***      - 
+//***      - CUDA Kernel function module management for Client.
+//********************************************************************
+typedef struct PtxRecord_t {
+    int  valid;   //1:valid, 0:invalid.
+    char name[RC_KMODULENAMELEN];
+    char ptx_image[RC_KMODULEIMAGELEN];
+    /*CONSTRUCTOR*/
+    PtxRecord_t(void);
+    /*METHODS*/
+    void invalidate(void);
+    void set(char *name0, char *ptx_image0);
+} PtxRecord_t;
+
+typedef struct PtxStore_t {
+    struct PtxRecord_t ptx_record[RC_NKMODULEMAX];
+    int used_count;
+    /*CONSTRUCTOR*/
+    PtxStore_t(void);
+    /*METHODS*/
+    PtxRecord_t *add(char *name0, char *ptx_image0);
+    PtxRecord_t *query(char *name0);
+    // Never remove items.
+} PtxStore_t;
+
+//********************************************************************
+//***  Class Name: "ClientModule_t"
+//***  Description:
 //********************************************************************
 typedef struct ClientModule_t {
-    int    valid;   /* 1=>alive, 0=>cache out, -1=>init val. */
-    int    vdevid;  /* the virtual device the module is loaded into. */
-    int    id[RC_NREDUNDANCYMAX]; /*  that consists of the virtual one, returned from server. */
-    char   name[RC_KMODULENAMELEN];
-    char   ptx_image[RC_KMODULEIMAGELEN]; /* needed for RecallHist(). */
+    int    index;  
+    int    id;     /*  that consists of the virtual one, returned from server. */
+    int    valid;  /* 1=>alive, 0=>cache out, -1=>init val. */
+    //char   name[RC_KMODULENAMELEN];
+    //char   ptx_image[RC_KMODULEIMAGELEN]; /* needed for RecallHist(). */
+    PtxRecord_t *ptx_data;
     time_t sent_time;
-
+    /*CONSTRUCTOR*/
+    ClientModule_t(void);
+    /*METHODS*/
     void validate() { valid = 1; }
     void invalidate() { valid = 0; }
-    int  isValid()  {
-	if (valid<-1 || valid>1) {
-	    fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
-	    exit(1);
-	}
-	else if (valid==1) { return 1; }
-	else { return 0; }
-    }
-    int  isInvalid()  {
-	if (valid<-1 || valid>1) {
-	    fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
-	    exit(1);
-	}
-	else if (valid==1) { return 0;}
-	else { return 1; }
-    }
-    void setPtxPath(char *ptxpath) {
-	strncpy(name, ptxpath, RC_KMODULENAMELEN);
-    }
-    void setPtxImage(char *ptxstr) {
-	strncpy(ptx_image, ptxstr, RC_KMODULEIMAGELEN);
-    }
-    int isAlive() {
+    
+    int  isValid(void);
+    int  isInvalid(void);
+//    void setPtxPath(char *ptxpath) {
+//	strncpy(name, ptxpath, RC_KMODULENAMELEN);
+//    }
+//    void setPtxImage(char *ptxstr) {
+//	strncpy(ptx_image, ptxstr, RC_KMODULEIMAGELEN);
+//    }
+    void linkPtxData(char *ptxpath, char *ptxstr, PtxStore_t *ptxstore);
+    int  isAlive() {
 	if( (time(NULL) - sent_time) < RC_CLIENT_CACHE_LIFETIME ) {
 	    return 1;
 	} else {
 	    return 0;
 	}
     }
-    /*
-    int isTimeout() {
-	
-    }
-    */
-    ClientModule_t(void);
+
 } ClientModule;
 
 //********************************************************************
@@ -336,23 +348,32 @@ typedef struct RCServer {
 
     /*CONSTRUCTOR*/
     RCServer();
+
+    /*CUDA KERNEL MODULES MANAGEMENT*/
+    ClientModule modulelist[RC_NKMODULEMAX];
+    int         loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
+			   char *modulebuf, int module_index);
+    int         findModuleOpen(void);
+    int         queryModuleID(int module_index);
+    void        invalidateModuleCache(void);
+
     /*METHODS*/
     void setupConnection(void);
-    void rpcErrorHook(struct rpc_err *err);
     void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
-    void        launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
+    void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
 		RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
-    int         loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
-			   char *modulebuf);
 
     //<--- Migration series
+    void rpcErrorHook(struct rpc_err *err);
     void migrateServer(struct RCServer *spare);
     void migrateReallocAllRegions(void);
+    void migrateDeliverAllRegions(void);
+    void migrateDeliverAllModules(void);
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
@@ -396,14 +417,20 @@ typedef struct VirDev_t {
     BkupMemList memlist;              //part of Checkpoint data.
     HistRecList reclist;
 
+    /*CUDA kernel modules management*/
+    ClientModule modulelist[RC_NKMODULEMAX];
+    int         loadModule(char *name, char *strdata);
+    int         findModuleOpen(void);
+    void        invalidateAllModuleCache(void);
+    void        printModuleList(void);
+    /*METHODS*/
     void        setFaultMode(enum FtMode_e fault_mode);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
-    void  launchKernel(int *moduleid, int kid, char *kname, RCdim3 gdim,
+    void  launchKernel(int module_index, int kid, char *kname, RCdim3 gdim,
 		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
-    
     
     void remallocRegionsGPU(int num_svr);
 } Vdev_t;
@@ -426,9 +453,7 @@ public:
     int    Nvdev;             // # of virtual devices available.
     Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
 
-
     FtMode       ft_mode;
-    char *getFtModeString(void);    
                               /*** Static Information ***/
     unsigned int ip_addr;     // Client IP address.
     time_t       start_time;  // Clinet start time.
@@ -465,6 +490,7 @@ public:
     int  getMigrateDevice() { return migration; }
 };
 extern struct ClientState_t St;
+extern struct PtxStore_t PtxStore;
 //extern int    ClientState_t::Nvdev;
 //extern Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
 
@@ -478,19 +504,16 @@ extern int    Vdevid[RC_NPTHREADMAX];
 extern void (*errorHandler)(void *arg);
 
 extern void *errorHandlerArg;
-extern ClientModule  CltModulelist[RC_NKMODULEMAX];
+//extern ClientModule  CltModulelist[RC_NKMODULEMAX];
 extern RCmappedMem    *RCmappedMemListTop;
 extern RCmappedMem    *RCmappedMemListTail;
 
 void printModuleList(void);
 void printVirtualDeviceList();
-void invalidateModuleCache(void);
 int  requestDaemonForDevice(char *ipaddr, int devid, int useibv);
 int  vdevidIndex(void);
 
-int  dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename,
-			   char *modulebuf, int vdevid, int raidid);
-int *dscudaLoadModule(char *srcname, char *strdata);
+int  dscudaLoadModule(char *srcname, char *strdata);
 void
 checkResult(void *rp, RCServer_t &sp);
 cudaError_t cudaSetDevice_clnt( int device, int errcheck );
@@ -641,7 +664,7 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
 				   size_t count, size_t offset = 0,
 				   enum cudaMemcpyKind kind = cudaMemcpyDeviceToHost, cudaStream_t stream = 0);
 void
-rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
+rpcDscudaLaunchKernelWrapper(int moduleid, int kid, char *kname,
 			     RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
 			     RCargs args);
 

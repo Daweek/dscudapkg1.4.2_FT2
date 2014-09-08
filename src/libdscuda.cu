@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 09:23:50
+// Last Modified On : 2014-09-08 18:07:28
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -26,18 +26,8 @@
 #include <pthread.h>
 #include "dscuda.h"
 #include "libdscuda.h"
-//#include "dscudaverb.h"
 
-ClientModule_t::ClientModule_t(void) {
-    WARN( 5, "The constructor %s() called.\n", __func__ );
-    valid  = -1;
-    vdevid = -1;
-    for (int i=0; i<RC_NREDUNDANCYMAX; i++) id[i] = -1;
-    strncpy(name, "init", RC_KMODULENAMELEN);
-    strncpy(ptx_image, "init", RC_KMODULEIMAGELEN);
-}
-
-static int   VdevidIndexMax = 0;            // # of pthreads which utilize virtual devices.
+static int   VdevidIndexMax = 0; //# of pthreads which utilize virtual devices.
 const  char *DEFAULT_SVRIP = "localhost";
 static char Dscudapath[512];
 
@@ -75,14 +65,115 @@ void *errorHandlerArg = NULL;
 
 //struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
-ClientModule CltModulelist[RC_NKMODULEMAX]; /* is Singleton.*/
-
+//ClientModule CltModulelist[RC_NKMODULEMAX];
 
 struct ClientState_t St;
+struct PtxStore_t    PtxStore;
 //int    ClientState_t::Nvdev;
 //Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
 SvrList::SvrList(void) {
     num = 0;
+}
+//*********************************************************
+//*** CLASS: PtxRecord_t
+//*********************************************************
+PtxRecord_t::PtxRecord_t(void) {
+    if (RC_KMODULENAMELEN < 16) {
+	WARN(0, "%s():RC_KMODULENAMELEN is too small.\n", __func__);
+	exit(1);
+    }
+    if (RC_KMODULEIMAGELEN < 16) {
+	WARN(0, "%s():RC_KMODULEIMAGELEN is too small.\n", __func__);
+	exit(1);
+    }
+    strcpy(name, "unknown");
+    strcpy(ptx_image, "empty");
+    valid = 0;
+}
+void PtxRecord_t::invalidate(void) {
+    strncpy(name, "unknown", RC_KMODULENAMELEN);
+    strncpy(ptx_image, "empty", RC_KMODULEIMAGELEN);
+    valid = 0;
+}
+void PtxRecord_t::set(char *name0, char *ptx_image0) {
+    strncpy(name,      name0,      RC_KMODULENAMELEN);
+    strncpy(ptx_image, ptx_image0, RC_KMODULEIMAGELEN);
+    valid = 1;
+    
+    if (name[RC_KMODULENAMELEN-1] != '\0') {
+	WARN(0, "%s():RC_KMODULENAMELEN is too small.\n");
+	exit(1);
+    }
+    if (ptx_image[RC_KMODULEIMAGELEN-1] != '\0') {
+	WARN(0, "%s():RC_KMODULEIMAGELEN is too small.\n");
+	exit(1);
+    }
+}
+//*********************************************************
+//*** CLASS: PtxStore_t
+//*********************************************************
+PtxStore_t::PtxStore_t(void) {
+    used_count = 0;
+}
+PtxRecord_t *PtxStore_t::add(char *name0, char *ptx_image0) {
+    PtxRecord_t *ptx_ptr = &ptx_record[used_count];
+    if (used_count > RC_NKMODULEMAX) {
+	WARN(0, "PtxStore_t::%s(): PtxStore array FULL!\n");
+	exit(1);
+    }
+    ptx_ptr->set(name0, ptx_image0);
+    used_count++;
+    return ptx_ptr;
+}
+PtxRecord_t *PtxStore_t::query(char *name0) {
+    PtxRecord_t *ptx_ptr;
+    for (int i=0; i<RC_NKMODULEMAX; i++) {
+	ptx_ptr = &ptx_record[i];
+	if ( strcmp(name0, ptx_ptr->name)==0 ) {/*found*/
+	    return ptx_ptr;
+	}
+    }
+    WARN(5, "%s(): Not Found Ptx.\n");
+    return NULL;
+}
+
+ClientModule_t::ClientModule_t(void) {
+    WARN( 5, "The constructor %s() called.\n", __func__ );
+    valid  = -1;
+    id     = -1;
+    ptx_data = NULL;
+}
+
+int ClientModule_t::isValid(void) {
+    if (valid<-1 || valid>1) {
+	fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
+	exit(1);
+    } else if (valid==1) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+int ClientModule_t::isInvalid(void) {
+    if (valid<-1 || valid>1) {
+	fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
+	exit(1);
+    } else if (valid==1) {
+	return 0;
+    } else {
+	return 1;
+    }
+}
+
+void ClientModule_t::linkPtxData(char *ptxpath, char *ptxstr, PtxStore_t *ptxstore) {
+    PtxRecord_t *ptx_ptr;
+    ptx_ptr = ptxstore->query( ptxpath );
+    if (ptx_ptr != NULL) {
+	ptx_data = ptx_ptr;
+    } else {
+	ptx_ptr = ptxstore->add( ptxpath, ptxstr );
+    }
 }
 
 int SvrList::add(const char *ip, int ndev, const char *hname) {
@@ -117,20 +208,6 @@ RCServer *SvrList::findBroken(void) {
 	}
     }
     return sp;
-}
-
-char *ClientState_t::getFtModeString( void ) {
-    static char s[80];
-    switch ( ft_mode ) {
-    case FT_PLAIN: strncpy( s, "FT_PLAIN", 70);	break;
-    case FT_REDUN: strncpy( s, "FT_REDUN", 70); break;
-    case FT_MIGRA: strncpy( s, "FT_MIGRA", 70); break;
-    case FT_BOTH:  strncpy( s, "FT_BOTH",  70); break;
-    default:
-	WARN( 0, "%s(): confused.\n", __func__ );
-	exit( EXIT_FAILURE );
-    }
-    return s;
 }
 
 int requestDaemonForDevice(char *ip, int devid, int useibv) {
@@ -274,7 +351,7 @@ void RCstreamArrayRegister(cudaStream_t *streams) {
     if (!st) {
         perror("RCstreamArrayRegister");
     }
-    for (int i = 0; i < RC_NREDUNDANCYMAX; i++) {
+    for (int i=0; i<RC_NREDUNDANCYMAX; i++) {
         st->s[i] = streams[i];
     }
     st->prev = RCstreamArrayListTail;
@@ -588,31 +665,34 @@ void printVirtualDeviceList( void ) {
     return;
 }
 
-void printModuleList(void) {
+void VirDev_t::printModuleList(void) {
     const int len = 256;
     char printbuf[len];
     int valid_cnt = 0;
     
-    WARN( 5, "%s(): ====================================================\n", __func__);
-    WARN( 5, "%s(): RC_NKMODULEMAX= %d\n", __func__, RC_NKMODULEMAX);
+    WARN(5, "====================================================\n");
+    WARN(5, "RC_NKMODULEMAX= %d\n", RC_NKMODULEMAX);
     
     for (int i=0; i<RC_NKMODULEMAX; i++) {
-	if( CltModulelist[i].isValid() ){
-	    WARN( 5, "%s(): CltModulelist[%d]:\n", __func__, i);
-	    WARN( 5, "%s():    + vdevid= %d\n", __func__, CltModulelist[i].vdevid);
-	    for (int j=0; j<4; j++) {
-		WARN( 5, "%s():    + id[%d]= %d\n", __func__, j, CltModulelist[i].id[j]);
-	    }
-	    WARN( 5, "%s():    + name= %s\n", __func__, CltModulelist[i].name);
+	if( modulelist[i].valid==1 || modulelist[i].valid==0 ) {
+	    WARN( 5, "Virtual[%d]:modulelist[%d]:\n", id, i);
+	    WARN( 5, "    + name= %s\n", modulelist[i].ptx_data->name);
 	    //printf("    + send_time= \n", sent_time., sent_time.);
-	    strncpy(printbuf, CltModulelist[i].ptx_image, len - 1 );
+	    strncpy(printbuf, modulelist[i].ptx_data->ptx_image, len - 1 );
 	    printbuf[255]='\0';
 	    //printf("# %s():    + ptx_image=\n%s\n", __func__, printbuf);
 	    valid_cnt++;
 	}
     }
-    WARN( 5, "%s(): %d valid modules registered.\n", __func__, valid_cnt);
-    WARN( 5, "%s(): ====================================================\n", __func__);
+    WARN(5, "%d valid modules registered.\n",  valid_cnt);
+    WARN(5, "====================================================\n");
+    
+}
+
+void printModuleList(void) {
+    for (int i=0; i<St.Nvdev; i++) {
+	St.Vdev[i].printModuleList();
+    }
 }
 
 static
@@ -1323,10 +1403,10 @@ ClientState_t::~ClientState_t(void) {
     WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
 }
 
-void invalidateModuleCache(void) {
+void VirDev_t::invalidateAllModuleCache(void) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
-        if( CltModulelist[i].isValid() ){
-	    CltModulelist[i].invalidate();
+        if( modulelist[i].isValid() ){
+	    modulelist[i].invalidate();
 	} else { 
 	    continue;
 	}
@@ -1413,6 +1493,20 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  * returns id for the module.
  * the module is cached and sent only once for a certain period.
  */
+
+int dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
+    int idx = vdevidIndex();
+    Vdev_t *vdev = St.Vdev + Vdevid[idx];
+    int module_index;
+
+    module_index = vdev->loadModule(name, strdata);
+    
+    printModuleList();
+
+    return module_index;
+}
+
+#if 0 // backup
 int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
     int i, j, mid;
     ClientModule *mp;
@@ -1423,9 +1517,14 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
 #if RC_CACHE_MODULE
 	// look for modulename in the module list.
 	for (i=0, mp=CltModulelist; i < RC_NKMODULEMAX; i++, mp++) {
-	    if ( mp->isInvalid() ) continue;
+	    if ( mp->isInvalid() ) {
+		continue;
+	    }
+	    
 	    idx = vdevidIndex();
-	    if (mp->vdevid != Vdevid[idx]) continue;
+	    if (mp->vdevid != Vdevid[idx]) {
+		continue;
+	    }
 	    if ( !strcmp(name, mp->name) ) {
 		if ( mp->isAlive() ) {
 		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
@@ -1490,8 +1589,10 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
 	    }
             CltModulelist[j].validate();
             CltModulelist[j].sent_time = time(NULL);
-            CltModulelist[j].setPtxPath(name_found);
-	    CltModulelist[j].setPtxImage(strdata_found);
+//            CltModulelist[j].setPtxPath(name_found);
+//	    CltModulelist[j].setPtxImage(strdata_found);
+	    CltModulelist[j].linkPtxData(name_found, strdata_found, &PtxStore);
+	    
             WARN(5, "New client module item was registered. id:%d\n", mid);
         }
         CltModulelist[j].id[i] = mid;
@@ -1501,6 +1602,7 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
 
     return CltModulelist[j].id; //mp->id;
 }
+#endif
 
 cudaError_t
 dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func) {

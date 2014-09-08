@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 09:21:07
+// Last Modified On : 2014-09-08 18:10:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -122,22 +122,51 @@ void RCServer::migrateServer(RCServer_t *spare) {
 }
 
 void RCServer::migrateReallocAllRegions(void) {
-    BkupMem *mem_ptr = memlist.head;
+    BkupMem *memp = memlist.head;
+    int     verb = St.isAutoVerb();
+    int     i=0;
+    
+    WARN(1, "RCServer::%s(void) {\n", __func__);
+    WARN(1, "   + # of realloc region = %d.\n", memlist.length );
+    
+    while (memp != NULL) {
+	this->cudaMalloc(&memp->d_region, memp->size);
+	WARN(5, "   + region[%d]: v_ptr=%p, d_ptr=%p(updated), size= %d\n",
+	     i, memp->v_region, memp->d_region, memp->size);
+
+	memp = memp->next;
+	i++;
+    }
+    WARN(1, "}\n");
+    WARN(1, "\n");
+}
+
+void RCServer::migrateDeliverAllRegions(void) {
+    BkupMem *memp = memlist.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;
     
-    WARN(1, "%s(void).\n", __func__);
-    WARN(1, "Num. of realloc region = %d\n", memlist.length );
+    WARN(1, "RCServer::%s(void) {\n", __func__);
+    WARN(1, "   + # of deliverd region = %d.\n", memlist.length );
     
-    while (mem_ptr != NULL) {
-	/* TODO: select migrateded virtual device, not all region. */
-	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem_ptr->d_region, mem_ptr->size);
-	this->cudaMalloc(&mem_ptr->d_region, mem_ptr->size);
-	mem_ptr = mem_ptr->next;
+    while (memp != NULL) {
+	WARN(5, "   + region[%d]: v_ptr=%p, d_ptr=%p, h_ptr=%p, size= %d\n",
+	     i, memp->v_region, memp->d_region, memp->h_region, memp->size);
+	this->cudaMemcpyH2D(memp->v_region, memp->h_region, memp->size);
+	memp = memp->next;
 	i++;
     }
-    WARN(1, "+--- Done.\n");
+    WARN(1, "}\n");
+    WARN(1, "\n");
+}
+
+void RCServer::migrateDeliverAllModules(void) {
+    WARN(1, "RCServer::%s(void) {\n", __func__);
+    WARN(1, "   + # of deliverd modules = %d.\n", -1000);
+    
+    WARN(1, "}\n");
+    WARN(1, "\n");
 }
 
 void VirDev_t::setFaultMode(enum FtMode_e fault_mode) {
@@ -217,6 +246,7 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	    migrateServer(sp);
 	    setupConnection();
 	    migrateReallocAllRegions();
+	    migrateDeliverAllRegions();
 	}
 	break;
     case FT_BOTH:
@@ -464,7 +494,10 @@ cudaError_t cudaSetDeviceFlags(unsigned int flags) {
         }
         xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     }
-    invalidateModuleCache();
+    //invalidateModuleCache();
+    for (int i=0; i<St.Nvdev; i++) {
+	St.Vdev[i].invalidateAllModuleCache();
+    }
 
     WARN(3, "done.\n");
 
@@ -739,24 +772,24 @@ cudaError_t cudaFree(void *d_ptr) {
 /*
  * cudaMemcpy( HostToDevice )
  */
-cudaError_t RCServer::cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t count) {
+cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
     dscudaResult *rp;
     RCbuf srcbuf;
-    BkupMem *dst;
+    void *d_ptr;
     cudaError_t cuda_error;
 
 
     srcbuf.RCbuf_len = count;
     srcbuf.RCbuf_val = (char *)h_ptr;
 
-    //<-- Translate virtual d_ptr to real d_ptr.
-    dst = memlist.query(d_ptr);
-    //--> Translate virtual d_ptr to real d_ptr.
+    //<-- Translate virtual v_ptr to real d_ptr.
+    d_ptr = memlist.queryDevicePtr(v_ptr);
+    //--> Translate virtual v_ptr to real d_ptr.
 
     //<-- RPC communication.
     WARN(5, "%s():v_region=%p, d_region=%p, size=%zu\n",
-	 __func__, d_ptr, dst->d_region, count);
-    rp = dscudamemcpyh2did_1((RCadr)dst->d_region, srcbuf, count, Clnt);
+	 __func__, v_ptr, d_ptr, count);
+    rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, Clnt);
     
     //<-- RPC fault check.
     struct rpc_err rpc_error;
@@ -780,14 +813,13 @@ cudaError_t RCServer::cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t count
     return cuda_error;
 }
 
-cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
-    WARN( 4, "   Vdev[%d].%s() called with \"%s(%s)\" {\n",
-	  id, __func__, St.getFtModeString(), info );
+cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
+    WARN( 4, "   Vdev[%d].%s() {\n", id, __func__);
     cudaError_t    err = cudaSuccess;
 	
     for (int i=0; i<nredundancy; i++) {
-	WARN( 4, "      + Physical[%d] dst=%p\n", i, dst);
-	server[i].cudaMemcpyH2D(dst, src, count);
+	WARN( 4, "      + Physical[%d] v_ptr=%p\n", i, v_ptr);
+	server[i].cudaMemcpyH2D(v_ptr, h_ptr, count);
 	if ( ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH ) {
 	    
 	}
@@ -798,8 +830,8 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *dst, const void *src, size_t count) {
      */
     struct CudaMemcpyArgs_t args;
     if (ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH) {
-	args.dst   = dst;
-	args.src   = (void *)src;
+	args.dst   = v_ptr;
+	args.src   = (void *)h_ptr;
 	args.count = count;
 	args.kind  = cudaMemcpyHostToDevice;
 	this->reclist.add(dscudaMemcpyH2DId, &args);
@@ -880,8 +912,7 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
 }
 
 cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
-    WARN( 4, "   Virtual[%d]:%s() with \"%s(%s)\" {\n",
-	  id, __func__, St.getFtModeString(), info );
+    WARN( 4, "   Virtual[%d]:%s() {\n", id, __func__);
 
     int matched_count   = 0;
     int unmatched_count = 0;
@@ -1152,62 +1183,163 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
     return err;
 }
 
-#if 0 // original version
-int
-dscudaLoadModuleLocal(unsigned int ipaddr, pid_t pid, char *modulename, char *modulebuf, int vdevid, int raidid) {
-    //WARN(10, "<---Entering %s()\n", __func__);
-    //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
-    
-    int ret;
-    //RCServer_t *sp = (St.Vdev + vdevid)->server + raidid;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
-    /* send to virtual GPU */
-    dscudaLoadModuleResult *rp = dscudaloadmoduleid_1( St.getIpAddress(), getpid(), modulename, modulebuf, sp[raidid].Clnt );
-    checkResult(rp, sp[raidid]);
-    ret = rp->id;
-    xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
-    
-    if (St.isAutoVerb() ) {
-	/*Nop*/
+/*
+ * LoadModule Management. 
+ */
+int RCServer::findModuleOpen(void) {
+    int i;
+    for (i=0; i<RC_NKMODULEMAX; i++) {
+	if ( modulelist[i].valid != 1 ) {
+	    return i;
+	}
     }
-
-    //WARN(10, "--->Exiting  %s()\n", __func__);
-    return ret;
+    WARN(0, "%s():Module management array is full. and exit.\n", __func__);
+    exit(EXIT_FAILURE);
 }
-#endif
+
+int RCServer::queryModuleID(int module_index) {
+    int i;
+    for (i=0; i<RC_NKMODULEMAX; i++) {
+	if ( modulelist[i].index == module_index ) {
+	    return modulelist[i].id;
+	}
+    }
+    WARN(0, "%s():Not found Module Index in array. and exit.\n", __func__);
+    exit(EXIT_FAILURE);
+}
+
+int VirDev_t::findModuleOpen(void) { //TODO: almost same as above func.
+    int i;
+    for (i=0; i<RC_NKMODULEMAX; i++) {
+	if ( modulelist[i].valid != 1 ) {
+	    return i;
+	}
+    }
+    WARN(0, "%s():Module management array is full. and exit.\n", __func__);
+    exit(EXIT_FAILURE);
+}
 
 int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
-			 char *modulebuf) {
+			 char *modulebuf, int module_index) {
     //WARN(10, "<---Entering %s()\n", __func__);
     //WARN(10, "ipaddr= %u, modulename= %s\n", ipaddr, modulename);
-    dscudaLoadModuleResult *rp;
     
-    int ret;
+    int module_id;
     
     /* send to virtual GPU */
+    dscudaLoadModuleResult *rp;
     rp = dscudaloadmoduleid_1(St.getIpAddress(), getpid(), modulename, modulebuf, Clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
-    }
 
-    ret = rp->id;
+    //<--- RPC Error Hook
+    struct rpc_err rpc_error;
+    clnt_geterr(Clnt, &rpc_error );
+    if (rpc_error.re_status == RPC_SUCCESS) {
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	}
+    } else {
+	rpcErrorHook(&rpc_error);
+    }
+    //---> RPC Error Hook.
+
+    module_id = rp->id;
     xdr_free((xdrproc_t)xdr_dscudaLoadModuleResult, (char *)rp);
+
+    // register a new module into the list,
+    // and then, return a module id assigned by the server.
+    int n = this->findModuleOpen(); 
+    modulelist[n].valid     = 1;
+    modulelist[n].index     = module_index;
+    modulelist[n].id        = module_id;
+    modulelist[n].sent_time = time(NULL);
+//    modulelist[n].setPtxPath( modulename );
+//    modulelist[n].setPtxImage( modulebuf );
+    modulelist[n].linkPtxData( modulename, modulebuf, &PtxStore );
+    
+    WARN(5, "New client module item was registered. id:%d\n", module_id);
     
     if (St.isAutoVerb() ) {
 	/*Nop*/
     }
 
     //WARN(10, "--->Exiting  %s()\n", __func__);
-    return ret;
+    return module_id;
 }
+
+int VirDev_t::loadModule(char *name, char *strdata) {
+    int mid;
+
+    if (name != NULL) {
+	WARN(5, "VirDev_t::loadModule(%p) modulename:%s  ...\n", name, name);
+#if RC_CACHE_MODULE
+	// look for modulename in the module list.
+	for (int i=0; i<RC_NKMODULEMAX; i++) {
+	    if ( modulelist[i].isInvalid() ) {
+		continue;
+	    }
+	    if ( !strcmp(name, modulelist[i].ptx_data->name) ) {
+		if ( modulelist[i].isAlive() ) {
+		    WARN(5, "done. found a cached one. id:%d  age:%d  name:%s\n",
+			 modulelist[i].index, time(NULL) - modulelist[i].sent_time, modulelist[i].ptx_data->name);
+		    return modulelist[i].index; // module found. i.e, it's already loaded.
+		} else {
+		    WARN(5, "found a cached one with id:%d, but it is too old (age:%d). resend it.\n",
+			 modulelist[i].index, time(NULL) - modulelist[i].sent_time);
+		    modulelist[i].invalidate(); // invalidate the cache.
+		}
+	    }
+	}
+#endif // RC_CACHE_MODULE
+    } else {
+	WARN(5, "VirDev_t::loadModule(%p) modulename:-\n", name);
+    }
+
+    //<---
+    char *strdata_found = NULL;
+    char *name_found=NULL;
+    if (name==NULL && strdata==NULL) {
+        for (int i=0; i<RC_NKMODULEMAX; i++) {
+	    WARN(10, "i=%d\n", i);
+	    if (modulelist[i].isInvalid()) continue;
+	    if (!strcmp(name, modulelist[i].ptx_data->name)) {     /* matched */
+		strdata_found = modulelist[i].ptx_data->ptx_image;
+		name_found = modulelist[i].ptx_data->name;
+		break;
+	    }
+	}
+    } else {
+	strdata_found = strdata;
+	name_found = name;
+    }
+    //--->
+
+    // module not found in the module list.
+    // really need to send it to the server.
+    int j = this->findModuleOpen();
+    this->modulelist[j].index     = j;
+    this->modulelist[j].id        = j; //dummy; not used.
+    this->modulelist[j].valid     = 1;
+    this->modulelist[j].sent_time = time(NULL);
+//    this->modulelist[j].setPtxPath(name_found);
+//    this->modulelist[j].setPtxImage(strdata_found);
+    this->modulelist[j].linkPtxData(name_found, strdata_found, &PtxStore);
+    WARN(5, "New client module item was registered. id:%d\n", mid);
+    
+    for (int i=0; i<nredundancy; i++) {
+	mid = server[i].loadModule(St.getIpAddress(), getpid(), name_found, strdata_found, j);
+        WARN(3, "(info) server[%d].loadModule() returns mid=%d.\n", i, mid);
+    }
+
+    return modulelist[j].index;
+}//VirDev_t::loadModule(
 
 /*
  * launch a kernel function of id 'kid', defined in a module of id 'moduleid'.
  * 'kid' must be unique inside a single module.
  */
-void RCServer::launchKernel(int *moduleid, int kid, char *kname,
+void RCServer::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
     RCargs lo_args;
@@ -1228,7 +1360,7 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
     }
 
     /*
-     * TODO: insert codes that replace v_ptr to d_ptr int args.
+     * Replace v_ptr to d_ptr int args.
      */
     RCarg *argp;
     void  *v_ptr;
@@ -1242,8 +1374,12 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
 	    argp->val.RCargVal_u.address = (RCadr)d_ptr;
 	}
     }
+    /*
+     * Replace module_index with real module id.
+     */
+    int moduleid = queryModuleID(module_index);
 
-    void *rp = dscudalaunchkernelid_1(moduleid[id], kid, kname, gdim, bdim,
+    void *rp = dscudalaunchkernelid_1(moduleid, kid, kname, gdim, bdim,
 				      smemsize, (RCstream)st->s[id], lo_args, Clnt);
 
     //<--- Timed Out
@@ -1263,7 +1399,7 @@ void RCServer::launchKernel(int *moduleid, int kid, char *kname,
     free(lo_args.RCargs_val);
 }
 
-void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
+void VirDev_t::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 			    RCstream stream, RCargs args) {
     /*     
@@ -1271,7 +1407,7 @@ void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
      */
     if (St.isAutoVerb() ) {
         cudaRpcLaunchKernelArgs args2;
-        args2.moduleid = moduleid;
+        args2.moduleid = module_index;
         args2.kid      = kid;
         args2.kname    = kname;
         args2.gdim     = gdim;
@@ -1283,13 +1419,13 @@ void VirDev_t::launchKernel(int *moduleid, int kid, char *kname,
     }
 
     for (int i=0; i<nredundancy; i++) {
-        server[i].launchKernel(moduleid, kid, kname, gdim,
+        server[i].launchKernel(module_index, kid, kname, gdim,
 			       bdim, smemsize, stream, args);
     }
 }
 
 void
-rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
+rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
                              RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
                              RCargs args) {
     WARN(5, "%s() {\n", __func__);
@@ -1298,7 +1434,7 @@ rpcDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,  /* moduleid i
     pthread_mutex_lock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.p
 
     vdev = St.Vdev + Vdevid[vdevidIndex()];
-    vdev->launchKernel(moduleid, kid, kname, gdim, bdim, smemsize, stream, args);
+    vdev->launchKernel(module_index, kid, kname, gdim, bdim, smemsize, stream, args);
     
     pthread_mutex_unlock( &cudaKernelRun_mutex ); // Avoid conflict with CheciPointing.
     WARN(5, "} %s().\n", __func__)

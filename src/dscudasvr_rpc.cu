@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 11:42:01
+// Last Modified On : 2014-09-08 12:48:45
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -171,6 +171,11 @@ static void setupRpc(void) {
     addr.sin_port = htons(TcpPort);
     //    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // listen only on 127.0.0.1
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    /* <-- For avoiding TIME_WAIT status on TCP port. */
+    bool yes=1;
+    setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
+    /* --> For avoiding TIME_WAIT status on TCP port. */
 
     if (bind(sock, (struct sockaddr *) &addr, sizeof addr) == -1) {
         perror("dscudasvr_rpc:bind");

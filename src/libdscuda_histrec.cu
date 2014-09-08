@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 09:27:38
+// Last Modified On : 2014-09-08 15:11:28
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -161,8 +161,9 @@ static void *storeRpcLaunchKernel(void *argp) {
     DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
 
     int nredundancy = dscudaNredundancy();
-    argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
-    memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
+    //argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
+    //memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
+    argdst->moduleid = argsrc->moduleid;
     
     argdst->kname = (char *)malloc(sizeof(char) * strlen(argsrc->kname) + 1);
     strcpy(argdst->kname, argsrc->kname);
@@ -241,7 +242,7 @@ static void releaseRpcLaunchKernel(void *argp) {
     cudaRpcLaunchKernelArgs *argsrc;
     argsrc = (cudaRpcLaunchKernelArgs *)argp;
     
-    free(argsrc->moduleid);
+    //free(argsrc->moduleid);
     free(argsrc->kname);
     free(argsrc->args.RCargs_val);
     free(argsrc);
@@ -494,6 +495,7 @@ int HistRecList_t::recall(void) {
 /*
  *
  */
+#if 0
 void dscudaVerbMigrateModule() {
     // module not found in the module list.
     // really need to send it to the server.
@@ -513,4 +515,5 @@ void dscudaVerbMigrateModule() {
     }
     printModuleList();
 }
+#endif
 

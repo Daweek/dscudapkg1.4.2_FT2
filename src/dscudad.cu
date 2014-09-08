@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-07 23:40:00
+// Last Modified On : 2014-09-08 12:47:31
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -86,7 +86,12 @@ static int create_daemon_socket(in_port_t port, int backlog) {
 	perror("dscudad:socket");
 	return -1;
     }
-	
+
+    /* <-- For avoiding TIME_WAIT status on TCP port. */
+    bool yes=1;
+    setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
+    /* --> For avoiding TIME_WAIT status on TCP port. */
+    
     if (bind(sock, (struct sockaddr *)&me, sizeof(me)) == -1) {
         perror("dscudad:bind");
         return -1;
@@ -315,6 +320,12 @@ static void *response_to_search( void *arg ) {
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = htonl( INADDR_ANY );
+
+    /* <-- For avoiding TIME_WAIT status on TCP port. */
+    bool yes=1;
+    setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
+    /* --> For avoiding TIME_WAIT status on TCP port. */
+    
     if ( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
 	perror("response_to_search:bind()");
 	return NULL;
