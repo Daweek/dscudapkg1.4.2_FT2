@@ -16,7 +16,7 @@ argc=$#
 Init_env() {
 #    export CUDAPATH=/usr/local/cuda-${cuda_ver}/cuda
 #    export CUDASDKPATH=${CUDAPATH%cuda}NVIDIA_GPU_Computing_SDK
-#    export DSCUDA_PATH=~/dscudapkg
+    export DSCUDA_PATH=~/dscudapkg_FT
     export PATH=${DSCUDA_PATH}/bin:$CUDAPATH/bin:${PATH}
     export DSCUDA_WARNLEVEL=10
     export DSCUDA_REMOTECALL="rpc"
