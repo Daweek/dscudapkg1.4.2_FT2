@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 15:39:26
+// Last Modified On : 2014-09-09 16:01:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -354,12 +354,12 @@ static void *response_to_search( void *arg ) {
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
 	WARN(2, "Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
-
+	WARN(2, "Nserver = %d.\n", Nserver);
 	if ( Nserver > 0 ) {
 	    if ( Nserver==1 ) {
-		WARN(2, "%d dscudasvr is running, so don't reply.\n");
+		WARN(2, "%d dscudasvr is running, so don't reply.\n", Nserver);
 	    } else {
-		WARN(2, "%d dscudasvrs are running, so don't reply.\n");
+		WARN(2, "%d dscudasvrs are running, so don't reply.\n", Nserver);
 	    }
 	    memset( recvbuf, 0, SEARCH_BUFLEN_RX );
 	    continue;
