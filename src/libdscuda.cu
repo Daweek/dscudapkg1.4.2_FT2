@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-08 23:44:10
+// Last Modified On : 2014-09-09 17:13:20
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -58,7 +58,8 @@ int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
  * Physical GPU device server
  */
 SvrList_t SvrCand;
-SvrList_t SvrSpare;
+SvrList_t SvrSpare;   // Alternative GPU Device Servers.
+SvrList_t SvrIgnore;  // Forbidden GPU Device Servers.
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
@@ -856,12 +857,20 @@ int dscudaSearchDaemon(void) {
 /*
  *
  */
-static
-void initVirtualServerList(const char *env) {
+static void initVirtualServerList(void) {
     char *ip, *hostname, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
     RCServer_t *sp;
     Vdev_t *pvdev;
+    char *env;
+
+    // DSCUDA_SERVER
+    char *sconfname;
+    if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
+        env = readServerConf(sconfname);
+    } else {
+        env = getenv("DSCUDA_SERVER");
+    }
     
     if (env) {
 	if (sizeof(buf) < strlen(env)) {
@@ -968,14 +977,94 @@ void initVirtualServerList(const char *env) {
 	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
     }
 }
-static
-void updateSpareServerList(void) { //TODO: need more good algorithm.
+#if 0
+static void initForbiddenServerList(void) {
+    char *ip, *hostname, ips[RC_NVDEVMAX][256];
+    char buf[1024*RC_NVDEVMAX];
+    RCServer_t *sp;
+    Vdev_t *pvdev;
+    char *env;
+    
+    SvrIgnore.num = 0;
+    
+    env = getenv("DSCUDA_IGNORE");
+    if (env) {
+	if (sizeof(buf) < strlen(env)) {
+	    WARN(0, "%s():environment variable DSCUDA_IGNORE too long.\n", __func__);
+	    exit(1);
+	}
+	strncpy(buf, env, sizeof(buf));
+
+	ip = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
+	while ( ip != NULL ) {
+	    strcpy(ips[SvrIgnore.num], ip);
+	    SvrIgnore.num++;
+	    if ( RC_NVDEVMAX < SvrIgnore.num ) {
+		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		     RC_NVDEVMAX);
+		exit(1);
+	    }
+	    ip = strtok(NULL, DELIM_VDEV);
+	}
+	
+	for ( int i=0; i<SvrIgnore.num; i++ ) {
+	    int nred=0;
+	    int uniq=0; // begin with 0.
+	    pvdev = St.Vdev + i;  /* vdev = &Vdev[i]  */
+	    
+	    sp = pvdev->server;
+	}
+	/* convert hostname to ip address. */
+	int  det_abc;
+	char letter;
+	char *ip_ref;
+	struct hostent *hostent0;
+	for ( int i=0; i<SvrIgnore.num; i++ ) {
+	    for (int j=0; j < St.Vdev[i].nredundancy; j++) {
+		ip = St.Vdev[i].server[j].ip;
+		hostname = St.Vdev[i].server[j].hostname;
+		det_abc=1;
+		for (int k=0; k < strlen(ip); k++) {
+		    letter = ip[k];
+		    if (isdigit((unsigned char)letter || letter=='.')) {
+			det_abc = 0;
+			printf("%c", letter);
+		    } else {
+			det_abc = 1;
+			break;
+		    }
+		    printf("\n");
+		}
+		if ( det_abc == 1 ) {
+		    strcpy( hostname, ip );
+		    hostent0 = gethostbyname( hostname );
+		    if ( hostent0 == NULL ) {
+			//herror("initVirtualServerList():");
+			WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
+			WARN( 0, "Program terminated.\n\n\n\n" );
+			exit( EXIT_FAILURE );
+		    } else {
+			ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
+			strcpy( ip, ip_ref );
+		    }
+		}
+	    }
+	}
+    } else {
+	SvrIgnore = 1;
+	sp = St.Vdev[0].server;
+	sp->id = 0;
+	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
+    }
+}// initForbiddenServerList()
+#endif
+
+static void updateSpareServerList(void) { //TODO: need more good algorithm.
     int         spare_count = 0;;
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
 
-    // Sweep all Vdev.server[] and compare.
-    for (int i=0; i<SvrCand.num; i++) {
+    for (int i=0; i<SvrCand.num; i++) {    // Sweep all Vdev.server[] and compare.
 	int found = 0;
 	pVdev = St.Vdev;
 	for (int j=0; j<St.Nvdev; j++) {
@@ -1001,8 +1090,7 @@ void updateSpareServerList(void) { //TODO: need more good algorithm.
     SvrSpare.num = spare_count;
 }
 
-static void printVersion(void)
-{
+static void printVersion(void) {
     WARN(0, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
 }
 static void updateWarnLevel(void)
@@ -1107,24 +1195,17 @@ void ClientState_t::setFaultTolerantMode(void) {
  * 
  */
 void ClientState_t::initEnv(void) {
-    char *sconfname;
-    char *env;
+
 
     printVersion();
     updateDscudaPath();      /* set "Dscudapath[]" from DSCUDA_PATH */
     updateWarnLevel();       /* set "" from DSCUDA_WARNLEVEL */
-    // DSCUDA_SERVER
-    if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
-        env = readServerConf(sconfname);
-    } else {
-        env = getenv("DSCUDA_SERVER");
-    }
     
     resetServerUniqID();      /* set all unique ID to invalid(-1)*/
     
     dscudaSearchDaemon();
 
-    initVirtualServerList(env);  /* Update the list of virtual devices information. */
+    initVirtualServerList();  /* Update the list of virtual devices information. */
     updateSpareServerList();
     
     printVirtualDeviceList(); /* Print result to screen. */
