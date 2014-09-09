@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 01:18:16
+// Last Modified On : 2014-09-09 17:59:40
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -46,7 +46,7 @@ RCServer::RCServer(void) {
     Clnt = NULL;
 }
 
-void RCServer::setupConnection(void) {
+int RCServer::setupConnection(void) {
     int  pgid = DSCUDA_PROG;
     char msg[256];
 
@@ -63,6 +63,10 @@ void RCServer::setupConnection(void) {
 	WARN(1, "Access port number is self-defined by client.\n");
         sport = RC_SERVER_IP_PORT + cid;
     }
+    if ( sport < 0 ) { // means that maybe daemon program is down.
+	return -1;
+    }
+    
     sockaddr = setupSockaddr( ip, sport );
 
     this->Clnt = clnttcp_create(&sockaddr,
@@ -83,6 +87,7 @@ void RCServer::setupConnection(void) {
         exit( EXIT_FAILURE );
     }
     WARN(2, "Established a socket connection between %s...\n", msg);
+    return 0;
 }
 
 void RCServer::dupServer(RCServer_t *dup) {
@@ -229,6 +234,7 @@ void checkResult(void *rp, RCServer_t &sp) {
 //void rpcErrorHook(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
 void RCServer::rpcErrorHook(struct rpc_err *err) {
     RCServer *sp;
+    int retval;
     
     WARN(1, "********************************************************\n");
     WARN(1, "***  detected rpc communication error; ");
@@ -275,19 +281,26 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
     case FT_MIGRA:
 	WARN0(1, "\"FT_MIGRA\"\n");
 	WARN(1, "***  I am going to migrate to another device.\n");
-	sp = SvrSpare.findSpare();
-	if (sp==NULL) {
-	    WARN(0, "*** Not found any spare servers.\n");
-	    exit(EXIT_FAILURE);
-	} else {
-	    WARN(0, "*** Found spare server.\n");
-	    WARN(0, "***    + ip = %s:%d\n", sp->ip, sp->cid);
+
+	do {
+	    sp = SvrSpare.findSpare();
+	    if ( sp == NULL ) {
+		WARN(0, "*** Not found any spare servers.\n");
+		exit(EXIT_FAILURE);
+	    }
+	    WARN(1, "*** Found spare server.\n");
+	    WARN(1, "***    + ip = %s:%d\n", sp->ip, sp->cid);
 	    migrateServer(sp);
-	    setupConnection();
-	    migrateReallocAllRegions();
-	    migrateDeliverAllRegions();
-	    migrateRebuildModulelist();
-	}
+	    retval = setupConnection();
+	    if (retval != 0) { //failed to connection.
+		sp->ft_mode = FT_BROKEN; // write mark of broken.
+		WARN(1, "***    + but looks like broken.\n");
+	    }
+	} while ( retval != 0 );
+	
+	migrateReallocAllRegions();
+	migrateDeliverAllRegions();
+	migrateRebuildModulelist();
 	break;
     case FT_BOTH:
 	WARN0(1, "\"FT_BOTH\"\n");

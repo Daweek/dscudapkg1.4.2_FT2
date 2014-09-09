@@ -8,7 +8,8 @@ if [ "${mode}" = "MONO" ]; then
     DSCUDA_SERVER="c4hdn:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "POLY2"
-    DSCUDA_SERVER="c4hdn:0,c4hdn:1"
+#    DSCUDA_SERVER="c4hdn:0,c4hdn:1"
+    DSCUDA_SERVER="stelletto2:0,stelletto2:1"
 elif [ "${mode}" = "POLY3" ]; then
     echo "POLY3"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2"

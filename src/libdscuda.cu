@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 17:13:20
+// Last Modified On : 2014-09-09 18:01:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -222,10 +222,11 @@ int requestDaemonForDevice(char *ip, int devid, int useibv) {
     }
     
     if ( connect(dsock, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) == -1 ) {
-        perror("(;_;) Connect");
+        perror("(;_;) connect(...)");
 	WARN(0, "+--- Program terminated at %s:L%d\n", __FILE__, __LINE__ );
 	WARN(0, "+--- Maybe DS-CUDA daemon is not running...\n" );
-        exit(1);
+        //exit(1);
+	return -1;
     }
     sprintf(msg, "deviceid:%d", devid);
     WARN(1, "<--- Send message: \"%s\".\n", msg);

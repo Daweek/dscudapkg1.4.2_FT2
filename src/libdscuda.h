@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 16:27:49
+// Last Modified On : 2014-09-09 17:47:28
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -349,7 +349,7 @@ typedef struct RCServer {
     void        invalidateModuleCache(void);
 
     /*METHODS*/
-    void setupConnection(void);
+    int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
