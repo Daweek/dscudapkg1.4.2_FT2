@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 18:01:21
+// Last Modified On : 2014-09-09 18:12:09
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -229,8 +229,8 @@ int requestDaemonForDevice(char *ip, int devid, int useibv) {
 	return -1;
     }
     sprintf(msg, "deviceid:%d", devid);
-    WARN(1, "<--- Send message: \"%s\".\n", msg);
     sendMsgBySocket(dsock, msg);
+    WARN(1, "<--- Send message: \"%s\".\n", msg);
 
     memset(msg, 0, strlen(msg));
     recvMsgBySocket(dsock, msg, sizeof(msg));
