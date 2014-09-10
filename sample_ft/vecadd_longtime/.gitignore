@@ -1,4 +1,5 @@
 *.log
 vecadd_rpc
+vecadd_local
 dscudautil.h
 dscudatmp/

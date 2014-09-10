@@ -18,7 +18,7 @@ $(TARGET).o: $(SRC) ../../lib/libdscuda.a
 	$(DSCUDACPP) $(NVCCFLAGS) -c -DRPC_ONLY=1 -o $@ -I. -i $< -ldscuda -lpthread
 
 $(TARGET)_local: $(SRC)
-	$(NVCC) -o $@ $(CUDAINCLUDES) $(DSCUDAINCLUDE) $< -lcuda
+	$(NVCC) $(NVCCFLAGS) -o $@ $(CUDAINCLUDES) $(DSCUDAINCLUDE) $< -lcuda
 
 clean:
 	rm -rf *.o *.ptx $(TARGET)_rpc $(TARGET)_local *.linkinfo ./dscudatmp

@@ -39,7 +39,14 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
 	       /* from UVA */ 
                void *dscudaAdrOfUva(void *adr);			
 	       int dscudaDevidOfUva(void *adr);
-	    
+
+	(5) Automatic Daemon searching function.
+	    I also need manually setting daemon because UDP broadcast packet 
+            can not reached in some environment. For example DHCPed notebook
+            has different subnet mask against with fix IP server nodes.
+            (2014.09.10)	    
+
+            And must not terminate program from no daemon replied.
 [History]
 	2014.08.17   (problem) dscuda-daemon searching function freezed.
 
