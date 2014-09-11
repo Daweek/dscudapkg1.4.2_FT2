@@ -1,3 +1,13 @@
+//                             -*- Mode: C++ -*-
+// Filename         : dscudautil.cu
+// Description      : DS-CUDA utility.
+// Author           : A.Kawai, K.Yoshikawa, T.Narumi
+// Created On       : 2011-01-01 00:00:00
+// Last Modified By : M.Oikawa
+// Last Modified On : 2014-09-11 12:53:07
+// Update Count     : 0.1
+// Status           : Unknown, Use with caution!
+//------------------------------------------------------------------------------
 #include <stdio.h>
 #include <sys/time.h>
 #include <driver_types.h>
@@ -6,21 +16,17 @@ static int WarnLevel = 2; /* warning message output level. the higher the more v
                              0: no warning (may cause wrong result with g7pkg/scripts/check.csh)
                              1: minimum
                              2: default
-                             3: for debugging purpose
+                             >= 3: for debugging purpose
                           */
-int dscudaWarnLevel(void)
-{
+int dscudaWarnLevel(void) {
     return WarnLevel;
 }
 
-void dscudaSetWarnLevel(int level)
-{
+void dscudaSetWarnLevel(int level) {
     WarnLevel = level;
 }
 
-char *
-dscudaMemcpyKindName(cudaMemcpyKind kind)
-{
+char *dscudaMemcpyKindName(cudaMemcpyKind kind) {
     static char *name;
 
     switch (kind) {
@@ -45,10 +51,7 @@ dscudaMemcpyKindName(cudaMemcpyKind kind)
     return name;
 }
 
-
-const char *
-dscudaGetIpaddrString(unsigned int addr)
-{
+const char *dscudaGetIpaddrString(unsigned int addr) {
     static char buf[128];
     char *p = (char *)&addr;
     sprintf(buf, "%hhu.%hhu.%hhu.%hhu", p[0], p[1], p[2], p[3]);
@@ -60,9 +63,7 @@ dscudaGetIpaddrString(unsigned int addr)
  * t0 : time of day (in second) the last time this function is called.
  * returns the number of seconds passed since *t0.
  */
-double
-RCgetCputime(double *t0)
-{
+double RCgetCputime(double *t0) {
     struct timeval t;
     double tnow, dt;
 

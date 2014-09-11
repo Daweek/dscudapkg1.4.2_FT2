@@ -25,6 +25,11 @@ else
 fi
 export DSCUDA_SERVER
 
+# <--- new!
+export DSCUDA_SERVER_IGNORE="stelleto2:0"
+export DSCUDA_SERVER_SPARE="naruminote0:0"
+# ---> new!
+
 if [ "${ft}" = "MIGRA" ]; then
     DSCUDA_MIGRATION=1
 else

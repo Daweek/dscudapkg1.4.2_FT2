@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 18:12:09
+// Last Modified On : 2014-09-11 15:10:22
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -29,7 +29,7 @@
 
 static int   VdevidIndexMax = 0; //# of pthreads which utilize virtual devices.
 const  char *DEFAULT_SVRIP = "localhost";
-static char Dscudapath[512];
+static char  DscudaPath[512];
 
 static pthread_mutex_t VdevidMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid index into pthread id.
@@ -588,20 +588,6 @@ static char* readServerConf(char *fname) {
     return buf;
 }
 
-static void resetServerUniqID(void) {
-    for (int i=0; i<RC_NVDEVMAX; i++) { /* Vdev[*] */
-	for (int j=0; j<RC_NREDUNDANCYMAX; j++) {
-	    St.Vdev[i].server[j].uniq = RC_UNIQ_INVALID;
-	}
-    }
-    for (int j=0; j<RC_NVDEVMAX; j++) { /* svrCand[*] */
-	SvrCand.svr[j].uniq = RC_UNIQ_INVALID;
-    }
-    for (int j=0; j<RC_NVDEVMAX; j++) { /* svrSpare[*] */
-	SvrSpare.svr[j].uniq = RC_UNIQ_INVALID;
-    }
-}
-
 /*
  *
  */
@@ -696,8 +682,7 @@ void printModuleList(void) {
     }
 }
 
-static
-int dscudaSearchDaemon(void) {
+static int dscudaSearchDaemon(void) {
     int sendsock;
     int recvsock;
 
@@ -829,27 +814,27 @@ int dscudaSearchDaemon(void) {
     close_ret = close( sendsock );
     if ( close_ret != 0 ) {
 	WARN(0, "close(sendsock) failed.\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     }
     
     close_ret = close( recvsock );
     if ( close_ret != 0 ) {
 	WARN(0, "close(recvsock) failed.\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     }
 
     if ( num_daemon > 0 ) {
 	WARN( 2, "Found %d valid DSCUDA daemon%s. (%d ignored).\n",
 	      num_daemon, (num_daemon>1)? "s":"", num_ignore );
-    } else {
-	/* Terminate program and exit. */
-	if ( num_daemon == 0 ) {
-	    WARN( 0, "%s(): Not found DS-CUDA daemon in this network.\n", __func__ );
-	    WARN( 0, "%s(): Terminate this application.\n", __func__ );
-	} else {
-	    WARN( 0, "%s(): Detected unexpected trouble; num_daemon=%d\n", __func__, num_daemon );
-	}
-	exit(-1);
+    } else if ( num_daemon == 0 ) {
+	//
+	// Even if no daemons found, the servers defined in DSCUDA_SERVER are available.
+	//
+	WARN( 0, "%s(): Not found DS-CUDA daemon in this network.\n", __func__ );
+	WARN( 0, "%s(): And Trying to continue execution.\n", __func__ );
+    } else { 	/* Terminate program and exit. */
+	WARN( 0, "%s(): Detected unexpected trouble; num_daemon=%d?\n", __func__, num_daemon );
+	exit(EXIT_FAILURE);
     }
 
     return num_daemon;
@@ -1091,20 +1076,16 @@ static void updateSpareServerList(void) { //TODO: need more good algorithm.
     SvrSpare.num = spare_count;
 }
 
-static void printVersion(void) {
-    WARN(0, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
-}
-static void updateWarnLevel(void)
-{
+static void getenvWarnLevel(void) {
     char *env = getenv("DSCUDA_WARNLEVEL");
     int val;
-    if (env) {
+    if ( env ) {
         val = atoi(strtok(env, " "));
-        if (val >= 0) {
-	    dscudaSetWarnLevel(val);
+        if ( val >= 0 ) {
+	    dscudaSetWarnLevel( val );
 	} else {
 	    WARN(0, "(;_;) Invalid DSCUDA_WARNLEVEL(%d), set 0 or positive integer.\n", val);
-	    exit(1);
+	    exit(EXIT_FAILURE);
 	}
     } else {
 	dscudaSetWarnLevel(RC_WARNLEVEL_DEFAULT);
@@ -1112,16 +1093,15 @@ static void updateWarnLevel(void)
     WARN(1, "Found DSCUDA_WARNLEVEL= %d\n", dscudaWarnLevel());
 }
 
-static
-void updateDscudaPath(void) {
+static void getenvDscudaPath(void) {
     char *env = getenv("DSCUDA_PATH");
-    if (env) {
-	strncpy(Dscudapath, env, sizeof(Dscudapath)); //"Dscudapath" has global scape.
+    if ( env != NULL ) {
+	strncpy(DscudaPath, env, sizeof(DscudaPath)); //"DscudaPath" has global scape.
     } else {
-        fprintf(stderr, "(;_;) An environment variable 'DSCUDA_PATH' not found.\n");
-        exit(1);
+        fprintf(stderr, "(;_;)Not Found the environment variable 'DSCUDA_PATH'.\n");
+        exit(EXIT_FAILURE);
     }
-    WARN(2, "Found DSCUDA_PATH= %s\n", Dscudapath);
+    WARN(2, "Found DSCUDA_PATH= %s\n", DscudaPath);
 }
 
 /*
@@ -1197,19 +1177,9 @@ void ClientState_t::setFaultTolerantMode(void) {
  */
 void ClientState_t::initEnv(void) {
 
-
-    printVersion();
-    updateDscudaPath();      /* set "Dscudapath[]" from DSCUDA_PATH */
-    updateWarnLevel();       /* set "" from DSCUDA_WARNLEVEL */
-    
-    resetServerUniqID();      /* set all unique ID to invalid(-1)*/
-    
-    dscudaSearchDaemon();
-
-    initVirtualServerList();  /* Update the list of virtual devices information. */
     updateSpareServerList();
     
-    printVirtualDeviceList(); /* Print result to screen. */
+    printVirtualDeviceList(); /* Print result to terminal. */
 
     WARN(2, "method of remote procedure call: ");
     switch ( dscudaRemoteCallType() ) {
@@ -1409,9 +1379,9 @@ void *periodicCheckpoint(void *arg) {
  */
 ClientState_t::ClientState_t(void) {
     start_time = time( NULL );
-    WARN( 1, "[ERRORSTATICS] start.\n" );
-    
-    WARN( 5, "The constructor %s() called.\n", __func__ );
+    WARN(0, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
+    WARN(1, "[ERRORSTATICS] start.\n" );
+    WARN(5, "The constructor %s() called.\n", __func__ );
 
     ip_addr     = 0;
     use_ibv     = 0;
@@ -1419,23 +1389,28 @@ ClientState_t::ClientState_t(void) {
     migration   = 0;
     daemon      = 0;
     historical_calling = 0;
+
+    getenvDscudaPath();      /* set from DSCUDA_PATH */
+    getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
     
-    setFaultTolerantMode();
+    this->setFaultTolerantMode();
     
     for (int i=0; i<RC_NVDEVMAX; i++) {
 	Vdev[i].id = i;
 	Vdev[i].setFaultMode(this->ft_mode);
     }
     
-    initEnv();
-
+    dscudaSearchDaemon();
+    initVirtualServerList();  /* Update the list of virtual devices */
+    this->initEnv();
     /*
      * Establish connections of all physical devices.
      */
     for ( int i=0; i < Nvdev; i++ ) {
 	for ( int j=0; j < Vdev[i].nredundancy; j++ ) {
 	    Vdev[i].server[j].setupConnection();
-	    WARN(0, "setupConn. Vdev[%d].server[%d].Clnt=%p\n", i, j, Vdev[i].server[j].Clnt);
+	    WARN(0, "setupConn. Vdev[%d].server[%d].Clnt=%p\n",
+		 i, j, Vdev[i].server[j].Clnt);
         }
     }
     struct sockaddr_in addrin;
@@ -1448,9 +1423,9 @@ ClientState_t::ClientState_t(void) {
 }
 
 ClientState_t::~ClientState_t(void) {
-    RCServer *svr;
-    time_t exe_time;
-    char my_tfmt[64];	      
+    RCServer  *svr;
+    time_t     exe_time;
+    char       my_tfmt[64];	      
     struct tm *my_local;
 
     pthread_cancel(tid);
@@ -1547,7 +1522,7 @@ dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata
     // exec 'ptx2symbol' to obtain the mangled name.
     // command output is stored to name.
     if (!mangler[0]) {
-        sprintf(mangler, "%s/bin/ptx2symbol", Dscudapath);
+        sprintf(mangler, "%s/bin/ptx2symbol", DscudaPath);
     }
     sprintf(cmd, "%s %s << EOF\n%s\nEOF", mangler, ptxfile, funcif);
     outpipe = popen(cmd, "r");

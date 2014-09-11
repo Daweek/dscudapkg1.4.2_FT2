@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 17:59:40
+// Last Modified On : 2014-09-11 15:02:55
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ int dscudaRemoteCallType(void) {
 RCServer::RCServer(void) {
     id   = -1;
     cid  = -1;
-    uniq = -1;
+    uniq = RC_UNIQ_INVALID;
     ft_mode = FT_INIT;
     strcpy(ip,       "empty");
     strcpy(hostname, "empty");

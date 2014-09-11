@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 17:47:28
+// Last Modified On : 2014-09-11 11:38:21
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -458,6 +458,7 @@ public:
     int daemon;
     int historical_calling;
     
+    /*CONSRUCTOR, DESTRUCTOR*/
     ClientState_t(void);
     ~ClientState_t(void);
     
