@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:10:22
+// Last Modified On : 2014-09-11 15:24:35
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -57,9 +57,9 @@ int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
 /*
  * Physical GPU device server
  */
-SvrList_t SvrCand;
-SvrList_t SvrSpare;   // Alternative GPU Device Servers.
-SvrList_t SvrIgnore;  // Forbidden GPU Device Servers.
+ServerArray_t SvrCand;
+ServerArray_t SvrSpare;   // Alternative GPU Device Servers.
+ServerArray_t SvrIgnore;  // Forbidden GPU Device Servers.
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
@@ -72,7 +72,7 @@ struct ClientState_t St;
 struct PtxStore_t    PtxStore;
 //int    ClientState_t::Nvdev;
 //Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
-SvrList::SvrList(void) {
+ServerArray::ServerArray(void) {
     num = 0;
 }
 //*********************************************************
@@ -174,7 +174,7 @@ int ClientModule_t::isInvalid(void) {
     }
 }
 
-int SvrList::add(const char *ip, int ndev, const char *hname) {
+int ServerArray::add(const char *ip, int ndev, const char *hname) {
     if ( num >= (RC_NVDEVMAX - 1) ) {
 	WARN(0, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n",
 	     RC_NVDEVMAX);
@@ -188,7 +188,7 @@ int SvrList::add(const char *ip, int ndev, const char *hname) {
     return 0;
 }
 
-RCServer *SvrList::findSpare(void) {
+RCServer *ServerArray::findSpare(void) {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_SPARE) {
@@ -198,7 +198,7 @@ RCServer *SvrList::findSpare(void) {
     return sp;
 }
 
-RCServer *SvrList::findBroken(void) {
+RCServer *ServerArray::findBroken(void) {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_BROKEN) {
@@ -1045,7 +1045,10 @@ static void initForbiddenServerList(void) {
 }// initForbiddenServerList()
 #endif
 
-static void updateSpareServerList(void) { //TODO: need more good algorithm.
+//
+//
+//
+static void updateSpareServerList(void) {
     int         spare_count = 0;;
     Vdev_t     *pVdev;
     RCServer_t *pSvr;
@@ -1178,7 +1181,6 @@ void ClientState_t::setFaultTolerantMode(void) {
 void ClientState_t::initEnv(void) {
 
     updateSpareServerList();
-    
     printVirtualDeviceList(); /* Print result to terminal. */
 
     WARN(2, "method of remote procedure call: ");

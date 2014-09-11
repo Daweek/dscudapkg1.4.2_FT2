@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 11:38:21
+// Last Modified On : 2014-09-11 15:26:40
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -369,20 +369,20 @@ typedef struct RCServer {
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
-//***  Class Name: "SvrList"
+//***  Class Name: "ServerArray"
 //***  Description:
 //***      - The Group of Physical GPU Device Class.
 //*************************************************
-typedef struct SvrList {
+typedef struct ServerArray {
     int num;                      /* # of server candidates.         */
     RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
     /*CONSTRUCTOR*/
-    SvrList(void);
+    ServerArray(void);
     /*METHODS*/
     int add(const char *ip, int ndev, const char *hname);
     RCServer *findSpare(void);
     RCServer *findBroken(void);
-} SvrList_t;
+} ServerArray_t;
 
 
 typedef enum VdevConf_e{
@@ -490,8 +490,8 @@ extern struct PtxStore_t PtxStore;
 
 extern const char *DEFAULT_SVRIP;
 
-extern SvrList_t SvrSpare;   // Alternative GPU Device Servers.
-extern SvrList_t SvrIgnore;  // Forbidden GPU Device Servers.
+extern ServerArray_t SvrSpare;   // Alternative GPU Device Servers.
+extern ServerArray_t SvrIgnore;  // Forbidden GPU Device Servers.
 
 extern int    Vdevid[RC_NPTHREADMAX];
 //extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
