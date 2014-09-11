@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:26:40
+// Last Modified On : 2014-09-11 15:31:38
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -437,7 +437,6 @@ struct ClientState_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
     //static void *periodicCheckpoint(void *arg);
-    void initEnv(void);
     void setFaultTolerantMode(void);
 public:
     //static int    Nvdev;             // # of virtual devices available.

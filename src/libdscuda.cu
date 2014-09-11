@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:24:35
+// Last Modified On : 2014-09-11 15:30:47
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -860,7 +860,7 @@ static void initVirtualServerList(void) {
     
     if (env) {
 	if (sizeof(buf) < strlen(env)) {
-	    WARN(0, "initEnv:evironment variable DSCUDA_SERVER too long.\n");
+	    WARN(0, "Too long DSCUDA_SERVER.\n");
 	    exit(1);
 	}
 	strncpy(buf, env, sizeof(buf));
@@ -870,7 +870,7 @@ static void initVirtualServerList(void) {
 	    strcpy(ips[St.Nvdev], ip);
 	    St.Nvdev++; /* counts Nvdev */
 	    if (RC_NVDEVMAX < St.Nvdev) {
-		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
 		     RC_NVDEVMAX);
 		exit(1);
 	    }
@@ -986,7 +986,7 @@ static void initForbiddenServerList(void) {
 	    strcpy(ips[SvrIgnore.num], ip);
 	    SvrIgnore.num++;
 	    if ( RC_NVDEVMAX < SvrIgnore.num ) {
-		WARN(0, "initEnv:number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
 		     RC_NVDEVMAX);
 		exit(1);
 	    }
@@ -1172,38 +1172,6 @@ void ClientState_t::setFaultTolerantMode(void) {
 	exit( EXIT_FAILURE );
     }
     WARN( 2, "*****************************************************\n");
-    return;
-}
-
-/*
- * 
- */
-void ClientState_t::initEnv(void) {
-
-    updateSpareServerList();
-    printVirtualDeviceList(); /* Print result to terminal. */
-
-    WARN(2, "method of remote procedure call: ");
-    switch ( dscudaRemoteCallType() ) {
-    case RC_REMOTECALL_TYPE_RPC:
-	WARN0(2, "RPC\n");
-	break;
-    case RC_REMOTECALL_TYPE_IBV:
-	WARN0(2, "InfiniBand Verbs\n");
-	break;
-    default:
-	WARN0(0, "(Unkown)\n"); exit(1);
-    }
-
-    /*
-     * Create a thread of checkpointing.
-     */
-#if 0
-    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
-	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
-    }
-#endif
-    
     return;
 }
 
@@ -1404,7 +1372,22 @@ ClientState_t::ClientState_t(void) {
     
     dscudaSearchDaemon();
     initVirtualServerList();  /* Update the list of virtual devices */
-    this->initEnv();
+
+    updateSpareServerList();
+    printVirtualDeviceList(); /* Print result to terminal. */
+
+    WARN(2, "method of remote procedure call: ");
+    switch ( dscudaRemoteCallType() ) {
+    case RC_REMOTECALL_TYPE_RPC:
+	WARN0(2, "RPC\n");
+	break;
+    case RC_REMOTECALL_TYPE_IBV:
+	WARN0(2, "InfiniBand Verbs\n");
+	break;
+    default:
+	WARN0(0, "(Unkown)\n"); exit(1);
+    }
+
     /*
      * Establish connections of all physical devices.
      */
@@ -1420,7 +1403,14 @@ ClientState_t::ClientState_t(void) {
     setIpAddress(addrin.sin_addr.s_addr);
 
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
-    
+    /*
+     * Create a thread of checkpointing.
+     */
+#if 0
+    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
+    }
+#endif
     WARN( 5, "The constructor %s() ends.\n", __func__);
 }
 
