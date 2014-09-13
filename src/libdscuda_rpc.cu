@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-13 19:53:34
+// Last Modified On : 2014-09-14 01:30:33
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -46,7 +46,7 @@ RCServer::RCServer(void) {
     Clnt = NULL;
 }
 
-void RCServer::setIP(char *ip0) {
+void RCServer::setIP(const char *ip0) {
     strncpy(this->ip, ip0, sizeof(ip));
 }
 void RCServer::setID(int id0) {

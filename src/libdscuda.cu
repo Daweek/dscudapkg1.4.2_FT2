@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-13 22:53:22
+// Last Modified On : 2014-09-14 01:33:17
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -179,13 +179,30 @@ int ServerArray::add(const char *ip, int ndev, const char *hname) {
 	     RC_NVDEVMAX);
 	exit(EXIT_FAILURE);
     }
-    strcpy(svr[num].ip, ip);
+    svr[num].setIP( ip );
     strcpy(svr[num].hostname, hname);
-    svr[num].cid  = ndev;
+    svr[num].setID( ndev );
+    svr[num].setCID( ndev );
     svr[num].uniq = RC_UNIQ_CANDBASE + num;
     num++;
     return 0;
 }
+
+int ServerArray::add(RCServer *svrptr) {
+    if ( num >= (RC_NVDEVMAX - 1) ) {
+	WARN(0, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n",
+	     RC_NVDEVMAX);
+	exit(EXIT_FAILURE);
+    }
+    svr[num].setIP( svrptr->ip );
+    strcpy(svr[num].hostname, svrptr->hostname);
+    svr[num].setID( svrptr->id );
+    svr[num].setCID( svrptr->cid );
+    svr[num].uniq = RC_UNIQ_CANDBASE + num;
+    num++;
+    return 0;
+}
+
 
 RCServer *ServerArray::findSpareOne(void) {
     RCServer *sp = NULL;
@@ -208,6 +225,7 @@ RCServer *ServerArray::findBrokenOne(void) {
 }
 
 void ServerArray::captureEnv(char *env_str) {
+    WARN(9, "   ServerArray::%s() {\n", __func__);
     char *env;
     char buf[1024*RC_NVDEVMAX];
     char *svr_token;
@@ -246,15 +264,19 @@ void ServerArray::captureEnv(char *env_str) {
     }
 
     this->num = svr_count;
+    WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
 void ServerArray::print(void) {
+    WARN(9, "   ServerArray::%s() {\n", __func__);
+    WARN(5, "      + num = %d\n", num);
     for (int i=0; i<num; i++) {
-	WARN(1, "svrarr[%d].id= %s\n", i, svr[i].id);
-	WARN(1, "svrarr[%d].cid= %s\n", i, svr[i].cid);
-	WARN(1, "svrarr[%d].ip= %s\n", i, svr[i].ip);
-	WARN(1, "svrarr[%d].hostname= %s\n", i, svr[i].hostname);
+	WARN(1, "      + svrarr[%d].id= %d\n", i, svr[i].id);
+	WARN(1, "      + svrarr[%d].cid= %d\n", i, svr[i].cid);
+	WARN(1, "      + svrarr[%d].ip= %s\n", i, svr[i].ip);
+	WARN(1, "      + svrarr[%d].hostname= %s\n", i, svr[i].hostname);
     }
+    WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
 int requestDaemonForDevice(char *ip, int devid, int useibv) {
@@ -1019,6 +1041,15 @@ void ClientState_t::initVirtualDeviceList(void) {
 //
 //
 //
+#if 0
+void ServerArray::removeArray(ServerArray *sub) {
+
+    for (int i=0; i<num; i++) {
+	for (int k=0; k<sub->num; k++) {
+	}
+    }
+}
+#endif
 static void updateSpareServerList(void) {
     int         spare_count = 0;;
     Vdev_t     *pVdev;
@@ -1339,17 +1370,22 @@ ClientState_t::ClientState_t(void) {
     getenvDscudaPath();      /* set from DSCUDA_PATH */
     getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
     
-    svr_array.captureEnv("DSCUDA_SERVER_SPARE");
-    svr_array.print();
-    svr_array.captureEnv("DSCUDA_SERVER_IGNORE");
-    svr_array.print();
-    exit(1);
 	
     this->setFaultTolerantMode();
     dscudaSearchDaemon();
     this->initVirtualDeviceList();  /* Update the list of virtual devices */
 
+    // dummy
+    svr_array.captureEnv("DSCUDA_SERVER_IGNORE");
+    svr_array.print();
+
     updateSpareServerList();
+    svr_array.captureEnv("DSCUDA_SERVER_SPARE");
+    svr_array.print();
+    for (int i=0; i<svr_array.num; i++) {
+	SvrSpare.add( &svr_array.svr[i] );
+    }
+    
     printVirtualDeviceList(); /* Print result to terminal. */
 
     WARN(2, "method of remote procedure call: ");

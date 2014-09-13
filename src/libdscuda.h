@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-13 22:51:03
+// Last Modified On : 2014-09-14 01:28:18
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -349,7 +349,7 @@ typedef struct RCServer {
     void        invalidateModuleCache(void);
 
     /*SETTER*/
-    void setIP(char *ip0);
+    void setIP(const char *ip0);
     void setID(int id0);
     void setCID(int cid0);
     void setCID(char *cir_sz);
@@ -387,6 +387,8 @@ typedef struct ServerArray {
     //~ServerArray(void);
     /*METHODS*/
     int add(const char *ip, int ndev, const char *hname);
+    int add(RCServer *svrptr);
+//    void      removeArray(ServerArray *sub);
     RCServer *findSpareOne(void);
     RCServer *findBrokenOne(void);
     void      captureEnv(char *env);
