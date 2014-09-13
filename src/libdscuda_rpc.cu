@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-12 01:58:41
+// Last Modified On : 2014-09-13 19:53:34
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -54,6 +54,18 @@ void RCServer::setID(int id0) {
 }
 void RCServer::setCID(int cid0) {
     this->cid = cid0;
+}
+void RCServer::setCID(char *cid_sz) {
+    int cid0;
+    if ( cid_sz == NULL ) {
+	cid0 = 0;
+    } else { 
+	cid0 = atoi( cid_sz );
+    }
+    this->cid = cid0;
+}
+void RCServer::setUNIQ(int uniq0) {
+    this->uniq = uniq0;
 }
 
 int RCServer::setupConnection(void) {

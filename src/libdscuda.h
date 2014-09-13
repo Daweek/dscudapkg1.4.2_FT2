@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-12 01:57:49
+// Last Modified On : 2014-09-13 22:51:03
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -352,6 +352,8 @@ typedef struct RCServer {
     void setIP(char *ip0);
     void setID(int id0);
     void setCID(int cid0);
+    void setCID(char *cir_sz);
+    void setUNIQ(int uniq0);
     /*METHODS*/
     int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(struct RCServer *dup);
@@ -382,11 +384,13 @@ typedef struct ServerArray {
     RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
     /*CONSTRUCTOR*/
     ServerArray(void);
+    //~ServerArray(void);
     /*METHODS*/
     int add(const char *ip, int ndev, const char *hname);
     RCServer *findSpareOne(void);
     RCServer *findBrokenOne(void);
-    void      updateFromEnv(char *env);
+    void      captureEnv(char *env);
+    void      print(void);
 } ServerArray_t;
 
 

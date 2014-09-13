@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-12 02:04:47
+// Last Modified On : 2014-09-13 22:53:22
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -207,16 +207,15 @@ RCServer *ServerArray::findBrokenOne(void) {
     return sp;
 }
 
-void ServerArray::updateFromEnv(char *env_str) {
+void ServerArray::captureEnv(char *env_str) {
     char *env;
     char buf[1024*RC_NVDEVMAX];
-    int  svr_cdount = 0;
     char *svr_token;
     char svr_token_ar[RC_NVDEVMAX][256];
     
     env = getenv(env_str);
     if (env == NULL) {
-	WARN(1, "Not found %s\n", ev_str);
+	WARN(1, "Not found %s\n", env_str);
 	return;
     }
     if (sizeof(buf) < strlen(env)) {
@@ -226,6 +225,7 @@ void ServerArray::updateFromEnv(char *env_str) {
     strncpy(buf, env, sizeof(buf));
 
     //<--- svr_token_sr[x]="hostname:n"
+    int  svr_count = 0;    
     svr_token = strtok(buf, " ");
     while (svr_token != NULL) {
 	strcpy(svr_token_ar[svr_count], svr_token);
@@ -238,19 +238,23 @@ void ServerArray::updateFromEnv(char *env_str) {
 	svr_token = strtok(NULL, " ");
     }
 
-    for (i=0; i<svr_count; i++) {
+    for (int i=0; i<svr_count; i++) {
 	svr_token = strtok( svr_token_ar[i], ":" );
-	setIP(svr_token);
-	svr_token = strtok( svr_token_ar[i], ":" );
-	setI(svr_token);
-	//TODO*
-	//TODO*
-	//TODO*
-	//TODO*
-	//TODO*
+	this->svr[i].setIP( svr_token );
+	svr_token = strtok( NULL, ":" );
+	this->svr[i].setCID( svr_token );
     }
 
     this->num = svr_count;
+}
+
+void ServerArray::print(void) {
+    for (int i=0; i<num; i++) {
+	WARN(1, "svrarr[%d].id= %s\n", i, svr[i].id);
+	WARN(1, "svrarr[%d].cid= %s\n", i, svr[i].cid);
+	WARN(1, "svrarr[%d].ip= %s\n", i, svr[i].ip);
+	WARN(1, "svrarr[%d].hostname= %s\n", i, svr[i].hostname);
+    }
 }
 
 int requestDaemonForDevice(char *ip, int devid, int useibv) {
@@ -969,9 +973,8 @@ void ClientState_t::initVirtualDeviceList(void) {
 	    ip = strtok(buf, ":");
 	    sp->setIP(ip);
 	    ip = strtok(NULL, ":");
-	    sp->setID(j);
-	    sp->cid = ip ? atoi(ip) : 0;
-	    sp->uniq = uniq;
+	    sp->setCID(ip);
+	    sp->setUNIQ(uniq);
 	    uniq++;
 	}
     } // for ( int i=0; ...
@@ -1013,87 +1016,6 @@ void ClientState_t::initVirtualDeviceList(void) {
 	}
     } // for (int i=0; ...
 }
-#if 0
-static void initForbiddenServerList(void) {
-    char *ip, *hostname, ips[RC_NVDEVMAX][256];
-    char buf[1024*RC_NVDEVMAX];
-    RCServer_t *sp;
-    Vdev_t *pvdev;
-    char *env;
-    
-    SvrIgnore.num = 0;
-    
-    env = getenv("DSCUDA_IGNORE");
-    if (env) {
-	if (sizeof(buf) < strlen(env)) {
-	    WARN(0, "%s():environment variable DSCUDA_IGNORE too long.\n", __func__);
-	    exit(1);
-	}
-	strncpy(buf, env, sizeof(buf));
-
-	ip = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
-	while ( ip != NULL ) {
-	    strcpy(ips[SvrIgnore.num], ip);
-	    SvrIgnore.num++;
-	    if ( RC_NVDEVMAX < SvrIgnore.num ) {
-		WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
-		     RC_NVDEVMAX);
-		exit(1);
-	    }
-	    ip = strtok(NULL, DELIM_VDEV);
-	}
-	
-	for ( int i=0; i<SvrIgnore.num; i++ ) {
-	    int nred=0;
-	    int uniq=0; // begin with 0.
-	    pvdev = St.Vdev + i;  /* vdev = &Vdev[i]  */
-	    
-	    sp = pvdev->server;
-	}
-	/* convert hostname to ip address. */
-	int  det_abc;
-	char letter;
-	char *ip_ref;
-	struct hostent *hostent0;
-	for ( int i=0; i<SvrIgnore.num; i++ ) {
-	    for (int j=0; j < St.Vdev[i].nredundancy; j++) {
-		ip = St.Vdev[i].server[j].ip;
-		hostname = St.Vdev[i].server[j].hostname;
-		det_abc=1;
-		for (int k=0; k < strlen(ip); k++) {
-		    letter = ip[k];
-		    if (isdigit((unsigned char)letter || letter=='.')) {
-			det_abc = 0;
-			printf("%c", letter);
-		    } else {
-			det_abc = 1;
-			break;
-		    }
-		    printf("\n");
-		}
-		if ( det_abc == 1 ) {
-		    strcpy( hostname, ip );
-		    hostent0 = gethostbyname( hostname );
-		    if ( hostent0 == NULL ) {
-			WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
-			WARN( 0, "Program terminated.\n\n\n\n" );
-			exit( EXIT_FAILURE );
-		    } else {
-			ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
-			strcpy( ip, ip_ref );
-		    }
-		}
-	    }
-	}
-    } else {
-	SvrIgnore = 1;
-	sp = St.Vdev[0].server;
-	sp->id = 0;
-	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
-    }
-}// initForbiddenServerList()
-#endif
-
 //
 //
 //
@@ -1401,6 +1323,8 @@ void *periodicCheckpoint(void *arg) {
  * This function may be executed in parallel threads, so need mutex lock.
  */
 ClientState_t::ClientState_t(void) {
+    ServerArray_t svr_array;
+    
     WARN(9, "ClinetState_t::ClientState_t() {\n");
     start_time = time( NULL );
     WARN(1, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
@@ -1414,6 +1338,13 @@ ClientState_t::ClientState_t(void) {
 
     getenvDscudaPath();      /* set from DSCUDA_PATH */
     getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
+    
+    svr_array.captureEnv("DSCUDA_SERVER_SPARE");
+    svr_array.print();
+    svr_array.captureEnv("DSCUDA_SERVER_IGNORE");
+    svr_array.print();
+    exit(1);
+	
     this->setFaultTolerantMode();
     dscudaSearchDaemon();
     this->initVirtualDeviceList();  /* Update the list of virtual devices */
