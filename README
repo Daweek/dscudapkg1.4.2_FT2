@@ -47,6 +47,8 @@ Branch version based on DS-CUDA version 1.4.2. I added some functions for Fault 
             (2014.09.10)	    
 
             And must not terminate program from no daemon replied.
+
+	    Add DSCUDA_SERVER_SPARE, DSCUDA_SERVER_IGNORE.
 [History]
 	2014.08.17   (problem) dscuda-daemon searching function freezed.
 

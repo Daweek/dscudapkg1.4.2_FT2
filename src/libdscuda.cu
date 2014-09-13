@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:30:47
+// Last Modified On : 2014-09-12 02:04:47
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -70,8 +70,7 @@ void *errorHandlerArg = NULL;
 
 struct ClientState_t St;
 struct PtxStore_t    PtxStore;
-//int    ClientState_t::Nvdev;
-//Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
+
 ServerArray::ServerArray(void) {
     num = 0;
 }
@@ -188,7 +187,7 @@ int ServerArray::add(const char *ip, int ndev, const char *hname) {
     return 0;
 }
 
-RCServer *ServerArray::findSpare(void) {
+RCServer *ServerArray::findSpareOne(void) {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_SPARE) {
@@ -198,7 +197,7 @@ RCServer *ServerArray::findSpare(void) {
     return sp;
 }
 
-RCServer *ServerArray::findBroken(void) {
+RCServer *ServerArray::findBrokenOne(void) {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_BROKEN) {
@@ -206,6 +205,52 @@ RCServer *ServerArray::findBroken(void) {
 	}
     }
     return sp;
+}
+
+void ServerArray::updateFromEnv(char *env_str) {
+    char *env;
+    char buf[1024*RC_NVDEVMAX];
+    int  svr_cdount = 0;
+    char *svr_token;
+    char svr_token_ar[RC_NVDEVMAX][256];
+    
+    env = getenv(env_str);
+    if (env == NULL) {
+	WARN(1, "Not found %s\n", ev_str);
+	return;
+    }
+    if (sizeof(buf) < strlen(env)) {
+	WARN(0, "Too long length of DSCUDA_SERVER.\n");
+	exit(EXIT_FAILURE);
+    }
+    strncpy(buf, env, sizeof(buf));
+
+    //<--- svr_token_sr[x]="hostname:n"
+    svr_token = strtok(buf, " ");
+    while (svr_token != NULL) {
+	strcpy(svr_token_ar[svr_count], svr_token);
+	svr_count++;
+	if (svr_count > RC_NVDEVMAX) {
+	    WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		 RC_NVDEVMAX);
+	    exit(EXIT_FAILURE);
+	}
+	svr_token = strtok(NULL, " ");
+    }
+
+    for (i=0; i<svr_count; i++) {
+	svr_token = strtok( svr_token_ar[i], ":" );
+	setIP(svr_token);
+	svr_token = strtok( svr_token_ar[i], ":" );
+	setI(svr_token);
+	//TODO*
+	//TODO*
+	//TODO*
+	//TODO*
+	//TODO*
+    }
+
+    this->num = svr_count;
 }
 
 int requestDaemonForDevice(char *ip, int devid, int useibv) {
@@ -650,6 +695,20 @@ void printVirtualDeviceList( void ) {
     return;
 }
 
+void VirDev_t::setConfInfo(int redun) {
+    nredundancy = redun; //Update Vdev.nredundancy.
+    if (redun == 1) {
+	conf = VDEV_MONO;
+	sprintf(info, "MONO");
+    } else if (redun > 1) {
+	conf = VDEV_POLY;
+	sprintf(info, "POLY%d", redun);
+    } else {
+	WARN(0, "Detect invalid nredundancy = %d.\n", redun);
+	exit(EXIT_FAILURE);
+    }
+}
+
 void VirDev_t::printModuleList(void) {
     const int len = 256;
     char printbuf[len];
@@ -843,12 +902,13 @@ static int dscudaSearchDaemon(void) {
 /*
  *
  */
-static void initVirtualServerList(void) {
-    char *ip, *hostname, ips[RC_NVDEVMAX][256];
+void ClientState_t::initVirtualDeviceList(void) {
+    char *ip, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
     RCServer_t *sp;
-    Vdev_t *pvdev;
     char *env;
+    char *vdev_token;
+    char *pdev_token;
 
     // DSCUDA_SERVER
     char *sconfname;
@@ -857,111 +917,101 @@ static void initVirtualServerList(void) {
     } else {
         env = getenv("DSCUDA_SERVER");
     }
-    
-    if (env) {
-	if (sizeof(buf) < strlen(env)) {
-	    WARN(0, "Too long DSCUDA_SERVER.\n");
-	    exit(1);
-	}
-	strncpy(buf, env, sizeof(buf));
-	St.Nvdev = 0;
-	ip = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
-	while (ip != NULL) {
-	    strcpy(ips[St.Nvdev], ip);
-	    St.Nvdev++; /* counts Nvdev */
-	    if (RC_NVDEVMAX < St.Nvdev) {
-		WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
-		     RC_NVDEVMAX);
-		exit(1);
-	    }
-	    ip = strtok(NULL, DELIM_VDEV);
-	}
-	for ( int i=0; i<St.Nvdev; i++ ) {
-	    int nred=0;
-	    int uniq=0; // begin with 0.
-	    pvdev = St.Vdev + i;  /* vdev = &Vdev[i]  */
-	    ip = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a colon) of
-	    // a single element of the vdev.
-	    while (ip != NULL) {
-		strcpy(pvdev->server[nred].ip, ip);
-		nred++;
-		ip = strtok(NULL, DELIM_REDUN);
-	    }
-	    /*
-	     * Update Vdev.nredundancy.
-	     */
-	    pvdev->nredundancy = nred;
-	    /*
-	     * update Vdev.info.
-	     */
-	    if ( nred == 1 ) {
-		pvdev->conf = VDEV_MONO;
-		sprintf( pvdev->info, "MONO" );
 
-	    } else if ( nred > 1 ) {
-		pvdev->conf = VDEV_POLY;
-		sprintf( pvdev->info, "POLY%d", pvdev->nredundancy );
-	    } else {
-		WARN( 0, "detected invalid nredundancy = %d.\n", nred );
-		exit( EXIT_FAILURE );
-	    }
-	    
-	    sp = pvdev->server;
-	    for (int ired=0; ired<nred; ired++) {
-		strncpy(buf, sp->ip, sizeof(buf));
-		ip = strtok(buf, ":");
-		strcpy(sp->ip, ip);
-		ip = strtok(NULL, ":");
-		sp->id  = ired;
-		sp->cid = ip ? atoi(ip) : 0;
-		sp->uniq = uniq;
-		uniq++;
-		sp++;
-	    }
-	}
-	/* convert hostname to ip address. */
-	int  det_abc;
-	char letter;
-	char *ip_ref;
-	struct hostent *hostent0;
-	for ( int i=0; i<St.Nvdev; i++ ) {
-	    for (int j=0; j < St.Vdev[i].nredundancy; j++) {
-		ip = St.Vdev[i].server[j].ip;
-		hostname = St.Vdev[i].server[j].hostname;
-		det_abc=1;
-		for (int k=0; k < strlen(ip); k++) {
-		    letter = ip[k];
-		    if (isdigit((unsigned char)letter || letter=='.')) {
-			det_abc = 0;
-			printf("%c", letter);
-		    } else {
-			det_abc = 1;
-			break;
-		    }
-		    printf("\n");
-		}
-		if ( det_abc == 1 ) {
-		    strcpy( hostname, ip );
-		    hostent0 = gethostbyname( hostname );
-		    if ( hostent0 == NULL ) {
-			//herror("initVirtualServerList():");
-			WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
-			WARN( 0, "Program terminated.\n\n\n\n" );
-			exit( EXIT_FAILURE );
-		    } else {
-			ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
-			strcpy( ip, ip_ref );
-		    }
-		}
-	    }
-	}
-    } else {
-	St.Nvdev = 1;
-	St.Vdev[0].nredundancy = 1;
-	sp = St.Vdev[0].server;
+    if (env == NULL) {
+	Nvdev = 1;
+	Vdev[0].nredundancy = 1;
+	sp = Vdev[0].server;
 	sp->id = 0;
 	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
+	return;
     }
+    
+    if (sizeof(buf) < strlen(env)) {
+	WARN(0, "Too long length of DSCUDA_SERVER.\n");
+	exit(EXIT_FAILURE);
+    }
+    strncpy(buf, env, sizeof(buf));
+
+    //<-- set "Nvdev", # of virtual device count.
+    Nvdev = 0;
+    vdev_token = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
+    while (vdev_token != NULL) {
+	strcpy(ips[Nvdev], vdev_token);
+	Nvdev++;
+	if (RC_NVDEVMAX < Nvdev) {
+	    WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		 RC_NVDEVMAX);
+	    exit(EXIT_FAILURE);
+	}
+	vdev_token = strtok(NULL, DELIM_VDEV);
+    }
+    //--> set "Nvdev", # of virtual device count.
+    
+    for (int i=0; i<Nvdev; i++) {
+	int nred=0;
+	int uniq=0; // begin with 0.
+	pdev_token = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a comma) of
+	// a single element of the vdev.
+	while (pdev_token != NULL) {
+	    strcpy(Vdev[i].server[nred].ip, pdev_token);
+	    pdev_token = strtok(NULL, DELIM_REDUN);
+	    nred++;
+	}
+	/*
+	 * update Vdev.info.
+	 */
+	Vdev[i].setConfInfo(nred);
+	
+	for (int j=0; j<nred; j++) {
+	    sp = &Vdev[i].server[j];
+	    strncpy(buf, sp->ip, sizeof(buf));
+	    ip = strtok(buf, ":");
+	    sp->setIP(ip);
+	    ip = strtok(NULL, ":");
+	    sp->setID(j);
+	    sp->cid = ip ? atoi(ip) : 0;
+	    sp->uniq = uniq;
+	    uniq++;
+	}
+    } // for ( int i=0; ...
+    /* convert hostname to ip address. */
+    char *hostname;
+    int  det_abc;
+    char letter;
+    char *ip_ref;
+    struct hostent *hostent0;
+    for (int i=0; i<Nvdev; i++) {
+	Vdev[i].id = i;
+	for (int j=0; j < Vdev[i].nredundancy; j++) {
+	    ip = Vdev[i].server[j].ip;
+	    hostname = Vdev[i].server[j].hostname;
+	    det_abc=1;
+	    for (int k=0; k < strlen(ip); k++) {
+		letter = ip[k];
+		if (isdigit((unsigned char)letter || letter=='.')) {
+		    det_abc = 0;
+		    printf("%c", letter);
+		} else {
+		    det_abc = 1;
+		    break;
+		}
+		printf("\n");
+	    }
+	    if ( det_abc == 1 ) {
+		strcpy( hostname, ip );
+		hostent0 = gethostbyname( hostname );
+		if ( hostent0 == NULL ) {
+		    WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
+		    WARN( 0, "Program terminated.\n\n\n\n" );
+		    exit(EXIT_FAILURE);
+		} else {
+		    ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
+		    strcpy( ip, ip_ref );
+		}
+	    }
+	}
+    } // for (int i=0; ...
 }
 #if 0
 static void initForbiddenServerList(void) {
@@ -1025,7 +1075,6 @@ static void initForbiddenServerList(void) {
 		    strcpy( hostname, ip );
 		    hostent0 = gethostbyname( hostname );
 		    if ( hostent0 == NULL ) {
-			//herror("initVirtualServerList():");
 			WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
 			WARN( 0, "Program terminated.\n\n\n\n" );
 			exit( EXIT_FAILURE );
@@ -1155,6 +1204,10 @@ void ClientState_t::setFaultTolerantMode(void) {
     } else {
 	WARN( 0, "Found invalid setting of DSCUDA_AUTOVERB=%d\n", autoverb );
 	exit( EXIT_FAILURE );
+    }
+
+    for (int i=0; i<RC_NVDEVMAX; i++) {
+	Vdev[i].setFaultMode(this->ft_mode);
     }
     
     WARN( 2, "Found DSCUDA_USEDAEMON=%d\n", daemon    );
@@ -1345,13 +1398,12 @@ void *periodicCheckpoint(void *arg) {
 
 /*
  * Client initializer.
- * This function may be executed in parallel threads, so need mutex lock.    
+ * This function may be executed in parallel threads, so need mutex lock.
  */
 ClientState_t::ClientState_t(void) {
+    WARN(9, "ClinetState_t::ClientState_t() {\n");
     start_time = time( NULL );
-    WARN(0, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
-    WARN(1, "[ERRORSTATICS] start.\n" );
-    WARN(5, "The constructor %s() called.\n", __func__ );
+    WARN(1, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
 
     ip_addr     = 0;
     use_ibv     = 0;
@@ -1362,16 +1414,9 @@ ClientState_t::ClientState_t(void) {
 
     getenvDscudaPath();      /* set from DSCUDA_PATH */
     getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
-    
     this->setFaultTolerantMode();
-    
-    for (int i=0; i<RC_NVDEVMAX; i++) {
-	Vdev[i].id = i;
-	Vdev[i].setFaultMode(this->ft_mode);
-    }
-    
     dscudaSearchDaemon();
-    initVirtualServerList();  /* Update the list of virtual devices */
+    this->initVirtualDeviceList();  /* Update the list of virtual devices */
 
     updateSpareServerList();
     printVirtualDeviceList(); /* Print result to terminal. */
@@ -1406,12 +1451,16 @@ ClientState_t::ClientState_t(void) {
     /*
      * Create a thread of checkpointing.
      */
-#if 0
+
     if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+	WARN(1, "[ERRORSTATICS] start.\n" );
+#if 0
 	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
-    }
 #endif
-    WARN( 5, "The constructor %s() ends.\n", __func__);
+    }
+
+    WARN(9, "} ClinetState_t::ClientState_t()\n");
+    WARN(9, "\n");
 }
 
 ClientState_t::~ClientState_t(void) {
@@ -1464,18 +1513,15 @@ void VirDev_t::invalidateAllModuleCache(void) {
 /*
  * public functions
  */
-
 int dscudaNredundancy(void) {
     Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
     return vdev->nredundancy;
 }
 
-void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg)
-{
+void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg) {
     errorHandler = handler;
     errorHandlerArg = handler_arg;
 }
-
 
 /*
  * Obtain a mangled symbol name of a function, whose

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:02:55
+// Last Modified On : 2014-09-12 01:58:41
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -44,6 +44,16 @@ RCServer::RCServer(void) {
     stat_correct = 0;
     d_faultconf = NULL;
     Clnt = NULL;
+}
+
+void RCServer::setIP(char *ip0) {
+    strncpy(this->ip, ip0, sizeof(ip));
+}
+void RCServer::setID(int id0) {
+    this->id = id0;
+}
+void RCServer::setCID(int cid0) {
+    this->cid = cid0;
 }
 
 int RCServer::setupConnection(void) {
@@ -283,7 +293,7 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	WARN(1, "***  I am going to migrate to another device.\n");
 
 	do {
-	    sp = SvrSpare.findSpare();
+	    sp = SvrSpare.findSpareOne();
 	    if ( sp == NULL ) {
 		WARN(0, "*** Not found any spare servers.\n");
 		exit(EXIT_FAILURE);

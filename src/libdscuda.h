@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-11 15:31:38
+// Last Modified On : 2014-09-12 01:57:49
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -348,6 +348,10 @@ typedef struct RCServer {
     int         queryModuleID(int module_index);
     void        invalidateModuleCache(void);
 
+    /*SETTER*/
+    void setIP(char *ip0);
+    void setID(int id0);
+    void setCID(int cid0);
     /*METHODS*/
     int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(struct RCServer *dup);
@@ -380,8 +384,9 @@ typedef struct ServerArray {
     ServerArray(void);
     /*METHODS*/
     int add(const char *ip, int ndev, const char *hname);
-    RCServer *findSpare(void);
-    RCServer *findBroken(void);
+    RCServer *findSpareOne(void);
+    RCServer *findBrokenOne(void);
+    void      updateFromEnv(char *env);
 } ServerArray_t;
 
 
@@ -417,6 +422,7 @@ typedef struct VirDev_t {
     void        printModuleList(void);
     /*METHODS*/
     void        setFaultMode(enum FtMode_e fault_mode);
+    void        setConfInfo(int redun);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
@@ -461,8 +467,10 @@ public:
     ClientState_t(void);
     ~ClientState_t(void);
     
+    /*METHODS*/
     void setIpAddress(unsigned int val) { ip_addr = val; }
     unsigned int getIpAddress() { return ip_addr; }
+    void initVirtualDeviceList(void); // Update the list of virtual devices
     
     void useIbv() { use_ibv = 1; }
     void useRpc() { use_ibv = 0; }
