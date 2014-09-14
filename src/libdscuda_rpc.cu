@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-14 01:30:33
+// Last Modified On : 2014-09-14 14:41:32
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -67,6 +67,9 @@ void RCServer::setCID(char *cid_sz) {
 void RCServer::setUNIQ(int uniq0) {
     this->uniq = uniq0;
 }
+void RCServer::setFTMODE(FtMode ft_mode0) {
+    this->ft_mode = ft_mode0;
+}
 
 int RCServer::setupConnection(void) {
     int  pgid = DSCUDA_PROG;
@@ -128,15 +131,15 @@ void RCServer::migrateServer(RCServer_t *spare) {
 
     dupServer(&tmp);
 
-    this->cid = spare->cid;
-    this->stat_error = spare->stat_error;
+    this->cid          = spare->cid;
+    this->stat_error   = spare->stat_error;
     this->stat_correct = spare->stat_correct;
     strcpy(this->ip, spare->ip);
     strcpy(this->hostname, spare->hostname);
 
-    spare->ft_mode = FT_BROKEN;
-    spare->cid = tmp.cid;
-    spare->stat_error = tmp.stat_error;
+    spare->ft_mode      = FT_BROKEN;
+    spare->cid          = tmp.cid;
+    spare->stat_error   = tmp.stat_error;
     spare->stat_correct = tmp.stat_correct;
     strcpy(spare->ip, tmp.ip);
     strcpy(spare->hostname, tmp.hostname);
@@ -252,8 +255,10 @@ void checkResult(void *rp, RCServer_t &sp) {
 	exit(EXIT_FAILURE);
     }
 }
-
-//void rpcErrorHook(RCServer_t *failed, RCServer_t *spare, struct rpc_err *err) {
+//*
+//* Error Handler on RPC communication.
+//*
+//*
 void RCServer::rpcErrorHook(struct rpc_err *err) {
     RCServer *sp;
     int retval;
@@ -1108,6 +1113,101 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     WARN(4, "   } libdscuda:%s().\n", __func__);
     return err;
 }
+
+void RCServer::collectEntireRegions(void) {
+    WARN(9, "      + RCServer[%d]::%s() {\n", id, __func__);
+    BkupMem *bkupmem;
+    dscudaMemcpyD2HResult *rp;
+    struct rpc_err rpc_error;
+    cudaError_t    cuda_error;
+    void *d_ptr;
+    void *h_ptr;
+    int   size;
+    int   i = 0;
+
+    bkupmem = memlist.head;
+    while (bkupmem != NULL) {
+	d_ptr = bkupmem->d_region;
+	h_ptr = bkupmem->h_region;
+	size  = bkupmem->size;
+	WARN(9, "         + correct region[%d], %d[Byte]...", i, size);
+	rp = dscudamemcpyd2hid_1((RCadr)d_ptr, size, Clnt);
+	WARN0(9, "done.\n");
+	
+	//<--- RPC fault check.
+	clnt_geterr(Clnt, &rpc_error);
+	if (rpc_error.re_status == RPC_SUCCESS) {
+	    if (rp == NULL) {
+		WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
+		clnt_perror(Clnt, ip);
+		exit(EXIT_FAILURE);
+	    } else {
+		cuda_error = (cudaError_t)rp->err;
+	    }
+	}
+#if 0 // temporary disable.
+	else {
+	    rpcErrorHook(&rpc_error);	
+	}
+#endif
+	//--> RPC fault check.
+	
+	memcpy(h_ptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len);
+	xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
+	//--> RPC communication.
+	
+	bkupmem = bkupmem->next;
+	i++;
+    } // while (...);
+    WARN(9, "      + } RCServer[%d]::%s()\n", id, __func__);
+}
+
+void VirDev_t::collectEntireRegions(void) {
+    WARN(9, "   + VirDev_t[%d]::%s()\n", id, __func__);
+    BkupMem *bkupmem;
+    dscudaMemcpyD2HResult *rp;
+    void *d_ptr;
+    int   size;
+
+    for (int n=0; n<nredundancy; n++) {
+	server[n].collectEntireRegions();
+    }
+    WARN(9, "   + } VirDev_t[%d]::%s()\n", id, __func__);
+}
+
+void ClientState_t::collectEntireRegions(void) {
+    WARN(9, "ClientState_t::%s() {\n", __func__);
+    
+    for (int n=0; n<Nvdev; n++) {
+	Vdev[n].collectEntireRegions();
+    }
+    
+    WARN(9, "} ClientState_t::%s()\n", __func__);
+}
+
+
+int VirDev_t::verifyEntireRegions(void) {
+    BkupMem *bkupmem;
+    void *v_region;
+
+    bkupmem = memlist.head;
+    while (bkupmem != NULL) {
+	v_region = bkupmem->v_region;
+	for (int i=0; i<nredundancy-1; i++) {
+	    for (int j=i+1; j<nredundancy; j++) {
+		memcmp( server[i].memlist.h_region,
+			server[j].memlist.h_region,
+			    server[i]);
+	    }
+	}
+    }//while
+}
+
+#if 0
+void VirDev_t::updateMemlist(void) {
+    
+}
+#endif
 
 static cudaError_t
 cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {

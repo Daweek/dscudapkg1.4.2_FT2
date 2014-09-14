@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-14 01:33:17
+// Last Modified On : 2014-09-14 14:28:54
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -198,11 +198,11 @@ int ServerArray::add(RCServer *svrptr) {
     strcpy(svr[num].hostname, svrptr->hostname);
     svr[num].setID( svrptr->id );
     svr[num].setCID( svrptr->cid );
-    svr[num].uniq = RC_UNIQ_CANDBASE + num;
+    svr[num].setUNIQ( RC_UNIQ_CANDBASE + num );
+    svr[num].setFTMODE( svrptr->ft_mode );
     num++;
     return 0;
 }
-
 
 RCServer *ServerArray::findSpareOne(void) {
     RCServer *sp = NULL;
@@ -224,7 +224,7 @@ RCServer *ServerArray::findBrokenOne(void) {
     return sp;
 }
 
-void ServerArray::captureEnv(char *env_str) {
+void ServerArray::captureEnv(char *env_str, FtMode ft_mode0) {
     WARN(9, "   ServerArray::%s() {\n", __func__);
     char *env;
     char buf[1024*RC_NVDEVMAX];
@@ -261,6 +261,8 @@ void ServerArray::captureEnv(char *env_str) {
 	this->svr[i].setIP( svr_token );
 	svr_token = strtok( NULL, ":" );
 	this->svr[i].setCID( svr_token );
+
+	this->svr[i].setFTMODE( ft_mode0 );
     }
 
     this->num = svr_count;
@@ -1119,21 +1121,28 @@ void ClientState_t::setFaultTolerantMode(void) {
     if ( env == NULL ) {
 	daemon = 0;
     } else {
-	daemon = atoi( env );
+	daemon = atoi(env);
     }
     
     env = getenv( "DSCUDA_AUTOVERB" );
     if ( env == NULL ) {
 	autoverb = 0;
     } else {
-	autoverb = atoi( env );
+	autoverb = atoi(env);
     }
 
     env = getenv( "DSCUDA_MIGRATION" );
     if ( env == NULL ) {
 	migration = 0;
     } else {
-	migration = atoi( env );
+	migration = atoi(env);
+    }
+
+    env = getenv( "DSCUDA_CP_PERIOD" );
+    if (env == NULL) {
+	cp_period = 60;
+    } else {
+	cp_period = atoi(env);
     }
 
     if ( autoverb == 0 ) {
@@ -1186,9 +1195,10 @@ void ClientState_t::setFaultTolerantMode(void) {
  * after verifying between redundant physical GPUs every specified wall clock
  * time period. The period is defined in second.
  */
-//void* ClientState_t::periodicCheckpoint(void *arg) {
 void *periodicCheckpoint(void *arg) {
-    int devid, d, i;
+    int cp_period = *(int *)arg;
+    int age = 0;
+    int devid, i;
     int errcheck = 1;
     cudaError_t cuerr;
     int pmem_devid;
@@ -1206,10 +1216,14 @@ void *periodicCheckpoint(void *arg) {
     void *dst_cand[RC_NREDUNDANCYMAX];
     int  dst_color[RC_NREDUNDANCYMAX], next_color;
 
-    for (;;) { /* infinite loop */
-	WARN( 10, "%s\n", __func__ );
-#if 1
-	for (d=0; d < St.Nvdev; d++) { /* Sweep all virtual GPUs */
+    for (;;) { /* activate every "cp_period" sec */
+	sleep( cp_period );
+	WARN(9, "periodicCheckpoint( period = %d[sec], age=%d ) {\n",
+	     cp_period, age++);
+
+	St.collectEntireRegions();
+#if 0
+	for (int d=0; d < St.Nvdev; d++) { /* Sweep all virtual GPUs */
 	    pmem = St.Vdev[d].memlist.head ;
 	    while ( pmem != NULL ) {
 		cudaSetDevice_clnt( d, errcheck );
@@ -1232,7 +1246,9 @@ void *periodicCheckpoint(void *arg) {
 	    }
 
 	}//for
-#else	
+#endif
+	
+#if 0	
 	for ( devid=0; devid < St.Nvdev; devid++ ) { /* All virtual GPUs */
 	    pmem = BKUPMEM.head;
 	    while ( pmem != NULL ) { /* sweep all registered regions */
@@ -1343,10 +1359,10 @@ void *periodicCheckpoint(void *arg) {
 	     */
 	    WARN(3, "Can not update checkpointing data, then Rollback retry.\n");
 	}
-	sleep(2);
+	WARN(9, "} periodicCheckpoint().\n");
 	pthread_testcancel();/* cancelation available */
     }//for (;;)
-}
+} // periodicCheckpoint()
 
 
 /*
@@ -1354,9 +1370,9 @@ void *periodicCheckpoint(void *arg) {
  * This function may be executed in parallel threads, so need mutex lock.
  */
 ClientState_t::ClientState_t(void) {
-    ServerArray_t svr_array;
-    
     WARN(9, "ClinetState_t::ClientState_t() {\n");
+    ServerArray_t svr_array;
+
     start_time = time( NULL );
     WARN(1, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
 
@@ -1376,11 +1392,11 @@ ClientState_t::ClientState_t(void) {
     this->initVirtualDeviceList();  /* Update the list of virtual devices */
 
     // dummy
-    svr_array.captureEnv("DSCUDA_SERVER_IGNORE");
+    svr_array.captureEnv("DSCUDA_SERVER_IGNORE", FT_IGNORE );
     svr_array.print();
 
     updateSpareServerList();
-    svr_array.captureEnv("DSCUDA_SERVER_SPARE");
+    svr_array.captureEnv( "DSCUDA_SERVER_SPARE", FT_SPARE );
     svr_array.print();
     for (int i=0; i<svr_array.num; i++) {
 	SvrSpare.add( &svr_array.svr[i] );
@@ -1406,7 +1422,7 @@ ClientState_t::ClientState_t(void) {
     for ( int i=0; i < Nvdev; i++ ) {
 	for ( int j=0; j < Vdev[i].nredundancy; j++ ) {
 	    Vdev[i].server[j].setupConnection();
-	    WARN(0, "setupConn. Vdev[%d].server[%d].Clnt=%p\n",
+	    WARN(1, "setupConn. Vdev[%d].server[%d].Clnt=%p\n",
 		 i, j, Vdev[i].server[j].Clnt);
         }
     }
@@ -1415,15 +1431,13 @@ ClientState_t::ClientState_t(void) {
     setIpAddress(addrin.sin_addr.s_addr);
 
     WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
-    /*
-     * Create a thread of checkpointing.
-     */
-
+    
     if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
 	WARN(1, "[ERRORSTATICS] start.\n" );
-#if 0
-	pthread_create( &tid, NULL, periodicCheckpoint, NULL);
-#endif
+	/********************************************
+	 ***>  Create the CHECKPOINTING thread.  <***
+	 ********************************************/
+	pthread_create(&tid, NULL, periodicCheckpoint, (void *)&cp_period);
     }
 
     WARN(9, "} ClinetState_t::ClientState_t()\n");

@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-14 01:28:18
+// Last Modified On : 2014-09-14 14:33:56
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -309,7 +309,8 @@ typedef enum FtMode_e {
     //
     FT_INIT   = 4,  // 
     FT_SPARE  = 5,  // Flag of alternate GPU
-    FT_BROKEN = 6   // Flag of No more use.
+    FT_BROKEN = 6,  // Flag of No more use.
+    FT_IGNORE = 7
 } FtMode;
 //********************************************************************
 //***  Class Name: "RCServer"
@@ -354,6 +355,7 @@ typedef struct RCServer {
     void setCID(int cid0);
     void setCID(char *cir_sz);
     void setUNIQ(int uniq0);
+    void setFTMODE(FtMode ft_mode0);
     /*METHODS*/
     int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(struct RCServer *dup);
@@ -372,6 +374,8 @@ typedef struct RCServer {
     void migrateDeliverAllRegions(void);
     void migrateDeliverAllModules(void);
     void migrateRebuildModulelist(void);
+
+    void collectEntireRegions(void);
 } RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
@@ -391,7 +395,7 @@ typedef struct ServerArray {
 //    void      removeArray(ServerArray *sub);
     RCServer *findSpareOne(void);
     RCServer *findBrokenOne(void);
-    void      captureEnv(char *env);
+    void      captureEnv(char *env, FtMode ft_mode0);
     void      print(void);
 } ServerArray_t;
 
@@ -435,8 +439,11 @@ typedef struct VirDev_t {
     cudaError_t cudaFree(void *d_ptr);
     void  launchKernel(int module_index, int kid, char *kname, RCdim3 gdim,
 		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
-    
-    void remallocRegionsGPU(int num_svr);
+    /*CP*/
+    void  remallocRegionsGPU(int num_svr); //cudaMemcpyD2H-all
+    int   collectEntireRegions(void);
+    void  verifyEntireRegions(void);
+    //void  updateMemlist(void); //TODO
 } Vdev_t;
 
 //*************************************************
@@ -445,6 +452,7 @@ typedef struct VirDev_t {
 //***      - DS-CUDA Client Status class.
 //*************************************************
 void *periodicCheckpoint(void *arg);
+
 struct ClientState_t {
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
@@ -466,6 +474,7 @@ public:
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int autoverb;           /* 1:Redundant calculation */
     int migration;
+    int cp_period;          // Period of checkpoint [sec]
     int daemon;
     int historical_calling;
     
@@ -494,6 +503,8 @@ public:
     void setMigrateDevice(int val=1) { migration = val; }
     void unsetMigrateDevice() { migration = 0; }
     int  getMigrateDevice() { return migration; }
+
+    void  collectEntireRegions(void);
 };
 extern struct ClientState_t St;
 extern struct PtxStore_t PtxStore;

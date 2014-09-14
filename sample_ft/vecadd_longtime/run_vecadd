@@ -3,6 +3,8 @@
 mode=${1}
 ft=${2}
 
+export DSCUDA_CP_PERIOD=5
+
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
     DSCUDA_SERVER="c4hdn:0"
@@ -27,7 +29,8 @@ export DSCUDA_SERVER
 
 # <--- new!
 export DSCUDA_SERVER_IGNORE="stelleto2:0"
-export DSCUDA_SERVER_SPARE="naruminote0:0"
+#export DSCUDA_SERVER_SPARE="naruminote0:0"
+export DSCUDA_SERVER_SPARE="10.68.59.55:0"
 # ---> new!
 
 if [ "${ft}" = "MIGRA" ]; then
