@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-14 14:33:56
+// Last Modified On : 2014-09-15 13:01:01
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -329,6 +329,7 @@ typedef struct RCServer {
     
     BkupMemList memlist;      // GPU global memory mirroring region.
     HistRecList reclist;      // GPU CUDA function called history.
+    int         rec_en;
     
     int        *d_faultconf;  //
 
@@ -348,6 +349,9 @@ typedef struct RCServer {
     int         findModuleOpen(void);
     int         queryModuleID(int module_index);
     void        invalidateModuleCache(void);
+    /*RECORDING HISTORY*/
+    int         isRecordOn(void);
+    int         setRecord(int rec_en0); // return current rec_en.
 
     /*SETTER*/
     void setIP(const char *ip0);
@@ -361,7 +365,7 @@ typedef struct RCServer {
     void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t size);
-    cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
+    cudaError_t cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
@@ -423,14 +427,20 @@ typedef struct VirDev_t {
                                            /*** CHECKPOINTING ***/
     BkupMemList memlist;              //part of Checkpoint data.
     HistRecList reclist;
+    int         rec_en;
 
+    /*CONSTRUCTOR*/
+    VirDev_t(void);
     /*CUDA kernel modules management*/
     ClientModule modulelist[RC_NKMODULEMAX];
     int         loadModule(char *name, char *strdata);
     int         findModuleOpen(void);
     void        invalidateAllModuleCache(void);
     void        printModuleList(void);
-    /*METHODS*/
+    /*HISTORY RECORDING*/
+    int         isRecordOn(void);
+    int         setRecord(int rec_en0); // return current rec_en.
+    
     void        setFaultMode(enum FtMode_e fault_mode);
     void        setConfInfo(int redun);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
@@ -441,9 +451,12 @@ typedef struct VirDev_t {
 		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
     /*CP*/
     void  remallocRegionsGPU(int num_svr); //cudaMemcpyD2H-all
-    int   collectEntireRegions(void);
-    void  verifyEntireRegions(void);
-    //void  updateMemlist(void); //TODO
+    void  collectEntireRegions(void);
+    int   verifyEntireRegions(void);
+    void  updateMemlist(int svr_id);
+    void  restoreMemlist(void);
+    void  clearReclist(void);
+
 } Vdev_t;
 
 //*************************************************
@@ -491,7 +504,7 @@ public:
     void useRpc() { use_ibv = 0; }
     int  isIbv()  { return use_ibv;       }
     int  isRpc()  { return (1 - use_ibv); }
-    
+
     void   setAutoVerb(int val=1)  { autoverb = val; }
     void unsetAutoVerb() { autoverb = 0; }
     int  isAutoVerb(void)    { return autoverb; }
@@ -503,9 +516,12 @@ public:
     void setMigrateDevice(int val=1) { migration = val; }
     void unsetMigrateDevice() { migration = 0; }
     int  getMigrateDevice() { return migration; }
-
+    /*CHECKPOINT*/
     void  collectEntireRegions(void);
-};
+    int   verifyEntireRegions(void);
+    void  udpateMemlist(void);
+}; // ClientState_t
+
 extern struct ClientState_t St;
 extern struct PtxStore_t PtxStore;
 //extern int    ClientState_t::Nvdev;

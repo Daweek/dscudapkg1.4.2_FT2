@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-14 14:28:54
+// Last Modified On : 2014-09-15 11:45:48
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -1169,9 +1169,21 @@ void ClientState_t::setFaultTolerantMode(void) {
     }
 
     for (int i=0; i<RC_NVDEVMAX; i++) {
-	Vdev[i].setFaultMode(this->ft_mode);
+	Vdev[i].ft_mode = this->ft_mode;
+	for (int k=0; k<Vdev[i].nredundancy; k++) {
+	    Vdev[i].server[k].ft_mode = this->ft_mode;
+	}
     }
-    
+
+    if (ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH) {
+	for (int i=0; i<RC_NVDEVMAX; i++) {
+	    Vdev[i].rec_en = 1;
+	    for (int k=0; k<Vdev[i].nredundancy; k++) {
+		Vdev[i].server[k].rec_en = 1;
+	    }
+	}
+    }
+
     WARN( 2, "Found DSCUDA_USEDAEMON=%d\n", daemon    );
     WARN( 2, "Found DSCUDA_AUTOVERB=%d\n",  autoverb  );
     WARN( 2, "Found DSCUDA_MIGRATION=%d\n", migration );
@@ -1190,15 +1202,16 @@ void ClientState_t::setFaultTolerantMode(void) {
     return;
 }
 
-/*
- * Take the data backups of each virtualized GPU to client's host memory
- * after verifying between redundant physical GPUs every specified wall clock
+/****** CHECK-POINTING THREAD ****************************************
+ * Take the data backups of each virtualized GPU to client's host
+ * memory after verifying between redundant physical GPUs every
+ * specified wall clock
  * time period. The period is defined in second.
  */
 void *periodicCheckpoint(void *arg) {
     int cp_period = *(int *)arg;
     int age = 0;
-    int devid, i;
+    int devid;
     int errcheck = 1;
     cudaError_t cuerr;
     int pmem_devid;
@@ -1216,159 +1229,71 @@ void *periodicCheckpoint(void *arg) {
     void *dst_cand[RC_NREDUNDANCYMAX];
     int  dst_color[RC_NREDUNDANCYMAX], next_color;
 
+    int correct_count = 0;
     for (;;) { /* activate every "cp_period" sec */
 	sleep( cp_period );
+
+	// mutex locks
+	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
+	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+	pthread_mutex_lock( &cudaKernelRun_mutex );
+	
 	WARN(9, "periodicCheckpoint( period = %d[sec], age=%d ) {\n",
 	     cp_period, age++);
 
 	St.collectEntireRegions();
-#if 0
-	for (int d=0; d < St.Nvdev; d++) { /* Sweep all virtual GPUs */
-	    pmem = St.Vdev[d].memlist.head ;
-	    while ( pmem != NULL ) {
-		cudaSetDevice_clnt( d, errcheck );
-		
-		// mutex locks
-		pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-		pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-		pthread_mutex_lock( &cudaKernelRun_mutex );
-		WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
-
-		for ( i=0; i < St.Vdev[d].nredundancy; i++ ) {
-		    
-		}
-
-		// mutex unlocks
-		pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
-		pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
-		pthread_mutex_unlock( &cudaKernelRun_mutex );
-
-	    }
-
-	}//for
-#endif
-	
-#if 0	
-	for ( devid=0; devid < St.Nvdev; devid++ ) { /* All virtual GPUs */
-	    pmem = BKUPMEM.head;
-	    while ( pmem != NULL ) { /* sweep all registered regions */
-		pmem_devid = dscudaDevidOfUva( pmem->d_region );
-		size = pmem->size;
-		if ( devid == pmem_devid ) {
-		    cudaSetDevice_clnt( devid, errcheck );
-		    redun = St.Vdev[devid].nredundancy;
-		    //<-- Mutex lock
-		    pthread_mutex_lock( &cudaMemcpyD2H_mutex );
-		    pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-		    pthread_mutex_lock( &cudaKernelRun_mutex );
-		    WARN(3, "mutex_lock:%s(),cudaMemcpyD2H\n", __func__);
-		    for ( i=0; i < redun; i++ ) {
-			dst_cand[i] = malloc( size );
-			if ( dst_cand[i] == NULL ) {
-			    fprintf(stderr, "%s():malloc() failed.\n", __func__ );
-			    exit( EXIT_FAILURE );
-			}
-			//cudaMemcpyD2H_redundant( dst_cand[i], pmem->d_region, size, i );
-		    }
-		    pthread_mutex_unlock( &cudaMemcpyD2H_mutex );/*mutex-unlock*/
-		    pthread_mutex_unlock( &cudaMemcpyH2D_mutex );/*mutex-unlock*/
-		    pthread_mutex_unlock( &cudaKernelRun_mutex );/*mutex-unlock*/
-		    //--> Mutex lock
-		    WARN(3, "mutex_unlock:%s(),cudaMemcpyD2H\n", __func__);
-		    /**************************
-		     * compare redundant data.
-		     **************************/
-		    regional_match = 1;
-
-		    for ( i=0; i<RC_NREDUNDANCYMAX; i++) {
-			dst_color[i] = -1;
-		    }
-		    next_color = 0;
-		    dst_color[0] = next_color;
-		    for ( m=1; m<redun; m++ ) {
-			for ( n=0; n<m; n++ ) {
-			    WARN(3, "memcmp(%3d <--> %3d, %d Byte)... ", m, n, size);
-			    cmp_result[m][n] = memcmp(dst_cand[m], dst_cand[n], size);
-			    if ( cmp_result[m][n] == 0 ) {
-				WARN0(3, "Matched.\n");
-				dst_color[m] = dst_color[n];
-				break;
-			    } else {
-				WARN0(3, "*** Unmatched. ***\n");
-				regional_match = 0;
-				snapshot_match = 0;
-				if ( n == (m - 1) ) {
-				    next_color++;
-				    dst_color[m] = next_color;
-				}
-			    }//if ( cmp_result...
-			}//for (n...
-		    }//for (m...
-		    /********************
-		     * Verify
-		     ********************/
-		    for ( i=0; i<redun; i++ ) {
-			WARN(3, "redundant pattern: dst_color[%d]=%d\n", i, dst_color[i]);
-		    }
-		    if ( regional_match == 1 ) {    /* completely matched data */
-			WARN(3, "(^_^) matched all redundants(%d).\n", redun);
-			memcpy( pmem->h_region, dst_cand[0], size );
-		    } else {                   /* unmatch exist */
-			fprintf(stderr, "%s(): unmatched data.\n", __func__ );
-			exit(1);
-		    }
-		    /*
-		     * free 
-		     */
-		    for ( i=0; i<redun; i++ ) {
-			free( dst_cand[i] );
-		    }
-		} 
-		pmem = pmem->next;
-	    }
-	}//for ( devid=0; ...
-	
-#endif //replacing new code
-	
-	if (snapshot_match == 1) {
-#if 0
-	    /*****************************************
-	     * Update snapshot memories, and storage.
-	     */
-	    WARN(3, "***********************************\n");
-	    WARN(3, "*** Update checkpointing data(%d).\n", snapshot_count);
-	    WARN(3, "***********************************\n");
-	    //pmem = BKUPMEM.head;
-	    pmem_count = 0;
-	    while ( pmem != NULL ) { /* sweep all registered regions */
-		pmem->updateSafeRegion();
-		pmem_count++;	
-		pmem = pmem->next;
-	    }
-	    WARN(3, "*** Made checkpointing of all %d regions.\n", pmem_count);
-	    WARN(3, "***********************************\n");
-	    WARN(3, "*** Clear following cuda API called history(%d).\n", snapshot_count);
-	    WARN(3, "***********************************\n");
-	    //HISTREC.print();
-	    //HISTREC.clear();
-	    snapshot_count++;
-#endif
-	} else {
-	    /*
-	     * Rollback and retry cuda sequence.
-	     */
-	    WARN(3, "Can not update checkpointing data, then Rollback retry.\n");
+	int correct = St.verifyEntireRegions();
+	if ( correct==1 ) {
+	    correct_count++;
 	}
+#if 1 // force pseudo error
+	if (correct_count % 5 == 4) {
+	    correct = 0;
+	}
+#endif
+	if ( correct==1 ) {
+	    //***
+	    //*** All memory regions on all virtual devices are correct.
+	    //*** Then, collect clean device memory regions to host memory.
+	    //*** and clear CUDA API called history.
+	    //***
+	    WARN(1, "(^_^)Ready to update clean backup region.\n");
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].updateMemlist(0); // 0 means server[0].
+		St.Vdev[i].clearReclist();
+	    }
+	} else {
+	    //***
+	    //*** Some memory regions on any virtual devices are currupted.
+	    //*** Then, restore clean memory regions to all devices, and
+	    //*** redo the historical cuda API calls.
+	    //***
+	    WARN(1, "(+_+)Detected corrupted device region.\n");
+	    WARN(1, "(+_+)Restore the device memory using backup.\n");
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].restoreMemlist();
+	    }
+	    WARN(1, "(+_+)Redo the CUDA APIs Rollbacked.\n");	    
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].reclist.print();
+		St.Vdev[i].reclist.recall();
+	    }
+	}
+
+	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
+	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+	pthread_mutex_unlock( &cudaKernelRun_mutex );
+	
 	WARN(9, "} periodicCheckpoint().\n");
 	pthread_testcancel();/* cancelation available */
     }//for (;;)
 } // periodicCheckpoint()
 
-
 /*
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.
  */
+
 ClientState_t::ClientState_t(void) {
     WARN(9, "ClinetState_t::ClientState_t() {\n");
     ServerArray_t svr_array;
@@ -1387,9 +1312,9 @@ ClientState_t::ClientState_t(void) {
     getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
     
 	
-    this->setFaultTolerantMode();
+    setFaultTolerantMode();
     dscudaSearchDaemon();
-    this->initVirtualDeviceList();  /* Update the list of virtual devices */
+    initVirtualDeviceList();  /* Update the list of virtual devices */
 
     // dummy
     svr_array.captureEnv("DSCUDA_SERVER_IGNORE", FT_IGNORE );

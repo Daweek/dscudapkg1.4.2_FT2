@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-09 00:49:30
+// Last Modified On : 2014-09-15 13:51:58
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -262,14 +262,27 @@ static void recallMalloc(void *argp) {
 }
 
 static void recallMemcpyH2D(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
     cudaMemcpyArgs *argsrc;
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    Vdev_t     *vdev   = St.Vdev + vdevid;
+    int         rec_en_stack;
+    
     argsrc = (cudaMemcpyArgs *)argp;
-
-    WARN(3, "Recall cudaMemcpyH2D()...\n");
+    WARN(3, "Recall cudaMemcpyH2D()...");
+#if 0
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyHostToDevice);
+#else
+    rec_en_stack = vdev->setRecord(0);
+    vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
+    vdev->setRecord(rec_en_stack);
+#endif
+    
+    WARN0(3, "done\n");
 }
 
 static void recallMemcpyD2D(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
     cudaMemcpyArgs *argsrc;
     argsrc = (cudaMemcpyArgs *)argp;
     
@@ -278,10 +291,22 @@ static void recallMemcpyD2D(void *argp) {
 }
 
 static void recallMemcpyD2H(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
     cudaMemcpyArgs *argsrc;
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    Vdev_t     *vdev   = St.Vdev + vdevid;
+    int         rec_en_stack;
+
     argsrc = (cudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyD2H()...\n");
+#if 0
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToHost);
+#else
+    rec_en_stack = vdev->setRecord(0);
+    vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
+    vdev->setRecord(rec_en_stack);
+#endif
+    
 }
 
 static void recallMemcpyToSymbolH2D(void *argp) {
@@ -308,11 +333,20 @@ static void recallLoadModule(void *argp) {
 }
 
 static void recallRpcLaunchKernel(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
     cudaRpcLaunchKernelArgs *argsrc;
     argsrc = (cudaRpcLaunchKernelArgs *)argp;
-    WARN(3, "Recall RpcLaunchKernel((int*)moduleid=%p, (int)kid=%d, (char*)kname=%s, ...)...\n",
+    WARN(3, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
 	 argsrc->moduleid, argsrc->kid, argsrc->kname);
+#if 0
     rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
+#else
+    int         rec_en_stack;
+    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    rec_en_stack = vdev->setRecord(0);
+    vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
+    vdev->setRecord(rec_en_stack);
+#endif
 }
 
 /*
@@ -324,7 +358,7 @@ HistRecList_t::HistRecList_t(void) {
     
     histrec = (HistRec_t *)malloc( sizeof(HistRec) * max_len );
     if (histrec == NULL) {
-	WARN(0, "%s():malloc() failed.\n", __func__);
+	WARN(0, "HistRecList_t::%s():malloc() failed.\n", __func__);
 	exit(EXIT_FAILURE);
     }
 
@@ -362,10 +396,9 @@ HistRecList_t::HistRecList_t(void) {
     //HISTREC.on();
     //--> import from dscudaVerbInit()
     //WARN( 5, "The constructor %s() called.\n", __func__ );
-}
+} // HistRecList_t::HistRecList_t()
 
-void
-HistRecList_t::extendLen(void) {
+void HistRecList_t::extendLen(void) {
     max_len += EXTEND_LEN;
     histrec = (HistRec *)realloc( histrec, sizeof(HistRec) * max_len );
     if (histrec == NULL) {
@@ -390,22 +423,6 @@ void HistRecList_t::add(int funcID, void *argp) {
     histrec[length].funcID = funcID;
     length++; /* Increment the count of cuda call */
 
-#if 0
-    switch (funcID2DSCVMethod(funcID)) {
-    case DSCVMethodMemcpyD2D: /* cudaMemcpy(DevicetoDevice) */
-	cudaMemcpyArgs *args = (cudaMemcpyArgs *)argp;
-	BkupMem *mem = BKUPMEM.queryRegion( args->d_region );
-	if (!mem) {
-	    break;
-	}
-	int verb = St.isAutoVerb();
-	St.unsetAutoVerb();
-	cudaMemcpy(mem->dst, args->src, args->count, cudaMemcpyDeviceToHost);
-	St.setAutoVerb(verb);
-	break;
-    default:
-    }
-#endif
     return;
 }
 /*
@@ -430,22 +447,22 @@ void HistRecList_t::clrRecallFlag(void) {
 
 void HistRecList_t::print(void) {
     WARN(1, "%s(): *************************************************\n", __func__);
-    if ( length == 0 ) {
-	WARN(1, "%s(): Recall History[]> (Empty).\n", __func__);
+    if (this->length == 0) {
+	WARN(1, "%s(): RecList[]> (Empty).\n", __func__);
 	return;
     }
     for (int i=0; i < length; i++) { /* Print recall history. */
 	WARN(1, "%s(): Recall History[%d]> ", __func__, i);
 	switch (histrec[i].funcID) { /* see "dscudarpc.h" */
-	  case 305: WARN(1, "cudaSetDevice()\n");        break;
-	  case 504: WARN(1, "cudaEventRecord()\n");      break;
-	  case 505: WARN(1, "cudaEventSynchronize()\n"); break;
-	  case 600: WARN(1, "kernel-call<<< >>>()\n");   break;
-	  case 700: WARN(1, "cudaMalloc()\n");           break;
-	  case 701: WARN(1, "cudaFree()\n");             break;
-	  case 703: WARN(1, "cudaMemcpy(H2D)\n");        break;
-	  case 704: WARN(1, "cudaMemcpy(D2H)\n");        break;
-	  default:  WARN(1, "/* %d */()\n", histrec[i].funcID);
+	  case 305: WARN0(1, "cudaSetDevice()\n");        break;
+	  case 504: WARN0(1, "cudaEventRecord()\n");      break;
+	  case 505: WARN0(1, "cudaEventSynchronize()\n"); break;
+	  case 600: WARN0(1, "kernel-call<<< >>>()\n");   break;
+	  case 700: WARN0(1, "cudaMalloc()\n");           break;
+	  case 701: WARN0(1, "cudaFree()\n");             break;
+	  case 703: WARN0(1, "cudaMemcpy(H2D)\n");        break;
+	  case 704: WARN0(1, "cudaMemcpy(D2H)\n");        break;
+	  default:  WARN0(1, "/* %d */()\n", histrec[i].funcID);
 	}
     }
     WARN(1, "%s(): *************************************************\n", __func__);
@@ -454,13 +471,14 @@ void HistRecList_t::print(void) {
  * Rerun the recorded history of cuda function series.
  */
 int HistRecList_t::recall(void) {
+    WARN(9, "HistRecList_t::%s() {\n", __func__);
    static int called_depth = 0;
    int result;
    int verb_curr = St.autoverb;
 
    setRecallFlag();
    
-   WARN(1, "#<--- Entering (depth=%d) %d function(s)..., %s().\n", called_depth, length, __func__);
+
    WARN(1, "called_depth= %d.\n", called_depth);
    if (called_depth < 0) {       /* irregal error */
        WARN(1, "#**********************************************************************\n");
@@ -469,7 +487,6 @@ int HistRecList_t::recall(void) {
        WARN(1, "#**********************************************************************\n\n");
        exit(1);
    } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
-       this->print();
        called_depth++;       
        for (int i=0; i< length; i++) { /* Do recall history */
 	   (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
@@ -485,11 +502,10 @@ int HistRecList_t::recall(void) {
        result = 1;
    }
 
-   WARN(1, "#---> Exiting (depth=%d) done, %s()\n", called_depth, __func__);
+   WARN(9, "} HistRecList_t::%s()\n", __func__);
    St.autoverb = verb_curr;
-   
    clrRecallFlag();
    
    return result;
-}
+} // HistRecList_t::recall(void)
 
