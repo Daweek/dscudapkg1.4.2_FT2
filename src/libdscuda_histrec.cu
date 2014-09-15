@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 13:51:58
+// Last Modified On : 2014-09-15 16:28:16
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -269,16 +269,12 @@ static void recallMemcpyH2D(void *argp) {
     int         rec_en_stack;
     
     argsrc = (cudaMemcpyArgs *)argp;
-    WARN(3, "Recall cudaMemcpyH2D()...");
-#if 0
-    cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyHostToDevice);
-#else
+    WARN(3, "Recall cudaMemcpyH2D() \n");
+
     rec_en_stack = vdev->setRecord(0);
     vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
     vdev->setRecord(rec_en_stack);
-#endif
-    
-    WARN0(3, "done\n");
+    WARN(3, "\n");
 }
 
 static void recallMemcpyD2D(void *argp) {
@@ -299,14 +295,11 @@ static void recallMemcpyD2H(void *argp) {
 
     argsrc = (cudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyD2H()...\n");
-#if 0
-    cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToHost);
-#else
+
     rec_en_stack = vdev->setRecord(0);
     vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
     vdev->setRecord(rec_en_stack);
-#endif
-    
+    WARN(3, "\n");
 }
 
 static void recallMemcpyToSymbolH2D(void *argp) {
@@ -472,40 +465,40 @@ void HistRecList_t::print(void) {
  */
 int HistRecList_t::recall(void) {
     WARN(9, "HistRecList_t::%s() {\n", __func__);
-   static int called_depth = 0;
-   int result;
-   int verb_curr = St.autoverb;
-
-   setRecallFlag();
+    static int called_depth = 0;
+    int result;
+    int verb_curr = St.autoverb;
    
+    setRecallFlag();
 
-   WARN(1, "called_depth= %d.\n", called_depth);
-   if (called_depth < 0) {       /* irregal error */
-       WARN(1, "#**********************************************************************\n");
-       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-       WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
-       WARN(1, "#**********************************************************************\n\n");
-       exit(1);
-   } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
-       called_depth++;       
-       for (int i=0; i< length; i++) { /* Do recall history */
-	   (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
-       }
-       called_depth=0;
-       result = 0;
-   } else { /* try migraion or not. */
-       WARN(1, "#**********************************************************************\n");
-       WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-       WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
-       WARN(1, "#**********************************************************************\n\n");
-       called_depth=0;
-       result = 1;
+    WARN(1, "called_depth= %d.\n", called_depth);
+    if (called_depth < 0) {       /* irregal error */
+	WARN(1, "#**********************************************************************\n");
+	WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+	WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
+	WARN(1, "#**********************************************************************\n\n");
+	exit(1);
+    } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
+	called_depth++;       
+	for (int i=0; i< length; i++) { /* Do recall history */
+	    WARN(3, "(._.)Rollback API[%4d/%d]................................\n", i, length-1);
+	    (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
+	}
+	called_depth=0;
+	result = 0;
+    } else { /* try migraion or not. */
+	WARN(1, "#**********************************************************************\n");
+	WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+	WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
+	WARN(1, "#**********************************************************************\n\n");
+	called_depth=0;
+	result = 1;
    }
 
-   WARN(9, "} HistRecList_t::%s()\n", __func__);
-   St.autoverb = verb_curr;
-   clrRecallFlag();
-   
+    WARN(9, "} HistRecList_t::%s()\n", __func__);
+    St.autoverb = verb_curr;
+    clrRecallFlag();
+    
    return result;
 } // HistRecList_t::recall(void)
 

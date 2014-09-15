@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 13:43:45
+// Last Modified On : 2014-09-15 16:12:59
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -172,9 +172,10 @@ void RCServer::migrateReallocAllRegions(void) {
     
     WARN(1, "RCServer::%s(void) {\n", __func__);
     WARN(1, "   + # of realloc region = %d.\n", memlist.length );
-    
+
+    struct rpc_err rpc_result;
     while (memp != NULL) {
-	this->cudaMalloc(&memp->d_region, memp->size);
+	this->cudaMalloc(&memp->d_region, memp->size, &rpc_result);
 	WARN(5, "   + region[%d]: v_ptr=%p, d_ptr=%p(updated), size= %d\n",
 	     i, memp->v_region, memp->d_region, memp->size);
 
@@ -193,11 +194,12 @@ void RCServer::migrateDeliverAllRegions(void) {
     
     WARN(1, "RCServer::%s(void) {\n", __func__);
     WARN(1, "   + # of deliverd region = %d.\n", memlist.length );
-    
+
+    struct rpc_err rpc_result;
     while (memp != NULL) {
 	WARN(5, "   + region[%d]: v_ptr=%p, d_ptr=%p, h_ptr=%p, size= %d\n",
 	     i, memp->v_region, memp->d_region, memp->h_region, memp->size);
-	this->cudaMemcpyH2D(memp->v_region, memp->h_region, memp->size);
+	this->cudaMemcpyH2D(memp->v_region, memp->h_region, memp->size, &rpc_result);
 	memp = memp->next;
 	i++;
     }
@@ -306,13 +308,16 @@ void checkResult(void *rp, RCServer_t &sp) {
 void RCServer::rpcErrorHook(struct rpc_err *err) {
     RCServer *sp;
     int retval;
+
+    if ( err->re_status == RPC_SUCCESS ) {
+	//Nothing to do.
+	//WARN(3, "\"RCServer::%s():RPC_SUCCESS\".\n", __func__);
+	return;
+    }
     
     WARN(1, "********************************************************\n");
     WARN(1, "***  detected rpc communication error; ");
     switch (err->re_status) {// *refer to /usr/include/rpc/clnt.h.
-    case RPC_SUCCESS: //=0
-	WARN0(1, "\"RPC_SUCCESS\".\n");
-	break;
     case RPC_CANTSEND: //=3
 	WARN0(1, "\"RPC_CANTSEND\".\n");
 	break;
@@ -343,14 +348,15 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	WARN0(1, "\"FT_PLAIN\"\n");
 	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
 	WARN(1, "********************************************************\n");
-	exit(1);
+	exit(EXIT_FAILURE);
     case FT_REDUN:
 	WARN0(1, "\"FT_REDUN\"\n");
 	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
 	WARN(1, "********************************************************\n");
-	exit(1);
-    case FT_MIGRA:
-	WARN0(1, "\"FT_MIGRA\"\n");
+	exit(EXIT_FAILURE);
+    case FT_MIGRA: //thru
+    case FT_BOTH:
+	WARN0(1, "\"FT_MIGRA\" or \"FT_BOTH\"\n");
 	WARN(1, "***  I am going to migrate to another device.\n");
 
 	do {
@@ -369,18 +375,20 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	    }
 	} while ( retval != 0 );
 	
-	migrateReallocAllRegions();
-	migrateDeliverAllRegions();
-	migrateRebuildModulelist();
-	break;
-    case FT_BOTH:
-	WARN0(1, "\"FT_BOTH\"\n");
+	this->migrateReallocAllRegions();
+	this->migrateRebuildModulelist();
+	//
+	//this->migrateDeliverAllRegions(); // should be done in Vdev_t level.
+	//
+	//this->reclist.print();   // should be done in Vdev_t level.
+	//this->reclist.recall();  // should be done in Vdev_t level.
 	break;
     default:
 	WARN0(1, "FT_(UNKNOWN)\n");
+	exit(EXIT_FAILURE);
     }
-    
     WARN(1, "********************************************************\n");
+    return;
 }
 
 /*
@@ -733,19 +741,20 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
 /*
  * Memory Management
  */
-cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size) {
+cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
 
     rp = dscudamallocid_1(size, Clnt);
-
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
-    }
-    if (rp->err != cudaSuccess) {
-	cuerr = (cudaError_t)rp->err;
+    clnt_geterr( Clnt, rpc_result );
+    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
+	if ( rp == NULL ) {
+	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    cuerr = (cudaError_t)rp->err;
+	}
     }
 
     *d_ptr = (void*)rp->devAdr;
@@ -763,13 +772,20 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
 
     WARN(3, "   Vdev[%d].cudaMalloc(%p, %zu) nredundancy=%d {\n",
 	 id, d_ptr, size, nredundancy);
-
+    
+    struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
 	/*
 	 * Virtual device looks like one device but has
 	 * nredundancy devices.
 	 */
-	cuerr_phy = server[i].cudaMalloc(&adrs[i], size);
+	cuerr_phy = server[i].cudaMalloc(&adrs[i], size, &rpc_result);
+	server[i].rpcErrorHook( &rpc_result );
+	if ( rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
+	
 	WARN(3, "      Physical[%d]: d_ptr=%p\n", i, adrs[i]);
 	if (cuerr_phy != cudaSuccess) {
 	    WARN(0, "      server[%d].cudaMalloc() Faild\n", i);
@@ -824,7 +840,7 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size) {
 /*
  * cudaFree() series.
  */
-cudaError_t RCServer::cudaFree(void *v_ptr) {
+cudaError_t RCServer::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
     void *d_ptr = memlist.queryDevicePtr(v_ptr);
@@ -832,13 +848,15 @@ cudaError_t RCServer::cudaFree(void *v_ptr) {
     WARN(3, "      + Physical[%d].cudaFree(%p) { }\n", id, d_ptr);
 
     rp = dscudafreeid_1((RCadr)d_ptr, Clnt);
-    if (rp == NULL) {
-	WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
-	clnt_perror(Clnt, ip);
-	exit(EXIT_FAILURE);
-    }
-    if ( rp->err != cudaSuccess ) {
-	err = (cudaError_t)rp->err;
+    clnt_geterr( Clnt, rpc_result );
+    if ( rpc_result->re_status == RPC_SUCCESS ) {
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    err = (cudaError_t)rp->err;
+	}
     }
     xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
 
@@ -849,8 +867,15 @@ cudaError_t VirDev_t::cudaFree(void *v_ptr) {
     cudaError_t  err = cudaSuccess;
 
     WARN(3, "   + Virtual[%d].cudaFree(%p) {\n", id, v_ptr);
+    struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
-	err = server[i].cudaFree(v_ptr);
+	err = server[i].cudaFree(v_ptr, &rpc_result);
+	server[i].rpcErrorHook( &rpc_result );
+	if (rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
+	
 	server[i].memlist.remove(v_ptr);
     }
     this->memlist.remove(v_ptr);
@@ -889,7 +914,7 @@ cudaError_t cudaFree(void *d_ptr) {
 /*
  * cudaMemcpy( HostToDevice )
  */
-cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
+cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc_err *rpc_result) {
     dscudaResult *rp;
     RCbuf srcbuf;
     void *d_ptr;
@@ -907,25 +932,21 @@ cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
     //<-- RPC communication.
     rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, Clnt);
     
-    //<-- RPC fault check.
-    struct rpc_err rpc_error;
-    
-    clnt_geterr(Clnt, &rpc_error);
-    if (rpc_error.re_status == RPC_SUCCESS) { /*Got response from remote client*/
-	if (rp == NULL) {
+    //<--    RPC fault check.
+    clnt_geterr( Clnt, rpc_result );
+    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
+	if ( rp == NULL ) {
 	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
 	    clnt_perror(Clnt, ip);
 	    exit(EXIT_FAILURE);
 	} else {
 	    cuda_error = (cudaError_t)rp->err;
 	}
-    } else { /*In any trouble in RPC communication*/
-	rpcErrorHook(&rpc_error);	
     }
-    //--> RPC fault check.
+    //-->    RPC fault check.
     xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
+    
     //--> RPC communication.
-
 
     //****>>> Record called history of CUDA APIs. <<<***********
     struct CudaMemcpyArgs_t args;
@@ -942,10 +963,16 @@ cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
 
 cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
     WARN( 4, "   Vdev[%d].%s() {\n", id, __func__);
-    cudaError_t    err = cudaSuccess;
+    cudaError_t    cuda_error = cudaSuccess;
+    struct rpc_err rpc_result;
 	
     for (int i=0; i<nredundancy; i++) {
-	server[i].cudaMemcpyH2D(v_ptr, h_ptr, count);
+	server[i].cudaMemcpyH2D(v_ptr, h_ptr, count, &rpc_result);
+        server[i].rpcErrorHook( &rpc_result );
+	if ( rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
     }
 
     /*
@@ -964,13 +991,13 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
     }
 
     WARN( 4, "   } libdscuda:%s().\n", __func__);
-    return err;
+    return cuda_error;
 }
 
 /*
  * cudaMemcpy( DeviceToHost )
  */
-cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count) {
+cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count, struct rpc_err *rpc_result) {
     struct CudaMemcpyArgs_t args;
     if (isRecordOn()) {
 	args.dst   = (void *)h_ptr;
@@ -1001,10 +1028,9 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
     rp = dscudamemcpyd2hid_1((RCadr)d_ptr, count, Clnt);
 
     //<--- RPC fault check.
-    struct rpc_err rpc_error;
     cudaError_t    cuda_error;
-    clnt_geterr(Clnt, &rpc_error);
-    if (rpc_error.re_status == RPC_SUCCESS) {
+    clnt_geterr(Clnt, rpc_result);
+    if (rpc_result->re_status == RPC_SUCCESS) {
 	if (rp == NULL) {
 	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
 	    clnt_perror(Clnt, ip);
@@ -1012,8 +1038,6 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
 	} else {
 	    cuda_error = (cudaError_t)rp->err;
 	}
-    } else {
-	rpcErrorHook(&rpc_error);	
     }
     //--> RPC fault check.
 
@@ -1047,8 +1071,14 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     }
     
     /* Get the data from remote GPU(s), then verify */
+    struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
-	server[i].cudaMemcpyD2H(dst, src, count);
+	server[i].cudaMemcpyD2H(dst, src, count, &rpc_result);
+	server[i].rpcErrorHook( &rpc_result );
+	if ( rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
     }
     
 #if 0
@@ -1076,9 +1106,6 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     switch (conf) {
     case VDEV_MONO:
 	memcpy( dst, server[0].memlist.queryHostPtr(src), count );
-	if (isRecordOn()) {
-	    //BKUPMEM.updateRegion( src, dst, count );
-	}
 	break;
     case VDEV_POLY:
 	for (int i=0; i<nredundancy-1; i++) {
@@ -1098,12 +1125,6 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
 	    memcpy( dst, server[0].memlist.queryHostPtr(src), count );
-	    /*
-	     * Update backuped memory region.
-	     */
-	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
-		//memlist.updateRegion(src, dst, count); /* mirroring copy. !!!src and dst is swapped!!! */
-	    }
 	} else {
 	    if ( unmatched_count>0 && matched_count<(nredundancy-1)) {
 		WARN( 1, " #   #\n");
@@ -1119,11 +1140,9 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA ||
 		  St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
 		St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
-		//HISTREC.rec_en = 0; // <--- Must not record Historical call list.
 	    
 		//TODO: rewrite BKUPMEM.restructDeviceRegion();
-		
-		//recall_result = HISTREC.recall();
+		//TODO: recall_result = HISTREC.recall();
 	    
 		if (recall_result != 0) {
 		    printModuleList();
@@ -1327,7 +1346,8 @@ void VirDev_t::restoreMemlist(void) {
     void      *v_ptr;
     void      *h_src;
     int        size;
-    int        rec_en_stack; 
+    int        rec_en_stack;
+    struct rpc_err rpc_result;
 
     mem_ptr = memlist.head;    
     while ( mem_ptr != NULL ) {
@@ -1337,7 +1357,7 @@ void VirDev_t::restoreMemlist(void) {
 	for (int i=0; i<nredundancy; i++) {
 	    rec_en_stack = server[i].rec_en;
 	    server[i].rec_en = 0;
-	    server[i].cudaMemcpyH2D(v_ptr, h_src, size);
+	    server[i].cudaMemcpyH2D(v_ptr, h_src, size, &rpc_result);
 	    server[i].rec_en = rec_en_stack;
 	}
 	mem_ptr = mem_ptr->next;
@@ -1657,7 +1677,8 @@ int VirDev_t::loadModule(char *name, char *strdata) {
  */
 void RCServer::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-			    RCstream stream, RCargs args) {
+			    RCstream stream, RCargs args,
+			    struct rpc_err *rpc_result) {
     WARN(5, "      + RCServer[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
@@ -1700,21 +1721,16 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
 				      smemsize, (RCstream)st->s[id], lo_args, Clnt);
 
     //<--- Timed Out
-    struct rpc_err rpc_error;
-    
-    clnt_geterr(Clnt, &rpc_error);
-    if (rpc_error.re_status == RPC_SUCCESS) {
+    clnt_geterr(Clnt, rpc_result);
+    if (rpc_result->re_status == RPC_SUCCESS) {
 	if (rp == NULL) {
 	    WARN( 0, "NULL pointer returned, %s(). exit.\n", __func__ );
 	    clnt_perror(Clnt, ip);
 	    exit( EXIT_FAILURE );
 	}
-    } else {
-	rpcErrorHook(&rpc_error);
     }
     //--->
     free(lo_args.RCargs_val);
-
 
     cudaRpcLaunchKernelArgs args2;
     if (isRecordOn()) {
@@ -1752,9 +1768,15 @@ void VirDev_t::launchKernel(int module_index, int kid, char *kname,
         reclist.add( dscudaLaunchKernelId, (void *)&args2 );
     }
 
+    struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
         server[i].launchKernel(module_index, kid, kname, gdim,
-			       bdim, smemsize, stream, args);
+			       bdim, smemsize, stream, args, &rpc_result);
+	server[i].rpcErrorHook( &rpc_result );
+	if (rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
     }
     WARN(5, "   + } // VirDev_t::%s()\n", __func__);
 }

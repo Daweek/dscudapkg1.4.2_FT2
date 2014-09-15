@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 13:01:01
+// Last Modified On : 2014-09-15 15:55:37
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -364,12 +364,13 @@ typedef struct RCServer {
     int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(struct RCServer *dup);
 
-    cudaError_t cudaMalloc(void **d_ptr, size_t size);
-    cudaError_t cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t size);
-    cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t size);
-    cudaError_t cudaFree(void *d_ptr);
+    cudaError_t cudaMalloc(void **d_ptr, size_t, struct rpc_err *);
+    cudaError_t cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t, struct rpc_err *);
+    cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t, struct rpc_err *);
+    cudaError_t cudaFree(void *d_ptr, struct rpc_err *);
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
-		RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
+			     RCdim3 bdim, RCsize smemsize, RCstream stream,
+			     RCargs args, struct rpc_err *);
 
     //<--- Migration series
     void rpcErrorHook(struct rpc_err *err);
