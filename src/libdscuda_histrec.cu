@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 16:28:16
+// Last Modified On : 2014-09-17 11:41:58
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -347,6 +347,7 @@ static void recallRpcLaunchKernel(void *argp) {
  */
 HistRecList_t::HistRecList_t(void) {
     length    = 0;
+    byte_size = 0;
     max_len   = 32;
     
     histrec = (HistRec_t *)malloc( sizeof(HistRec) * max_len );
@@ -402,7 +403,7 @@ void HistRecList_t::extendLen(void) {
 }
 
 /*
- *
+ * Add one item to called histry of CUDA API. 
  */
 void HistRecList_t::add(int funcID, void *argp) {
     int DSCVMethodId;
@@ -414,7 +415,41 @@ void HistRecList_t::add(int funcID, void *argp) {
     DSCVMethodId = funcID2DSCVMethod(funcID);
     histrec[length].args   = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
     histrec[length].funcID = funcID;
+    
     length++; /* Increment the count of cuda call */
+    byte_size += sizeof(funcID);
+    byte_size += sizeof(int);// dev_id
+    switch (funcID) {
+    case dscudaSetDeviceId:
+	byte_size += sizeof(struct CudaSetDeviceArgs_t);
+	break;
+    case dscudaMallocId:
+	byte_size += sizeof(struct CudaMallocArgs_t);
+	break;
+    case dscudaMemcpyH2DId: //thru
+    case dscudaMemcpyD2HId: //thru
+    case dscudaMemcpyD2DId:
+	byte_size += sizeof(struct CudaMemcpyArgs_t);
+	break;
+    case dscudaMemcpyToSymbolH2DId: //thru
+    case dscudaMemcpyToSymbolD2DId:
+	byte_size += sizeof(struct CudaMemcpyToSymbolArgs_t);
+	break;
+    case dscudaFreeId:
+	byte_size += sizeof(struct CudaFreeArgs_t);
+	break;
+	/*    
+	      case dscudaLoadModuleId:
+	      return DSCVMethodLoadModule;
+	*/
+    case dscudaLaunchKernelId:
+	byte_size += sizeof(struct CudaRpcLaunchKernelArgs_t) + 32;
+	// 32 is pseudo length of *kname.
+	break;
+    default:
+	WARN(0, "%s():unknown kind of cuda api.\n", __func__);
+	exit(1);
+    }
 
     return;
 }
@@ -428,6 +463,7 @@ void HistRecList_t::clear(void) {
       }
    }
    length = 0;
+   byte_size = 0;
 }
 
 void HistRecList_t::setRecallFlag(void) {

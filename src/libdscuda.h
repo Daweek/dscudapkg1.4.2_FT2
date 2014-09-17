@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 15:55:37
+// Last Modified On : 2014-09-17 10:55:33
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -166,6 +166,7 @@ typedef struct HistRec_t {
 typedef struct HistRecList_t {
     HistRec *histrec;
     int      length;    /* # of recorded function calls to be recalled */
+    int      byte_size; // Total size of this history
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
 
     // stubs for store/release args, and recall functions.
@@ -174,7 +175,7 @@ typedef struct HistRecList_t {
     void (*releaseArgsStub[DSCVMethodEnd])(void *);
     void (*recallStub[DSCVMethodEnd])(void *);
     
-    // Constructor.
+    /*CONSTRUCTOR*/
     HistRecList_t(void);
     //
     void add(int funcID, void *argp);
