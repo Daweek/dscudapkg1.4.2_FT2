@@ -189,7 +189,7 @@ void runTest(int argc, char** argv) {
 
     // use a larger block size for Fermi and above
     int block_size = (props.major < 2) ? 16 : 32;
-
+    printf("block_size = %d\n", block_size);
     printf("Device %d: \"%s\" with Compute %d.%d capability\n", devID, props.name, props.major, props.minor);
 
     // set seed for rand()
