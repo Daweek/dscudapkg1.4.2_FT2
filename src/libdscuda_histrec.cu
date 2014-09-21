@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-17 11:41:58
+// Last Modified On : 2014-09-17 11:50:29
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //----------------------------------------------------------------------
@@ -494,6 +494,7 @@ void HistRecList_t::print(void) {
 	  default:  WARN0(1, "/* %d */()\n", histrec[i].funcID);
 	}
     }
+    WARN(1, "%s(): Occupied size is %d Byte.\n", __func__, byte_size);
     WARN(1, "%s(): *************************************************\n", __func__);
 }
 /*

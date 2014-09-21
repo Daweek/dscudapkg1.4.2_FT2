@@ -1,0 +1,9 @@
+#!/bin/bash
+
+export DSCUDA_PATH=~/dscudapkg_FT
+export DSCUDA_USEDAEMON=1
+export DSCUDA_SERVER=c4hdn:0
+export DSCUDA_WARNLEVEL=1
+
+./bandwidth_rpc
+

@@ -57,5 +57,5 @@ export OMP_NUM_THREADS=1
 
 #~/bin/env_dscuda
 
-./vecadd_rpc 2>&1 | tee vecadd_rpc.log
+./matrixMul_rpc 2>&1 | tee matrixMul_rpc.log
 #emacs vecadd.cu 
