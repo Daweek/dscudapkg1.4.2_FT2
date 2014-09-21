@@ -3,13 +3,14 @@
 mode=${1}
 ft=${2}
 
-export DSCUDA_CP_PERIOD=5
+#export DSCUDA_CP_PERIOD=5
 #export DSCUDA_CP_PERIOD=60  
 #export DSCUDA_CP_PERIOD=600  
 
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
-    DSCUDA_SERVER="c4hdn:0"
+    DSCUDA_SERVER="c4hdn:2"
+    #DSCUDA_SERVER="stelletto:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "POLY2"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1"
@@ -57,5 +58,10 @@ export OMP_NUM_THREADS=1
 
 #~/bin/env_dscuda
 
-./matrixMul_rpc 2>&1 | tee matrixMul_rpc.log
+./matrixMul_rpc --sizemult=72 2>&1 | tee matrixMul_rpc.log
+#./matrixMul_rpc --sizemult=32 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=16 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=8 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=4 2>&1 | tee matrixMul_rpc.log # ok
+
 #emacs vecadd.cu 
