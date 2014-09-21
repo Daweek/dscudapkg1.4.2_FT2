@@ -162,12 +162,8 @@ void runTest(int argc, char** argv) {
     StopWatchInterface * timer_matrixMul;
 
     // execute the kernel
-    int nIter = 32;
-    {
-	//Performs warmup operation using matrixMul CUDA kernel
-	matrixMul<<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
-        cudaDeviceSynchronize();
-
+    int nIter = 4;
+    for (int i=0; i<100; i++) {
 	// Start Timing	
 	sdkCreateTimer(&timer_matrixMul);
 	sdkStartTimer(&timer_matrixMul);
