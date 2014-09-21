@@ -64,81 +64,6 @@ inline void __getLastCudaError( const char *errorMessage, const char *file, cons
         }
 }
 
-// This function returns the best GPU (with maximum GFLOPS)
-int gpuGetMaxGflopsDeviceId() {
-    int current_device   = 0, sm_per_multiproc = 0;
-    int max_compute_perf = 0, max_perf_device  = 0;
-    int device_count     = 0, best_SM_arch     = 0;
-    cudaDeviceProp deviceProp;
-
-    cudaGetDeviceCount( &device_count );
-    // Find the best major SM Architecture GPU device
-    while ( current_device < device_count ) {
-	cudaGetDeviceProperties( &deviceProp, current_device );
-	if (deviceProp.major > 0 && deviceProp.major < 9999) {
-	    best_SM_arch = MAX(best_SM_arch, deviceProp.major);
-	}
-	current_device++;
-    }
-    
-    // Find the best CUDA capable GPU device
-    current_device = 0;
-    while( current_device < device_count ) {
-	cudaGetDeviceProperties( &deviceProp, current_device );
-	if (deviceProp.major == 9999 && deviceProp.minor == 9999) {
-	    sm_per_multiproc = 1;
-	} else {
-	    sm_per_multiproc = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor);
-	}
-	
-	int compute_perf  = deviceProp.multiProcessorCount * sm_per_multiproc * deviceProp.clockRate;
-	if( compute_perf  > max_compute_perf ) {
-	    // If we find GPU with SM major > 2, search only these
-	    if ( best_SM_arch > 2 ) {
-		// If our device==dest_SM_arch, choose this, or else pass
-		if (deviceProp.major == best_SM_arch) {	
-		    max_compute_perf  = compute_perf;
-		    max_perf_device   = current_device;
-		}
-	    } else {
-		max_compute_perf  = compute_perf;
-		max_perf_device   = current_device;
-	    }
-	}
-	++current_device;
-    }
-    return max_perf_device;
-}
-
-// Initialization code to find the best CUDA Device
-int findCudaDevice(int argc, const char **argv) {
-    cudaDeviceProp deviceProp;
-    int devID = 0;
-    // If the command-line has a device number specified, use it
-    if (checkCmdLineFlag(argc, argv, "device")) {
-	devID = getCmdLineArgumentInt(argc, argv, "device=");
-	if (devID < 0) {
-	    printf("Invalid command line parameters\n");
-	    exit(-1);
-	} else {
-	    devID = 0;
-	    if (devID < 0) {
-                   printf("exiting...\n");
-                   shrQAFinishExit(argc, (const char **)argv, QA_FAILED);
-                   exit(-1);
-	    }
-	}
-    } else {
-	// Otherwise pick the device with highest Gflops/s
-	devID = gpuGetMaxGflopsDeviceId();
-	checkCudaErrors( cudaSetDevice( devID ) );
-	checkCudaErrors( cudaGetDeviceProperties(&deviceProp, devID) );
-	printf("> Using CUDA device [%d]: %s\n", devID, deviceProp.name);
-    }
-    return devID;
-}
-// end of CUDA Helper Functions
-
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
 void runTest(int argc, char** argv);
@@ -164,34 +89,13 @@ int main(int argc, char** argv) {
 //! Run a simple test for CUDA
 ////////////////////////////////////////////////////////////////////////////////
 void runTest(int argc, char** argv) {
-    if(checkCmdLineFlag(argc, (const char**)argv, "device"))  {
-        int devID = getCmdLineArgumentInt(argc, (const char **)argv, "device=");
-        if (devID < 0) {
-            printf("Invalid command line parameters\n");
-            exit(-1);
-        } else {
-            devID = 0;
-            if (devID < 0) {
-               printf("exiting...\n");
-               shrQAFinishExit(argc, (const char **)argv, QA_FAILED);
-               exit(-1);
-            }
-        }
-    } else {
-        checkCudaErrors( cudaSetDevice(gpuGetMaxGflopsDeviceId()) );
-    }
-
     int devID = 0;
-    cudaDeviceProp props;
-
-    // get number of SMs on this GPU
-    checkCudaErrors(cudaGetDeviceProperties(&props, devID));
+    checkCudaErrors( cudaSetDevice(devID) );
 
     // use a larger block size for Fermi and above
-    int block_size = (props.major < 2) ? 16 : 32;
-    printf("block_size = %d\n", block_size);
-    printf("Device %d: \"%s\" with Compute %d.%d capability\n", devID, props.name, props.major, props.minor);
+    int block_size = 32;
 
+    printf("Device %d: block_size = %d\n", devID, block_size);
     // set seed for rand()
     srand(2006);
 
@@ -209,24 +113,13 @@ void runTest(int argc, char** argv) {
 	iSizeMultiple = 128;
     }
 
-    // For GPUs with fewer # of SM's, we limit the maximum size of the matrix
-    printf("multiProcessorCount = %d\n", props.multiProcessorCount);
+    uiWA = WA * iSizeMultiple;
+    uiHA = HA * iSizeMultiple;
+    uiWB = WB * iSizeMultiple;
+    uiHB = HB * iSizeMultiple;
+    uiWC = WC * iSizeMultiple;
+    uiHC = HC * iSizeMultiple;
 
-    if (props.multiProcessorCount <= 4) {
-	uiWA = 2 * block_size * iSizeMultiple;
-	uiHA = 4 * block_size * iSizeMultiple;
-	uiWB = 2 * block_size * iSizeMultiple;
-	uiHB = 4 * block_size * iSizeMultiple;
-	uiWC = 2 * block_size * iSizeMultiple;
-	uiHC = 4 * block_size * iSizeMultiple;
-    } else {
-	uiWA = WA * iSizeMultiple;
-	uiHA = HA * iSizeMultiple;
-	uiWB = WB * iSizeMultiple;
-	uiHB = HB * iSizeMultiple;
-	uiWC = WC * iSizeMultiple;
-	uiHC = HC * iSizeMultiple;
-    }
     printf("\nUsing Matrix Sizes: A(%u x %u), B(%u x %u), C(%u x %u)\n\n", 
             uiWA, uiHA, uiWB, uiHB, uiWC, uiHC);
 
