@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 
+#define BLOCK_SIZE 32
+
 #define CHECK_BANK_CONFLICTS 0
 #if CHECK_BANK_CONFLICTS
 #define AS(i, j) cutilBankChecker(((float*)&As[0][0]), (BLOCK_SIZE * i + j))
@@ -31,7 +33,7 @@
 //! Matrix multiplication on the device: C = A * B
 //! wA is A's width and wB is B's width
 ////////////////////////////////////////////////////////////////////////////////
-template <int BLOCK_SIZE> __global__ void
+extern "C" __global__ void
 matrixMul( float* C, float* A, float* B, int wA, int wB) {
     // Block index
     int bx = blockIdx.x;
@@ -62,9 +64,7 @@ matrixMul( float* C, float* A, float* B, int wA, int wB) {
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
-    for (int a = aBegin, b = bBegin;
-             a <= aEnd;
-             a += aStep, b += bStep) {
+    for (int a = aBegin, b = bBegin;  a <= aEnd;  a += aStep, b += bStep) {
 
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
@@ -86,9 +86,10 @@ matrixMul( float* C, float* A, float* B, int wA, int wB) {
         // Multiply the two matrices together;
         // each thread computes one element
         // of the block sub-matrix
-#pragma unroll
-        for (int k = 0; k < BLOCK_SIZE; ++k)
+
+        for (int k = 0; k < BLOCK_SIZE; ++k) {
             Csub += AS(ty, k) * BS(k, tx);
+	}
 
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
