@@ -1,0 +1,67 @@
+#!/bin/bash
+
+mode=${1}
+ft=${2}
+
+#export DSCUDA_CP_PERIOD=5
+#export DSCUDA_CP_PERIOD=60  
+#export DSCUDA_CP_PERIOD=600  
+
+if [ "${mode}" = "MONO" ]; then
+    echo "MONO"
+    DSCUDA_SERVER="ds03:0,ds04:0"
+    #DSCUDA_SERVER="stelletto:0"
+elif [ "${mode}" = "POLY2" ]; then
+    echo "POLY2"
+    DSCUDA_SERVER="ds03:0,ds04:0"
+#    DSCUDA_SERVER="stelletto2:0,stelletto2:1"
+elif [ "${mode}" = "POLY3" ]; then
+    echo "POLY3"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2"
+elif [ "${mode}" = "POLY4" ]; then
+    echo "POLY4"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3"
+elif [ "${mode}" = "POLY8" ]; then
+    echo "POLY8"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3,c5hdn:0,c5hdn:1,c5hdn:2,c5hdn:3"
+else
+    echo "add MONO or POLYn for 1st parameter"
+    exit 1
+fi
+export DSCUDA_SERVER
+
+# <--- new!
+export DSCUDA_SERVER_IGNORE="stelleto2:0"
+#export DSCUDA_SERVER_SPARE="naruminote0:0"
+export DSCUDA_SERVER_SPARE="10.68.59.55:0"
+# ---> new!
+
+if [ "${ft}" = "MIGRA" ]; then
+    DSCUDA_MIGRATION=1
+else
+    DSCUDA_MIGRATION=0
+fi
+export DSCUDA_MIGRATION
+
+export CUDAPATH=/usr/local/cuda-4.2
+export CUDASDKPATH=~/NVIDIA_GPU_Computing_SDK
+export DSCUDA_PATH=~/dscudapkg_FT
+export DSCUDA_WARNLEVEL=10
+export DSCUDA_REMOTECALL="rpc"
+
+export DSCUDA_USEDAEMON=1
+export DSCUDA_AUTOVERB=0
+
+export LD_LIBRARY_PATH=$DSCUDA_PATH/lib:$CUDAPATH/lib64:$CUDAPATH/lib:$LD_LIBRARY_PATH
+export PATH=$DSCUDA_PATH/src:$CUDAPATH/bin:$PATH
+export OMP_NUM_THREADS=1
+
+#~/bin/env_dscuda
+
+./matrixMul_rpc --sizemult=72 2>&1 | tee matrixMul_rpc.log
+#./matrixMul_rpc --sizemult=32 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=16 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=8 2>&1 | tee matrixMul_rpc.log # ok
+#./matrixMul_rpc --sizemult=4 2>&1 | tee matrixMul_rpc.log # ok
+
+#emacs vecadd.cu 
