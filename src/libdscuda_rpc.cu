@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-15 16:12:59
+// Last Modified On : 2014-09-21 17:17:46
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -115,6 +115,13 @@ int RCServer::setupConnection(void) {
 				RC_BUFSIZE, RC_BUFSIZE);
 
     sprintf( msg, "Clnt=%p, %s:%d (port %d) ", Clnt, ip, cid, sport );
+
+    //<--- extend timeout by oikawa
+    struct timeval tout;
+    tout.tv_sec = 300; // 1000;
+    tout.tv_usec = 0;
+    clnt_control( this->Clnt, CLSET_TIMEOUT, (char *)&tout);
+    //---> extend timeout by oikawa
 
     if ( Clnt == NULL ) {
         clnt_pcreateerror( msg );
@@ -765,7 +772,7 @@ cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_
 
 cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
     cudaError_t cuerr_phy;
-    cudaError_t cuerr_vir;
+    cudaError_t cuerr_vir = cudaSuccess;
     void       *adrs[RC_NREDUNDANCYMAX];
     void       *uva_ptr = NULL;
 
