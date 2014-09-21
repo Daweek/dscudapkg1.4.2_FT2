@@ -140,12 +140,7 @@ void runTest(int argc, char** argv) {
     float* h_CUBLAS = (float*) malloc(mem_size_C);
 
     unsigned int mem_size_DEV = 0;
-    //checkCudaErrors(cudaMalloc((void**) &d_A, mem_size_A));
-    cuerr = cudaMalloc((void**) &d_A, mem_size_A);
-    if ( cuerr != cudaSuccess ){
-	fprintf(stderr, "%s(%i) : CUDA Runtime API error %d.\n", __FILE__, __LINE__, (int)cuerr);
-	exit(-1);
-    }
+    checkCudaErrors(cudaMalloc((void**) &d_A, mem_size_A));
     checkCudaErrors(cudaMalloc((void**) &d_B, mem_size_B));
     mem_size_DEV += mem_size_A;
     mem_size_DEV += mem_size_B;
@@ -167,25 +162,17 @@ void runTest(int argc, char** argv) {
     StopWatchInterface * timer_matrixMul;
 
     // execute the kernel
-    int nIter = 2;
+    int nIter = 32;
     {
 	//Performs warmup operation using matrixMul CUDA kernel
-	if (block_size == 16) {
-            matrixMul<16><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
-        } else {
-            matrixMul<32><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
-        }
+	matrixMul<<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
         cudaDeviceSynchronize();
 
 	// Start Timing	
 	sdkCreateTimer(&timer_matrixMul);
 	sdkStartTimer(&timer_matrixMul);
 	for (int j = 0; j < nIter; j++) {
-	    if (block_size == 16) {
-		matrixMul<16><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
-	    } else {
-		matrixMul<32><<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
-	    }
+	    matrixMul<<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
 	}
 	// check if kernel execution generated and error
 	getLastCudaError("CUDA matrixMul Kernel execution failed");
@@ -208,7 +195,7 @@ void runTest(int argc, char** argv) {
 	sdkDeleteTimer(&timer_matrixMul);
 	
 	// copy result from device to host
-	checkCudaErrors(cudaMemcpy(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost) );
+	checkCudaErrors( cudaMemcpy(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost) );
     }
 #if 0 // Bypass comparing with golden.
     // compute reference solution
@@ -234,7 +221,7 @@ void runTest(int argc, char** argv) {
     checkCudaErrors(cudaFree(d_B));
     checkCudaErrors(cudaFree(d_C));
 #if 0 // Bypass comparing with golden.
-    cudaDeviceReset();
+//    cudaDeviceReset();
     shrQAFinishExit(argc, (const char **)argv, (resCUDA == true) ? QA_PASSED : QA_FAILED);
 #endif
 }
