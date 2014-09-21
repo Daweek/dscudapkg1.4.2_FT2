@@ -4,7 +4,7 @@
 // Author           : A.Kawai, K.Yoshikawa, T.Narumi
 // Created On       : 2011-01-01 00:00:00
 // Last Modified By : M.Oikawa
-// Last Modified On : 2014-09-21 16:10:15
+// Last Modified On : 2014-09-21 16:19:26
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
@@ -832,8 +832,8 @@ dscudaMallocResult *dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     check_cuda_error(err);
     res.err = err;
 #if 1 //fill with zero for CheckPointing function.
-    err = cudaMemset( devadr, 0, size );
-    WARN(3, "cudaMemset( %p, %d ) done. return %d\n", devadr, (int)err);
+    err = cudaMemset( devadr, 0, (size_t)size );
+    WARN(3, "cudaMemset( %p, %d ) done. return %d\n", devadr, size, (int)err);
     check_cuda_error(err);
 #endif
 

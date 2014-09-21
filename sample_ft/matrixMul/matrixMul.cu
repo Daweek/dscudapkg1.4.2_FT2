@@ -30,8 +30,6 @@
 #include "sdkHelper.h"  // helper for shared functions common to CUDA SDK samples
 #include "shrQATest.h"
 
-#include <cuda_runtime.h>
-
 #include "matrixMul.h"
 
 // includes, kernels
@@ -89,6 +87,7 @@ int main(int argc, char** argv) {
 //! Run a simple test for CUDA
 ////////////////////////////////////////////////////////////////////////////////
 void runTest(int argc, char** argv) {
+    cudaError_t cuerr;
     int devID = 0;
     checkCudaErrors( cudaSetDevice(devID) );
 
@@ -106,12 +105,8 @@ void runTest(int argc, char** argv) {
         iSizeMultiple = getCmdLineArgumentInt(argc, (const char**)argv, "sizemult"); 
     }
     
-    //iSizeMultiple = CLAMP(iSizeMultiple, 1, 10);
-    if ( iSizeMultiple < 1 ) {
-	iSizeMultiple = 1;
-    } else if ( iSizeMultiple > 128 ) {
-	iSizeMultiple = 128;
-    }
+    if ( iSizeMultiple < 1 )        iSizeMultiple = 1;
+    else if ( iSizeMultiple > 128 ) iSizeMultiple = 128;
 
     uiWA = WA * iSizeMultiple;
     uiHA = HA * iSizeMultiple;
@@ -145,7 +140,12 @@ void runTest(int argc, char** argv) {
     float* h_CUBLAS = (float*) malloc(mem_size_C);
 
     unsigned int mem_size_DEV = 0;
-    checkCudaErrors(cudaMalloc((void**) &d_A, mem_size_A));
+    //checkCudaErrors(cudaMalloc((void**) &d_A, mem_size_A));
+    cuerr = cudaMalloc((void**) &d_A, mem_size_A);
+    if ( cuerr != cudaSuccess ){
+	fprintf(stderr, "%s(%i) : CUDA Runtime API error %d.\n", __FILE__, __LINE__, (int)cuerr);
+	exit(-1);
+    }
     checkCudaErrors(cudaMalloc((void**) &d_B, mem_size_B));
     mem_size_DEV += mem_size_A;
     mem_size_DEV += mem_size_B;
