@@ -210,6 +210,8 @@ void runTest(int argc, char** argv) {
     }
 
     // For GPUs with fewer # of SM's, we limit the maximum size of the matrix
+    printf("multiProcessorCount = %d\n", props.multiProcessorCount);
+
     if (props.multiProcessorCount <= 4) {
 	uiWA = 2 * block_size * iSizeMultiple;
 	uiHA = 4 * block_size * iSizeMultiple;
