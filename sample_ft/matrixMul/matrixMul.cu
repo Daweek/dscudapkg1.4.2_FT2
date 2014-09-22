@@ -163,16 +163,19 @@ void runTest(int argc, char** argv) {
 
     // execute the kernel
     int nIter = 4;
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<10000; i++) {
 	// Start Timing	
 	sdkCreateTimer(&timer_matrixMul);
 	sdkStartTimer(&timer_matrixMul);
 	for (int j = 0; j < nIter; j++) {
 	    matrixMul<<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
+	    matrixMul<<< grid, threads >>>(d_A, d_B, d_C, uiWA, uiWB);
+	    matrixMul<<< grid, threads >>>(d_B, d_C, d_A, uiWA, uiWB);
+	    matrixMul<<< grid, threads >>>(d_C, d_A, d_B, uiWA, uiWB);
 	}
 	// check if kernel execution generated and error
-	getLastCudaError("CUDA matrixMul Kernel execution failed");
-	
+	// getLastCudaError("CUDA matrixMul Kernel execution failed");
+#if 0	
         cudaDeviceSynchronize();
 	// stop and destroy timer
 	sdkStopTimer(&timer_matrixMul);
@@ -189,7 +192,7 @@ void runTest(int argc, char** argv) {
 	printf("NumDevsUsed = %d, Workgroup = %u, Elapsed_memsize_DEV = %u [kB]\n", 1, threads.x * threads.y, mem_size_DEV/1000);
 	
 	sdkDeleteTimer(&timer_matrixMul);
-	
+#endif 	
 	// copy result from device to host
 	checkCudaErrors( cudaMemcpy(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost) );
     }
