@@ -9,11 +9,11 @@ ft=${2}
 
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
-    DSCUDA_SERVER="ds03:0,ds04:0"
+    DSCUDA_SERVER="ds03ib:0 ds04ib:0"
     #DSCUDA_SERVER="stelletto:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "POLY2"
-    DSCUDA_SERVER="ds03:0,ds04:0"
+    DSCUDA_SERVER="ds03ib:0,ds04ib:0"
 #    DSCUDA_SERVER="stelletto2:0,stelletto2:1"
 elif [ "${mode}" = "POLY3" ]; then
     echo "POLY3"
