@@ -8,7 +8,6 @@ else
 endif
 
 BUILD_MODE = DEBUG_MODE
-#BUILD_MODE = DEBUG_MODE 
 
 GCCVER = 4.4
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
@@ -76,49 +75,69 @@ $(ODIR):
 
 rpconly:	$(TARGET_RPCONLY)
 
-libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
-                        $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
-                        libdscuda_bkupmem.o libdscuda_histrec.o
+LIBDSCUDA_OBJ = $(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
+                $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
+                libdscuda_bkupmem.o libdscuda_histrec.o
+#----
+.PHONY: libdscuda_rpc.so
+libdscuda_rpc.so: $(ODIR)/libdscuda_rpc.so
+$(ODIR)/libdscuda_rpc.so: $(addprefix $(ODIR)/, $(LIBDSCUDA_OBJ))
 	@echo "//************************"
-	@echo "//**  libdscuda_rpc.o  ***"
+	@echo "//**  libdscuda_rpc.so  ***"
 	@echo "//************************"
-	$(CXX) -shared -Wl,-soname,libdscuda.so -o $(ODIR)/$@ $^
-
-libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
-                        $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
-                        libdscuda_bkupmem.o libdscuda_histrec.o
+	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
+#----
+.PHONY: libdscuda_rpc.a
+libdscuda_rpc.a: $(ODIR)/libdscuda_rpc.a
+$(ODIR)/libdscuda_rpc.a: $(addprefix $(ODIR)/, $(LIBDSCUDA_OBJ))
 	ar rvu $@ $^
 	ranlib $@
+#
+#---- "libdscuda_rpc.o"
+.PHONY: libdscuda_rpc.o
+libdscuda_rpc.o : $(ODIR)/libdscuda_rpc.o
+$(ODIR)/libdscuda_rpc.o  : libdscuda_rpc.cu
+	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+#
+#---- "libdscuda.o"
+.PHONY: $(CLIENTBASE)
+$(CLIENTBASE) : $(ODIR)/$(CLIENTBASE)
+$(ODIR)/$(CLIENTBASE) : libdscuda.cu
+	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
 
-libdscuda_rpc.o  : libdscuda_rpc.cu
-	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -o $(ODIR)/$@ $<
-
-$(CLIENTBASE) : libdscuda.cu
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
-
-# A dummy library to override CUDA runtime library functions.
-libcudart.so.3:	cudart_dummy.cu
+#---- A dummy library to override CUDA runtime library functions.
+.PHONY: libcudart.so.3
+libcudart.so.3:	$(ODIR)/libcudart.so.3
+$(ODIR)/libcudart.so.3:	cudart_dummy.cu
 	$(NVCC) $(CUDAINCLUDES) -shared -Xcompiler -fPIC -o $@ $<
-
-libdscuda_bkupmem.o:  libdscuda_bkupmem.cu libdscuda.h
+#
+#---- "fault torelant" routine.
+.PHONY: libdscuda_bkupmem.o
+libdscuda_bkupmem.o: $(ODIR)/libdscuda_bkupmem.o
+$(ODIR)/libdscuda_bkupmem.o: libdscuda_bkupmem.cu libdscuda.h
 	@echo "//***************************"
 	@echo "//**  libdscuda_bkupmem.o  **"
 	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
-
-libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
+	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+#
+#---- "checkpoint" routine.
+.PHONY: libdscuda_histrec.o
+libdscuda_histrec.o: $(ODIR)/libdscuda_histrec.o
+$(ODIR)/libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
 	@echo "//***************************"
 	@echo "//**  libdscuda_histrec.o  **"
 	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
-
-dscudad :	dscudad.cu sockutil.c
+	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+#---- "dscudad"
+.PHONY: dscudad
+dscudad: $(ODIR)/dscudad
+$(ODIR)/dscudad: dscudad.cu $(ODIR)/sockutil.o
 	@echo "//****************"
 	@echo "//**  dscudad  ***"
 	@echo "//****************"
 	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
-
-dscudad_rpc :	dscudad.cu sockutil.c
+#----
+dscudad_rpc: dscudad.cu $(ODIR)/sockutil.o
 	$(NVCC) -o $@ $(CUDAINCLUDES) -DRPC_ONLY=1 $^ -lpthread
 
 dummysvr :	dummysvr.c
@@ -126,7 +145,7 @@ dummysvr :	dummysvr.c
 dummyclient :	dummyclient.c
 
 ###
-### dscudasvr
+### Generate "dscudasvr"
 ###
 .PHONY: dscudasvr dscudasvr.o
 DSCUDASVR_OBJ = dscudasvr.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
@@ -155,7 +174,7 @@ dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
 sockutil.o: $(ODIR)/sockutil.o
 $(ODIR)/sockutil.o: sockutil.c sockutil.h
 	@mkdir -p $(ODIR)
-	$(CXX) -c $(CXXFLAGS) -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 ###
 ### Generate object files for RPC.
 ###
@@ -169,25 +188,25 @@ rpcbase: $(RPCBASE)_clnt.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o
 $(RPCBASE)_clnt.o: $(ODIR)/$(RPCBASE)_clnt.o
 $(ODIR)/$(RPCBASE)_clnt.o: $(RPCBASE)_clnt.c
 	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
+	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
 #----
 .PHONY: $(RPCBASE)_svc.o
 $(RPCBASE)_svc.o: $(ODIR)/$(RPCBASE)_svc.o 
 $(ODIR)/$(RPCBASE)_svc.o: $(RPCBASE)_svc.c
 	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
+	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
 #----
 .PHONY: $(RPCBASE)_xdr.o
 $(RPCBASE)_xdr.o: $(ODIR)/$(RPCBASE)_xdr.o ;
 $(ODIR)/$(RPCBASE)_xdr.o: $(RPCBASE)_xdr.c
 	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
+	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
 #----
 .PHONY: dscudautil.o
 dscudautil.o: $(ODIR)/dscudautil.o ;
 $(ODIR)/dscudautil.o: dscudautil.cu dscudautil.h
 	@mkdir -p $(ODIR)
-	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
+	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
 ###
 ### source file include dependancy.
 ###
