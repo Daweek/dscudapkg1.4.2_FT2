@@ -7,6 +7,9 @@ else
 	LP64 = 0
 endif
 
+BUILD_MODE = DEBUG_MODE
+#BUILD_MODE = DEBUG_MODE 
+
 GCCVER = 4.4
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
 CC           ?= /usr/bin/gcc-$(GCCVER)
@@ -19,31 +22,76 @@ CUDASDKPATH  ?= /share02/m_oikawa/NVIDIA_GPU_Computing_SDK
 CUDAINCLUDES  = -I. -I$(CUDAPATH)/include -I$(CUDASDKPATH)/C/common/inc
 CUDALIBS      = -L. -L$(CUDAPATH)/lib64
 
-TARGET         = dscudad dscudasvr dscudasvr_fault libdscuda_rpc.a libcudart.so.3
+TARGET        = dscudad dscudasvr dscudasvr_fault libdscuda_rpc.a libcudart.so.3
+DBGTARGET     = $(DBGDIR)/$(TARGET)
+RELTARGET     = $(RELDIR)/$(TARGET)
+
 TARGET_RPCONLY = dscudad_rpc libdscuda_rpc.a libcudart.so.3
-DSCUDAIF       = dscudarpc
+
+RPCBASE        = dscudarpc
 CLIENTBASE     = libdscuda.o
 
-default :	$(TARGET)
+### Build in Debug mode.
+DBGDIR    = ./Debug
+CDEBUG    = -Wall -O0 -g -gp -D_DEBUG
+
+### Build in Release mode.
+RELDIR    = ./Release
+CRELEASE  = -Wall -O2 -D_RELEASE
+
+### Build by default.
+ODIR    = $(DBGDIR)
+
+###
+### Phony target
+###
+.PHONY: all clean install
+
+.PHONY: debug release
+debug: $(DBGTARGET)
+	@echo "********************"
+	@echo "*** Debug target ***"
+	@echo "********************"
+release: $(RELTARGET)
+	@echo "**********************"
+	@echo "*** Release target ***"
+	@echo "**********************"
+
+
+all : debug release
+
+.PHONY: debug_conf release_conf 
+debug_conf :
+	ODIR     =  $(DBGDIR)
+	CFLAGS   += $(CDEBUG)
+	CXXFLAGS += $(CDEBUG)
+	mkdir -p -v $(DBGDIR)	
+release_conf :
+	ODIR     =  $(RELDIR)
+	CFLAGS   += $(CRELEASE)
+	CXXFLAGS += $(CRELEASE)
+	mdkir -p -v $(RELDIR)
+$(ODIR):
+	mkdir -p -v $@
 
 rpconly:	$(TARGET_RPCONLY)
 
-libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
-                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o \
+libdscuda_rpc.so :	$(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
+                        $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
                         libdscuda_bkupmem.o libdscuda_histrec.o
 	@echo "//************************"
 	@echo "//**  libdscuda_rpc.o  ***"
 	@echo "//************************"
-	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
+	$(CXX) -shared -Wl,-soname,libdscuda.so -o $(ODIR)/$@ $^
 
-libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(DSCUDAIF)_clnt.o \
-                        $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o \
+libdscuda_rpc.a :	$(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
+                        $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
                         libdscuda_bkupmem.o libdscuda_histrec.o
 	ar rvu $@ $^
 	ranlib $@
 
 libdscuda_rpc.o  : libdscuda_rpc.cu
-	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -o $@ $<
+	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -o $(ODIR)/$@ $<
 
 $(CLIENTBASE) : libdscuda.cu
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
@@ -77,47 +125,69 @@ dummysvr :	dummysvr.c
 
 dummyclient :	dummyclient.c
 
-#
-# dscudasvr series
-# 
-dscudasvr :	   dscudasvr.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+###
+### dscudasvr
+###
+.PHONY: dscudasvr dscudasvr.o
+DSCUDASVR_OBJ = dscudasvr.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
+dscudasvr: $(ODIR)/dscudasvr
+$(ODIR)/dscudasvr: $(addprefix $(ODIR)/, $(DSCUDASVR_OBJ))
 	@echo "//******************"
 	@echo "//**  dscudasvr  ***"
 	@echo "//******************"
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
-
-dscudasvr.o:       dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
+#----
+dscudasvr.o: $(ODIR)/dscudasvr.o
+$(ODIR)/dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
+	@mkdir -p $(ODIR)
 	@echo "//********************"
 	@echo "//**  dscudasvr.o  ***"
 	@echo "//********************"
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 
-dscudasvr_fault :  dscudasvr_fault.o $(DSCUDAIF)_svc.o $(DSCUDAIF)_xdr.o dscudautil.o sockutil.o
+dscudasvr_fault :  dscudasvr_fault.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
 dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
 	$(NVCC) -c $(CUDAINCLUDES) -DRPC_ONLY=1 -DFAULT_AT_D2H=1 -o $@ $<
 
-#
-#
-#
-dscudatest :	              dscudatest.cu libdscuda_ibv.so
+.PHONY: sockutil.o
+sockutil.o: $(ODIR)/sockutil.o
+$(ODIR)/sockutil.o: sockutil.c sockutil.h
+	@mkdir -p $(ODIR)
+	$(CXX) -c $(CXXFLAGS) -o $@ $<
+###
+### Generate object files for RPC.
+###
+dscudatest: dscudatest.cu libdscuda_ibv.so
 	$(NVCC) $(CUDAINCLUDES) -o $@ $< -L../lib -ldscuda_ibv -lrdmacm -libverbs -lpthread
-
-$(DSCUDAIF)_clnt.o:	$(DSCUDAIF)_clnt.c
+#---- "RPC partial set"
+.PHONY: rpcbase
+rpcbase: $(RPCBASE)_clnt.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o
+#----
+.PHONY: $(RPCBASE)_clnt.o 
+$(RPCBASE)_clnt.o: $(ODIR)/$(RPCBASE)_clnt.o
+$(ODIR)/$(RPCBASE)_clnt.o: $(RPCBASE)_clnt.c
+	@mkdir -p $(ODIR)
 	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
-
-$(DSCUDAIF)_svc.o:	$(DSCUDAIF)_svc.c 
+#----
+.PHONY: $(RPCBASE)_svc.o
+$(RPCBASE)_svc.o: $(ODIR)/$(RPCBASE)_svc.o 
+$(ODIR)/$(RPCBASE)_svc.o: $(RPCBASE)_svc.c
+	@mkdir -p $(ODIR)
 	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
-
-$(DSCUDAIF)_xdr.o:	$(DSCUDAIF)_xdr.c
+#----
+.PHONY: $(RPCBASE)_xdr.o
+$(RPCBASE)_xdr.o: $(ODIR)/$(RPCBASE)_xdr.o ;
+$(ODIR)/$(RPCBASE)_xdr.o: $(RPCBASE)_xdr.c
+	@mkdir -p $(ODIR)
 	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
-
-dscudautil.o:	dscudautil.cu dscudautil.h
+#----
+.PHONY: dscudautil.o
+dscudautil.o: $(ODIR)/dscudautil.o ;
+$(ODIR)/dscudautil.o: dscudautil.cu dscudautil.h
+	@mkdir -p $(ODIR)
 	$(NVCC) $(CUDAINCLUDES) -c -o $@ $<
-
-#ibv_rdma.o:	ibv_rdma.cpp
-#	$(CXX) $(CUDAINCLUDES) -c -o $@ $<
 ###
 ### source file include dependancy.
 ###
@@ -131,22 +201,17 @@ ibv_rdma.cpp:      ibv_rdma.h
 ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudamacros.h
 dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
 ###
-### RPCGEN
+### Create RPC source files into current direcotory by "rpcgen".
 ###
-$(DSCUDAIF)_clnt.c :	$(DSCUDAIF).x $(DSCUDAIF).h
+$(RPCBASE)_clnt.c:	$(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -l $< > $@
-$(DSCUDAIF)_svc.c:	$(DSCUDAIF).x $(DSCUDAIF).h
+$(RPCBASE)_svc.c:	$(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -m $< > $@
-#	$(RPCGEN) -s tcp -s udp $< > $@
-$(DSCUDAIF)_xdr.c:	$(DSCUDAIF).x $(DSCUDAIF).h
+$(RPCBASE)_xdr.c:	$(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -c $< > $@
-$(DSCUDAIF).h:		$(DSCUDAIF).x
+$(RPCBASE).h:		$(RPCBASE).x
 	$(RPCGEN) -h $< > $@
-$(DSCUDAIF).x: dscudadefs.h
-###
-### Phony target
-###
-.PHONY: clean install
+$(RPCBASE).x: dscudadefs.h
 
 install:
 	@echo "//************************************************"
@@ -168,4 +233,4 @@ clean:
 	@echo "//*********************************"
 	@echo "//**  Clean up generated files.  **"
 	@echo "//*********************************"
-	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(DSCUDAIF).h $(DSCUDAIF)_svc.* $(DSCUDAIF)_clnt.* $(DSCUDAIF)_xdr.* *.o *~ *.linkinfo
+	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(RPCBASE).h $(RPCBASE)_svc.* $(RPCBASE)_clnt.* $(RPCBASE)_xdr.* *.o *~ *.linkinfo
