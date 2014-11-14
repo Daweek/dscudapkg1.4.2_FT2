@@ -429,29 +429,66 @@ cudaError_t cudaThreadExit(void) {
     return err;
 }
 
-cudaError_t cudaThreadSynchronize(void) {
+cudaError_t
+RCServer::cudaThreadSynchronize( struct rpc_err *rpc_result)
+{
     dscudaResult *rp;
-    cudaError_t err = cudaSuccess;
-    int vid = vdevidIndex();
-
-    WARN( 3, "cudaThreadSynchronize() {\n");
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
-    for (int i = 0; i < vdev->nredundancy; i++) {
-        rp = dscudathreadsynchronizeid_1( sp[i].Clnt );
-        checkResult( rp, sp[i]);
-        if (rp->err != cudaSuccess) {
-            err = (cudaError_t)rp->err;
-        }
-        xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
+    cudaError_t   cuerr = cudaSuccess;
+    rp = dscudathreadsynchronizeid_1( Clnt );
+    clnt_geterr( Clnt, rpc_result );
+    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n",
+		  __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    cuerr = (cudaError_t)rp->err;
+	}
     }
-    WARN(3, "} cudaThrreadSynchronize()\n");
-    WARN(3, "\n");
-
-    return err;
+    xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
+    return cuerr;
 }
 
-cudaError_t cudaThreadSetLimit(enum cudaLimit limit, size_t value)
+cudaError_t
+VirDev_t::cudaThreadSynchronize(void)
+{
+    cudaError_t cuerr_phy;
+    cudaError_t cuerr_vir = cudaSuccess;
+    struct rpc_err rpc_result;
+    
+    for (int i=0; i<nredundancy; i++) {
+	cuerr_phy = server[i].cudaThreadSynchronize( &rpc_result);
+	    server[i].rpcErrorHook( &rpc_result );
+	    if ( rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
+	
+	if (cuerr_phy != cudaSuccess) {
+	    WARN(0, "      server[%d].cudaThreadSynchronize() Faild\n", i);
+	    cuerr_vir = cuerr_phy;
+	    break;
+	}
+    }
+}
+    
+cudaError_t
+cudaThreadSynchronize(void)
+{
+    cudaError_t cuerr = cudaSuccess;
+    int         vid = vdevidIndex();
+    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    
+    WARN( 3, "cudaThreadSynchronize() {\n");
+    cuerr = vdev->cudaThreadSynchronize();
+    WARN( 3, "} cudaThrreadSynchronize()\n");
+    WARN( 3, "\n");
+    return cuerr;
+}
+
+cudaError_t
+cudaThreadSetLimit( enum cudaLimit limit, size_t value)
 {
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
@@ -748,14 +785,15 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
 /*
  * Memory Management
  */
-cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
+cudaError_t
+RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
 
     rp = dscudamallocid_1(size, Clnt);
     clnt_geterr( Clnt, rpc_result );
     if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
-	if ( rp == NULL ) {
+	if (rp == NULL) {
 	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
 	    clnt_perror(Clnt, ip);
 	    exit(EXIT_FAILURE);
@@ -828,7 +866,9 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size) {
     return cuerr_vir;
 }
 
-cudaError_t cudaMalloc(void **d_ptr, size_t size) {
+cudaError_t
+cudaMalloc( void **d_ptr, size_t size)
+{
     cudaError_t cuerr;
     int         vid  = vdevidIndex();
     Vdev_t     *vdev = St.Vdev + Vdevid[vid];
@@ -1443,8 +1483,8 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count) {
 /*
  * Replaced "cudaMemcpy()"
  */
-cudaError_t cudaMemcpy(void *dst, const void *src,
-		       size_t count, enum cudaMemcpyKind kind) {
+cudaError_t
+cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     RCuva      *suva, *duva;
     int         dev0;
     cudaError_t err  = cudaSuccess;
