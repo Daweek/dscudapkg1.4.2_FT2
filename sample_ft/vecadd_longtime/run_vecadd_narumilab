@@ -3,18 +3,12 @@
 mode=${1}
 ft=${2}
 
-#export DSCUDA_CP_PERIOD=5
-#export DSCUDA_CP_PERIOD=60  
-#export DSCUDA_CP_PERIOD=600  
-
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
-    DSCUDA_SERVER="ds03ib:0 ds04ib:0"
-    #DSCUDA_SERVER="stelletto:0"
+    DSCUDA_SERVER="ds14:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "POLY2"
-    DSCUDA_SERVER="ds03ib:0,ds04ib:0"
-#    DSCUDA_SERVER="stelletto2:0,stelletto2:1"
+    DSCUDA_SERVER="c4hdn:0,c4hdn:1"
 elif [ "${mode}" = "POLY3" ]; then
     echo "POLY3"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2"
@@ -29,12 +23,6 @@ else
     exit 1
 fi
 export DSCUDA_SERVER
-
-# <--- new!
-export DSCUDA_SERVER_IGNORE="stelleto2:0"
-#export DSCUDA_SERVER_SPARE="naruminote0:0"
-export DSCUDA_SERVER_SPARE="10.68.59.55:0"
-# ---> new!
 
 if [ "${ft}" = "MIGRA" ]; then
     DSCUDA_MIGRATION=1
@@ -58,10 +46,5 @@ export OMP_NUM_THREADS=1
 
 #~/bin/env_dscuda
 
-./matrixMul_rpc --sizemult=72 2>&1 | tee matrixMul_rpc.log
-#./matrixMul_rpc --sizemult=32 2>&1 | tee matrixMul_rpc.log # ok
-#./matrixMul_rpc --sizemult=16 2>&1 | tee matrixMul_rpc.log # ok
-#./matrixMul_rpc --sizemult=8 2>&1 | tee matrixMul_rpc.log # ok
-#./matrixMul_rpc --sizemult=4 2>&1 | tee matrixMul_rpc.log # ok
-
+./vecadd_rpc 2>&1 | tee vecadd_rpc.log
 #emacs vecadd.cu 

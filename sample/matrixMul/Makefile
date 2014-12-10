@@ -6,6 +6,12 @@ NVCC						?= $(CUDAPATH)/bin/nvcc -use_fast_math -O
 
 TARGET = matrixMul
 
+.PHONY: local rpc rpconly
+local   : $(TARGET)_local
+rpc     : $(TARGET)_rpc
+rpconly : $(TARGET)_rpconly
+
+
 $(TARGET)_ibv:	matrixMul.cu ../../lib/libdscuda.a
 	$(DSCUDACPP) -o $@ -I. -i $< -ldscuda -libverbs -lrdmacm -lpthread
 

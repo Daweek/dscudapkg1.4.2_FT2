@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
 
@@ -11,7 +12,8 @@
  */
 
 struct sockaddr_in
-setupSockaddr( char *ipaddr, int   tcpport ) {
+setupSockaddr( char *ipaddr, int   tcpport )
+{
     struct sockaddr_in sockaddr;
     
     memset((char *)&sockaddr, 0, sizeof(sockaddr));
@@ -22,7 +24,8 @@ setupSockaddr( char *ipaddr, int   tcpport ) {
     return sockaddr;
 }
 
-void sendMsgBySocket(int sock, char *msg) {
+void sendMsgBySocket(int sock, char *msg)
+{
     char buf[1024];
     int len = strlen(msg) + 1;
 
@@ -35,7 +38,8 @@ void sendMsgBySocket(int sock, char *msg) {
     send(sock, buf, sizeof(int) + len, 0);
 }
 
-void recvMsgBySocket(int sock, char *msg, int msgbufsize) {
+void recvMsgBySocket(int sock, char *msg, int msgbufsize)
+{
     char buf[1024];
     int len = strlen(msg) + 1;
 

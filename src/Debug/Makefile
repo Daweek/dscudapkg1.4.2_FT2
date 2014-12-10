@@ -1,6 +1,5 @@
 # ARCH = $(shell uname -m)
 # ifeq ($(ARCH), x86_64)
-VPATH = ../
 
 ifeq ($(shell uname -m), x86_64)
 	LP64 = 1
@@ -29,24 +28,17 @@ CLIENTBASE     = libdscuda.o
 
 ### Build in Debug mode.
 CDEBUG    = -Wall -O0 -g -gp -D_DEBUG
-
-### Build in Release mode.
-CRELEASE  = -Wall -O2 -D_RELEASE
-
-
+VPATH = ..
 ###
 ### Phony target
 ###
 .PHONY: all 
 all: $(TARGET)
 
-.PHONY: debug_conf release_conf 
+.PHONY: debug_conf 
 debug_conf :
 	CFLAGS   += $(CDEBUG)
 	CXXFLAGS += $(CDEBUG)
-release_conf :
-	CFLAGS   += $(CRELEASE)
-	CXXFLAGS += $(CRELEASE)
 
 rpconly:	$(TARGET_RPCONLY)
 
@@ -159,18 +151,6 @@ dscudatest.cu:     dscuda.h ibv_rdma.h
 ibv_rdma.cpp:      ibv_rdma.h 
 ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudamacros.h
 dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
-###
-### Create RPC source files into current direcotory by "rpcgen".
-###
-$(RPCBASE)_clnt.c:	$(RPCBASE).x $(RPCBASE).h
-	$(RPCGEN) -l $< > $@
-$(RPCBASE)_svc.c:	$(RPCBASE).x $(RPCBASE).h
-	$(RPCGEN) -m $< > $@
-$(RPCBASE)_xdr.c:	$(RPCBASE).x $(RPCBASE).h
-	$(RPCGEN) -c $< > $@
-$(RPCBASE).h:		$(RPCBASE).x
-	$(RPCGEN) -h $< > $@
-$(RPCBASE).x: dscudadefs.h
 
 .PHONY: install clean
 install:
@@ -193,4 +173,4 @@ clean:
 	@echo "//*********************************"
 	@echo "//**  Clean up generated files.  **"
 	@echo "//*********************************"
-	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(RPCBASE).h $(RPCBASE)_svc.* $(RPCBASE)_clnt.* $(RPCBASE)_xdr.* *.o *.so *~ *.linkinfo
+	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) *.o *.so *~ *.linkinfo

@@ -41,6 +41,9 @@ CRELEASE  = -Wall -O2 -D_RELEASE
 ### Build by default.
 ODIR    = $(DBGDIR)
 
+.PHONY: rpc_generated
+rpc_generated: $(RPCBASE)_clnt.c $(RPCBASE)_svc.c $(RPCBASE)_xdr.c $(RPCBASE).h
+
 ###
 ### Phony target
 ###
@@ -51,174 +54,18 @@ debug: $(DBGTARGET)
 	@echo "********************"
 	@echo "*** Debug target ***"
 	@echo "********************"
+	mkdir -p $(DBGDIR)
+	cd $(DBGDIR); make
+
 release: $(RELTARGET)
 	@echo "**********************"
 	@echo "*** Release target ***"
 	@echo "**********************"
-
+	mkdir -p $(RELDIR)
+	cd $(RELDIR); make
 
 all : debug release
 
-.PHONY: debug_conf release_conf 
-debug_conf :
-	ODIR     =  $(DBGDIR)
-	CFLAGS   += $(CDEBUG)
-	CXXFLAGS += $(CDEBUG)
-	mkdir -p -v $(DBGDIR)	
-release_conf :
-	ODIR     =  $(RELDIR)
-	CFLAGS   += $(CRELEASE)
-	CXXFLAGS += $(CRELEASE)
-	mdkir -p -v $(RELDIR)
-$(ODIR):
-	mkdir -p -v $@
-
-rpconly:	$(TARGET_RPCONLY)
-
-LIBDSCUDA_OBJ = $(CLIENTBASE) libdscuda_rpc.o $(RPCBASE)_clnt.o \
-                $(RPCBASE)_xdr.o dscudautil.o sockutil.o \
-                libdscuda_bkupmem.o libdscuda_histrec.o
-#----
-.PHONY: libdscuda_rpc.so
-libdscuda_rpc.so: $(ODIR)/libdscuda_rpc.so
-$(ODIR)/libdscuda_rpc.so: $(addprefix $(ODIR)/, $(LIBDSCUDA_OBJ))
-	@echo "//************************"
-	@echo "//**  libdscuda_rpc.so  ***"
-	@echo "//************************"
-	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
-#----
-.PHONY: libdscuda_rpc.a
-libdscuda_rpc.a: $(ODIR)/libdscuda_rpc.a
-$(ODIR)/libdscuda_rpc.a: $(addprefix $(ODIR)/, $(LIBDSCUDA_OBJ))
-	ar rvu $@ $^
-	ranlib $@
-#
-#---- "libdscuda_rpc.o"
-.PHONY: libdscuda_rpc.o
-libdscuda_rpc.o : $(ODIR)/libdscuda_rpc.o
-$(ODIR)/libdscuda_rpc.o  : libdscuda_rpc.cu
-	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
-#
-#---- "libdscuda.o"
-.PHONY: $(CLIENTBASE)
-$(CLIENTBASE) : $(ODIR)/$(CLIENTBASE)
-$(ODIR)/$(CLIENTBASE) : libdscuda.cu
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
-
-#---- A dummy library to override CUDA runtime library functions.
-.PHONY: libcudart.so.3
-libcudart.so.3:	$(ODIR)/libcudart.so.3
-$(ODIR)/libcudart.so.3:	cudart_dummy.cu
-	$(NVCC) $(CUDAINCLUDES) -shared -Xcompiler -fPIC -o $@ $<
-#
-#---- "fault torelant" routine.
-.PHONY: libdscuda_bkupmem.o
-libdscuda_bkupmem.o: $(ODIR)/libdscuda_bkupmem.o
-$(ODIR)/libdscuda_bkupmem.o: libdscuda_bkupmem.cu libdscuda.h
-	@echo "//***************************"
-	@echo "//**  libdscuda_bkupmem.o  **"
-	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
-#
-#---- "checkpoint" routine.
-.PHONY: libdscuda_histrec.o
-libdscuda_histrec.o: $(ODIR)/libdscuda_histrec.o
-$(ODIR)/libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
-	@echo "//***************************"
-	@echo "//**  libdscuda_histrec.o  **"
-	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
-#---- "dscudad"
-.PHONY: dscudad
-dscudad: $(ODIR)/dscudad
-$(ODIR)/dscudad: dscudad.cu $(ODIR)/sockutil.o
-	@echo "//****************"
-	@echo "//**  dscudad  ***"
-	@echo "//****************"
-	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
-#----
-dscudad_rpc: dscudad.cu $(ODIR)/sockutil.o
-	$(NVCC) -o $@ $(CUDAINCLUDES) -DRPC_ONLY=1 $^ -lpthread
-
-dummysvr :	dummysvr.c
-
-dummyclient :	dummyclient.c
-
-###
-### Generate "dscudasvr"
-###
-.PHONY: dscudasvr dscudasvr.o
-DSCUDASVR_OBJ = dscudasvr.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
-dscudasvr: $(ODIR)/dscudasvr
-$(ODIR)/dscudasvr: $(addprefix $(ODIR)/, $(DSCUDASVR_OBJ))
-	@echo "//******************"
-	@echo "//**  dscudasvr  ***"
-	@echo "//******************"
-	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
-#----
-dscudasvr.o: $(ODIR)/dscudasvr.o
-$(ODIR)/dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
-	@mkdir -p $(ODIR)
-	@echo "//********************"
-	@echo "//**  dscudasvr.o  ***"
-	@echo "//********************"
-	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
-
-dscudasvr_fault :  dscudasvr_fault.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
-	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
-
-dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
-	$(NVCC) -c $(CUDAINCLUDES) -DRPC_ONLY=1 -DFAULT_AT_D2H=1 -o $@ $<
-
-.PHONY: sockutil.o
-sockutil.o: $(ODIR)/sockutil.o
-$(ODIR)/sockutil.o: sockutil.c sockutil.h
-	@mkdir -p $(ODIR)
-	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
-###
-### Generate object files for RPC.
-###
-dscudatest: dscudatest.cu libdscuda_ibv.so
-	$(NVCC) $(CUDAINCLUDES) -o $@ $< -L../lib -ldscuda_ibv -lrdmacm -libverbs -lpthread
-#---- "RPC partial set"
-.PHONY: rpcbase
-rpcbase: $(RPCBASE)_clnt.o $(RPCBASE)_svc.o $(RPCBASE)_xdr.o
-#----
-.PHONY: $(RPCBASE)_clnt.o 
-$(RPCBASE)_clnt.o: $(ODIR)/$(RPCBASE)_clnt.o
-$(ODIR)/$(RPCBASE)_clnt.o: $(RPCBASE)_clnt.c
-	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
-#----
-.PHONY: $(RPCBASE)_svc.o
-$(RPCBASE)_svc.o: $(ODIR)/$(RPCBASE)_svc.o 
-$(ODIR)/$(RPCBASE)_svc.o: $(RPCBASE)_svc.c
-	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
-#----
-.PHONY: $(RPCBASE)_xdr.o
-$(RPCBASE)_xdr.o: $(ODIR)/$(RPCBASE)_xdr.o ;
-$(ODIR)/$(RPCBASE)_xdr.o: $(RPCBASE)_xdr.c
-	@mkdir -p $(ODIR)
-	$(CXX) $(CUDAINCLUDES) -c -fPIC -o $@ $<
-#----
-.PHONY: dscudautil.o
-dscudautil.o: $(ODIR)/dscudautil.o ;
-$(ODIR)/dscudautil.o: dscudautil.cu dscudautil.h
-	@mkdir -p $(ODIR)
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
-###
-### source file include dependancy.
-###
-libdscuda.cu:      dscuda.h libdscuda.h
-libdscuda_rpc.cu:  dscuda.h libdscuda.h
-libdscuda_ibv.cu:  dscuda.h libdscuda.h ibv_rdma.h
-dscudad.cu :       dscudadefs.h sockutil.h dscudarpc.h
-dscudaverb.cu:     dscuda.h libdscuda.h dscudaverb.h dscudarpc.h
-dscudatest.cu:     dscuda.h ibv_rdma.h
-ibv_rdma.cpp:      ibv_rdma.h 
-ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudamacros.h
-dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
 ###
 ### Create RPC source files into current direcotory by "rpcgen".
 ###
@@ -252,4 +99,4 @@ clean:
 	@echo "//*********************************"
 	@echo "//**  Clean up generated files.  **"
 	@echo "//*********************************"
-	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(RPCBASE).h $(RPCBASE)_svc.* $(RPCBASE)_clnt.* $(RPCBASE)_xdr.* *.o *~ *.linkinfo
+	/bin/rm -fv $(TARGET) $(TARGET_RPCONLY) $(rpc_generatedE).h $(RPCBASE)_svc.* $(RPCBASE)_clnt.* $(RPCBASE)_xdr.* *.o *~ *.linkinfo

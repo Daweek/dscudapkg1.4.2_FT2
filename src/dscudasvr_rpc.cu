@@ -26,7 +26,7 @@ rpcWatchDisconnection(void *arg) {
 #if 0 // oikawa, temporary
     sleep(5); // wait long enough so that connection is certainly establised.
 #else
-    sleep(35); // wait long enough so that connection is certainly establised.
+    sleep(59); // wait long enough so that connection is certainly establised.
 #endif
     
     WARN(3, "start socket polling:%d.\n", clientsock);

@@ -62,8 +62,7 @@ int main(void) {
   cudaMemcpy(hC, dC, size, cudaMemcpyDeviceToHost);
   gettimeofday(&end, NULL);
 
-  printf("%f\n", (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0);
-
+  printf("Elapsed_time: %f [sec]\n", (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0);
 
   cudaFree(dA);
   cudaFree(dB);

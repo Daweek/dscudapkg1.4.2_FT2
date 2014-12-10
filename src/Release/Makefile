@@ -162,13 +162,13 @@ dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
 ###
 ### Create RPC source files into current direcotory by "rpcgen".
 ###
-$(RPCBASE)_clnt.c:	$(RPCBASE).x $(RPCBASE).h
+../$(RPCBASE)_clnt.c: $(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -l $< > $@
-$(RPCBASE)_svc.c:	$(RPCBASE).x $(RPCBASE).h
+../$(RPCBASE)_svc.c: $(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -m $< > $@
-$(RPCBASE)_xdr.c:	$(RPCBASE).x $(RPCBASE).h
+../$(RPCBASE)_xdr.c: $(RPCBASE).x $(RPCBASE).h
 	$(RPCGEN) -c $< > $@
-$(RPCBASE).h:		$(RPCBASE).x
+../$(RPCBASE).h: $(RPCBASE).x
 	$(RPCGEN) -h $< > $@
 $(RPCBASE).x: dscudadefs.h
 

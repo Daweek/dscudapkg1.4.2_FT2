@@ -366,9 +366,11 @@ typedef struct RCServer {
     void dupServer(struct RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t, struct rpc_err *);
+    cudaError_t cudaFree(void *d_ptr, struct rpc_err *);
     cudaError_t cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t, struct rpc_err *);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t, struct rpc_err *);
-    cudaError_t cudaFree(void *d_ptr, struct rpc_err *);
+    cudaError_t cudaThreadSynchronize( struct rpc_err *);
+
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
 			     RCdim3 bdim, RCsize smemsize, RCstream stream,
 			     RCargs args, struct rpc_err *);
@@ -446,9 +448,11 @@ typedef struct VirDev_t {
     void        setFaultMode(enum FtMode_e fault_mode);
     void        setConfInfo(int redun);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
+    cudaError_t cudaFree(void *d_ptr);
     cudaError_t cudaMemcpyH2D(void *d_ptr, const void *h_ptr, size_t size);
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
-    cudaError_t cudaFree(void *d_ptr);
+    cudaError_t cudaThreadSynchronize(void);
+
     void  launchKernel(int module_index, int kid, char *kname, RCdim3 gdim,
 		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
     /*CP*/

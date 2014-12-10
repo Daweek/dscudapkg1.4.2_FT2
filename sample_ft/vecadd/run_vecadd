@@ -4,7 +4,7 @@ mode=${1}
 
 if [ "${mode}" = "MONO" ]; then
     echo "MONO"
-    DSCUDA_SERVER="c4hdn:0"
+    DSCUDA_SERVER="ds15:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "POLY2"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1"
@@ -38,5 +38,6 @@ export OMP_NUM_THREADS=1
 
 #~/bin/env_dscuda
 
-./vecadd_rpc 2>&1 | tee vecadd_rpc.log
+./vecadd_rpc
+#./vecadd_rpc 2>&1 | tee vecadd_rpc.log
 #emacs vecadd.cu 

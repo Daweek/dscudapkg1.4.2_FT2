@@ -10,6 +10,7 @@
 //--------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "dscudarpc.h"
 #include "dscudadefs.h"
 #include "dscudamacros.h"
@@ -68,7 +69,8 @@ void *BkupMem_t::translateAddrVtoH(const void *v_ptr) {
 /*
  * 
  */
-void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz) {
+void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz)
+{
     v_region   = uva_ptr;
     d_region   = d_ptr;
     h_region = (void *)malloc(sz);
@@ -190,7 +192,8 @@ BkupMemList_t::query(void *uva_ptr) {
 /*
  * Add the BkupMem_t cell at the tail of List.
  */
-void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size) {
+void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size)
+{
     BkupMem *mem;
     
     mem = (BkupMem *)malloc( sizeof(BkupMem) );
@@ -208,15 +211,9 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size) {
 	tail->next = mem;
 	mem->prev = tail;
     }
-    tail = mem;
+    tail = mem;  // Update tail poiter.
     length++;
     total_size += size;
-
-#if 0
-    WARN(5, "      add BkupMemList[%d]: uva_ptr=%p d_ptr=%p, size=%d\n",
-	 length - 1, uva_ptr, d_ptr, size);
-#endif
-    
     if (getLen() < 0) {
 	WARN(0, "(+_+) Unexpected error in %s()\n", __func__);
 	exit(EXIT_FAILURE);

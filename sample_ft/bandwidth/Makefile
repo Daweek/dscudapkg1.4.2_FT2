@@ -21,7 +21,7 @@ bandwidth_rpconly:	bandwidth.cu ../../lib/libdscuda_rpc.a
 	$(DSCUDACPP) -DRPC_ONLY=1 -o $@ -I. -i $< -ldscuda_rpc
 
 
-bandwidthlocal:	bandwidth.cu
+bandwidth_local:	bandwidth.cu
 	$(NVCC) -o $@ $(CUDAINCLUDES) $<
 
 bandwidthlocal_omp:	bandwidth.cu

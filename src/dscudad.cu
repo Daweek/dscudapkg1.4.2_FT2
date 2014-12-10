@@ -35,15 +35,23 @@ static int CallFaultServer = 0;
 
 #undef WARN
 
-#define WARN(lv, fmt, args...) if (lv <= WarnLevel) {		\
-	time_t now = time(NULL);				\
-	struct tm *local = localtime( &now );			\
-	char tfmt[16];						\
-	strftime( tfmt, 16, "%T", local );			\
-	fprintf(stderr, "[%s]", tfmt);				\
-	fprintf(stderr, "(DAEMON-%d) " fmt, lv, ## args);	\
+#define WARN(lv, fmt, args...) {					\
+	if (lv <= WarnLevel) {						\
+	    time_t now = time(NULL);					\
+	    struct tm *local = localtime( &now);			\
+	    char tfmt[16];						\
+	    int stderr2tty = isatty( fileno( stderr));			\
+	    strftime( tfmt, 16, "%T", local);				\
+	    if (stderr2tty == 1) {					\
+		fprintf(stderr, "\x1b[34m");				\
+	    }								\
+	    fprintf( stderr, "[%s]", tfmt);				\
+	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\
+	    if (stderr2tty == 1) {					\
+		fprintf( stderr, "\x1b[39m");				\
+	    }								\
+	}								\
     }
-
 typedef struct Server_t {
     pid_t pid;
     int   port;

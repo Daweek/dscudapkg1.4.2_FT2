@@ -1298,7 +1298,7 @@ ClientState_t::ClientState_t(void) {
     WARN(9, "ClinetState_t::ClientState_t() {\n");
     ServerArray_t svr_array;
 
-    start_time = time( NULL );
+    start_time = time( NULL);
     WARN(1, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
 
     ip_addr     = 0;
@@ -1344,8 +1344,8 @@ ClientState_t::ClientState_t(void) {
     /*
      * Establish connections of all physical devices.
      */
-    for ( int i=0; i < Nvdev; i++ ) {
-	for ( int j=0; j < Vdev[i].nredundancy; j++ ) {
+    for (int i=0; i<Nvdev; i++) {
+	for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    Vdev[i].server[j].setupConnection();
 	    WARN(1, "setupConn. Vdev[%d].server[%d].Clnt=%p\n",
 		 i, j, Vdev[i].server[j].Clnt);
@@ -1375,32 +1375,33 @@ ClientState_t::~ClientState_t(void) {
     char       my_tfmt[64];	      
     struct tm *my_local;
 
-    pthread_cancel(tid);
+    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+	pthread_cancel(tid);
+    }
     
-    stop_time = time( NULL );
+    stop_time = time( NULL);
     exe_time = stop_time - start_time;
 
     WARN( 1, "[ERRORSTATICS] stop.\n" );
     WARN( 1, "[ERRORSTATICS] ************** Summary *******************************\n" );
     
-    my_local = localtime( &start_time );
-    strftime( my_tfmt, 64, "%c", my_local );
-    WARN( 1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt );
+    my_local = localtime( &start_time);
+    strftime( my_tfmt, 64, "%c", my_local);
+    WARN( 1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
     
-    my_local = localtime( &stop_time );
-    strftime( my_tfmt, 64, "%c", my_local );
-    WARN( 1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt );
+    my_local = localtime( &stop_time);
+    strftime( my_tfmt, 64, "%c", my_local);
+    WARN( 1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
 
-    my_local = localtime( &exe_time );
-    strftime( my_tfmt, 64, "%s", my_local );
-    WARN( 1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt );
-    for ( int i=0; i<Nvdev; i++ ) {
-
-	WARN( 1, "[ERRORSTATICS]  Virtual[%2d]\n", i );
-	for ( int j=0; j<Vdev[i].nredundancy; j++ ) {
+    my_local = localtime( &exe_time);
+    strftime( my_tfmt, 64, "%s", my_local);
+    WARN( 1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
+    for (int i=0; i<Nvdev; i++) {
+	WARN( 1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
+	for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    svr = &Vdev[i].server[j];
-	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: stat_error= %d\n",
-		  j, svr->ip, svr->hostname, svr->stat_error);
+	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
+		  j, svr->ip, svr->hostname, svr->stat_error, svr->stat_correct);
 	}
     }
     WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
