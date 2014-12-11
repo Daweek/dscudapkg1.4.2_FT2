@@ -82,11 +82,13 @@ libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
 	@echo "//***************************"		
 	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
 #---- "dscudad"
-dscudad: dscudad.cu sockutil.o
+dscudad: dscudad.o sockutil.o dscudautil.o 
 	@echo "//****************"
 	@echo "//**  dscudad  ***"
 	@echo "//****************"
 	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
+dscudad.o: dscudad.cu dscuda.h dscudadefs.h dscudamacros.h sockutil.h
+	$(NVCC) -c -o $@ $(CUDAINCLUDES) $<
 #----
 dscudad_rpc: dscudad.cu sockutil.o
 	$(NVCC) -o $@ $(CUDAINCLUDES) -DRPC_ONLY=1 $^ -lpthread

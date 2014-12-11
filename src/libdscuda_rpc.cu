@@ -1733,11 +1733,8 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     WARN(5, "      + RCServer[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
-    lo_args.RCargs_val = (RCarg *)malloc(args.RCargs_len * sizeof(RCarg));
-    if (lo_args.RCargs_val == NULL) {
-	WARN(0, "%s():malloc() failed.\n", __func__);
-	exit(1);
-    }
+    lo_args.RCargs_val = (RCarg *)xmalloc(args.RCargs_len * sizeof(RCarg));
+
     for (int k=0; k<lo_args.RCargs_len; k++) {
 	lo_args.RCargs_val[k] = args.RCargs_val[k];
     }
@@ -3318,7 +3315,7 @@ cublasSetVector(int n, int elemSize, const void *x, int incx, void *devicePtr, i
     rcublasResult *rp;
 
     RCbuf buf;
-    buf.RCbuf_val = (char *)malloc(n * elemSize);
+    buf.RCbuf_val = (char *)xmalloc(n * elemSize);
     buf.RCbuf_len = n;
     memcpy(buf.RCbuf_val, x, n);
 

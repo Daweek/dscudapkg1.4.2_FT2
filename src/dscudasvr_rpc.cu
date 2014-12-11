@@ -17,6 +17,13 @@
 #include <errno.h>
 #include <rpc/pmap_clnt.h>
 #include <cutil.h>
+// remove definition of some macros which will be redefined in \"cutil_inline.h\".
+#ifdef MIN
+#undef MIN
+#endif
+#ifdef MAX
+#undef MAX
+#endif
 #include <cutil_inline.h>
 #include "dscuda.h"
 #include "libdscuda.h"

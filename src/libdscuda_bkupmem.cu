@@ -73,11 +73,7 @@ void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz)
 {
     v_region   = uva_ptr;
     d_region   = d_ptr;
-    h_region = (void *)malloc(sz);
-    if (h_region == NULL) {
-	perror("BkupMem_t.init()");
-	exit(EXIT_FAILURE);
-    }
+    h_region = (void *)xmalloc(sz);
     
 #if 0
     WARN(10, "%s():v_region=%p, d_region=%p, h_region=%p\n",
@@ -196,11 +192,7 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size)
 {
     BkupMem *mem;
     
-    mem = (BkupMem *)malloc( sizeof(BkupMem) );
-    if (mem == NULL) {
-	perror( "BkupMemLit_t::add()");
-	exit(EXIT_FAILURE);
-    }
+    mem = (BkupMem *)xmalloc( sizeof(BkupMem) );
     
     mem->init(uva_ptr, d_ptr, size);
 

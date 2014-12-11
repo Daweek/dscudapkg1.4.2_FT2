@@ -54,7 +54,6 @@ ServerState_t DscudaSvr;
     
 int D2Csock = -1; // socket for sideband communication to the client. inherited from the daemon.
 int TcpPort = RC_SERVER_IP_PORT;
-static int Connected = 0;
 static int UseIbv = 0; // use IB Verbs if set to 1. use RPC by default.
 int Ndevice = 1;                 // # of devices in the system.
 int Devid[RC_NDEVICEMAX] = {0,}; // real device ids of the ones in the system.

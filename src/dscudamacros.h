@@ -1,6 +1,8 @@
 #ifndef DSCUDA_MACROS_H
 #define DSCUDA_MACROS_H
 
+#include "dscudautil.h"
+
 #define MACRO_TSTAMP_FORMAT						\
 	time_t now = time(NULL);					\
 	struct tm *local = localtime( &now );				\
@@ -19,6 +21,7 @@
 	fprintf(stderr, fmt, ## args);					\
     }
 
+//-- [DSCUDA CLIENT] WARING Message.
 #define WARN(lv, fmt, args...) {					\
 	if (lv <= dscudaWarnLevel()) {					\
 	    MACRO_TSTAMP_FORMAT						\
@@ -41,15 +44,21 @@
       }								  \
    }
 
-// DSCUDA SERVER WARN
+//-- [DSCUDA SERVER] WARNING Message.
 #define SWARN(lv, fmt, args...)						\
     if ( lv <= dscudaWarnLevel() ) {					\
-	time_t now = time(NULL);					\
-	struct tm *local = localtime( &now );				\
-	char tfmt[16];							\
-	strftime( tfmt, 16, "%T", local );				\
+	MACRO_TSTAMP_FORMAT						\
 	fprintf(stderr, "[%s]", tfmt);					\
 	fprintf(stderr, "(SVR[%d]-%d) " fmt, TcpPort - RC_SERVER_IP_PORT, lv, ## args); \
+    }
+
+//-- [DSCUDA DAEMON] WARNING Message.
+#define DWARN(lv, fmt, args...) {					\
+	if (lv <= WarnLevel) {						\
+	    MACRO_TSTAMP_FORMAT						\
+	    fprintf( stderr, "[%s]", tfmt);				\
+	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\
+	}								\
     }
 
 
@@ -71,10 +80,5 @@
     }								
 
 #define ALIGN_UP(off, align) (off) = ((off) + (align) - 1) & ~((align) - 1)
-
-int  dscudaWarnLevel(void);
-void dscudaSetWarnLevel(int level);
-int  dscudaGetFaultInjection(void);
-void dscudaSetFaultInjection(int pattern);
 
 #endif //DSCUDA_MACROS_H

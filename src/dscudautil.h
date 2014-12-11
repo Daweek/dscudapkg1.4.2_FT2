@@ -10,10 +10,14 @@
 //------------------------------------------------------------------------------
 #ifndef DSCUDAUTIL_H
 #define DSCUDAUTIL_H
-int         sprintfDate(char *s, int fmt=0);
+
 int         dscudaWarnLevel(void);
 void        dscudaSetWarnLevel(int level);
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);
 const char *dscudaGetIpaddrString(unsigned int addr);
 double      RCgetCputime(double *t0);
+int         sprintfDate(char *s, int fmt=0);
+void*       xmalloc(size_t size);
+void        xfree(void *p);
+
 #endif // DSCUDAUTIL_H

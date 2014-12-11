@@ -26,6 +26,7 @@
 #include <time.h>
 #include "dscuda.h"
 #include "dscudadefs.h"
+#include "dscudamacros.h"
 #include "sockutil.h"
 
 #define NBACKLOG 1   // max # of servers can be put into the listening queue.
@@ -33,25 +34,6 @@
 static int WarnLevel = 2;
 static int CallFaultServer = 0;
 
-#undef WARN
-
-#define WARN(lv, fmt, args...) {					\
-	if (lv <= WarnLevel) {						\
-	    time_t now = time(NULL);					\
-	    struct tm *local = localtime( &now);			\
-	    char tfmt[16];						\
-	    int stderr2tty = isatty( fileno( stderr));			\
-	    strftime( tfmt, 16, "%T", local);				\
-	    if (stderr2tty == 1) {					\
-		fprintf(stderr, "\x1b[34m");				\
-	    }								\
-	    fprintf( stderr, "[%s]", tfmt);				\
-	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\
-	    if (stderr2tty == 1) {					\
-		fprintf( stderr, "\x1b[39m");				\
-	    }								\
-	}								\
-    }
 typedef struct Server_t {
     pid_t pid;
     int   port;
@@ -59,19 +41,9 @@ typedef struct Server_t {
     struct Server_t *next;
 } Server;
 
-static void parseArgv(int argc, char **argv);
-static void showUsage(char *command);
-
-static int create_daemon_socket(in_port_t port, int backlog);
-static int alloc_server_port(void);
-static void spawn_server(int listening_sock);
 static void signal_from_child(int sig);
-
-static void register_server(pid_t pid, int port);
-static void unregister_server(pid_t pid);
 static Server *server_with_pid(pid_t pid);
 static int unused_server_port(int devid);
-static void initEnv(void);
 static void* response_to_search( void *arg );
 
 static int Daemonize = 0;
@@ -80,7 +52,9 @@ static Server *ServerListTop = NULL;
 static Server *ServerListTail = NULL;
 static char LogFileName[1024] = "dscudad.log";
 
-static int create_daemon_socket(in_port_t port, int backlog) {
+static
+int create_daemon_socket(in_port_t port, int backlog)
+{
     struct sockaddr_in me;
     int sock;
 
@@ -109,17 +83,17 @@ static int create_daemon_socket(in_port_t port, int backlog) {
         perror("dscudad:listen");
         return -1;
     }
-    WARN(3, "socket for port %d successfully setup.\n", port);
+    DWARN(3, "socket for port %d successfully setup.\n", port);
 
     return sock;
 }
 
-static void register_server(pid_t pid, int port) {
-    WARN(3, "register_server(%d, %d).\n", pid, port);
-    Server *svr = (Server *)malloc(sizeof(Server));
-    if (!svr) {
-        perror("dscudad:register_server");
-    }
+static
+void register_server(pid_t pid, int port)
+{
+    DWARN(3, "register_server(%d, %d).\n", pid, port);
+    Server *svr = (Server *)xmalloc(sizeof(Server));
+
     svr->pid  = pid;
     svr->port = port;
     svr->prev = ServerListTail;
@@ -130,14 +104,16 @@ static void register_server(pid_t pid, int port) {
         ServerListTail->next = svr;
     }
     ServerListTail = svr;
-    WARN(3, "register_server done.\n");
+    DWARN(3, "register_server done.\n");
 }
 
-static void unregister_server(pid_t pid) {
-    WARN(3, "unregister_server(%d).\n", pid);
+static
+void unregister_server(pid_t pid)
+{
+    DWARN(3, "unregister_server(%d).\n", pid);
     Server *svr = server_with_pid(pid);
     if (!svr) {
-        WARN(0, "server with pid %d not found. "
+        DWARN(0, "server with pid %d not found. "
              "unregister operation not performed.\n", pid);
         return;
     }
@@ -153,18 +129,20 @@ static void unregister_server(pid_t pid) {
     if (!svr->next) { // svr was the last entry.
         ServerListTail = svr->prev;
     }
-    WARN(3, "unregister_server done. port:%d released.\n", svr->port);
-    WARN(3, "###     ###   #   #  #####\n");
-    WARN(3, "#   #  #   #  ##  #  #    \n");
-    WARN(3, "#   #  #   #  # # #  #### \n");
-    WARN(3, "#   #  #   #  #  ##  #    \n");
-    WARN(3, "###     ###   #   #  #####\n");
-    WARN(3, "\n");
-    WARN(3, "==============================================================================\n");
-    free(svr);
+    DWARN(3, "unregister_server done. port:%d released.\n", svr->port);
+    DWARN(3, "###     ###   #   #  #####\n");
+    DWARN(3, "#   #  #   #  ##  #  #    \n");
+    DWARN(3, "#   #  #   #  # # #  #### \n");
+    DWARN(3, "#   #  #   #  #  ##  #    \n");
+    DWARN(3, "###     ###   #   #  #####\n");
+    DWARN(3, "\n");
+    DWARN(3, "==============================================================================\n");
+    xfree(svr);
 }
 
-static Server *server_with_pid(pid_t pid) {
+static
+Server *server_with_pid(pid_t pid)
+{
     Server *svr = ServerListTop;
     while (svr) {
         if (svr->pid == pid) {
@@ -175,11 +153,13 @@ static Server *server_with_pid(pid_t pid) {
     return NULL; // server with pid not found in the list.
 }
 
-static int unused_server_port(int devid) {
+static
+int unused_server_port(int devid)
+{
     int inuse;
     Server *s;
 
-    WARN(3, "unused_server_port().\n");
+    DWARN(3, "unused_server_port().\n");
 
 //  for (int p=RC_SERVER_IP_PORT; p<RC_SERVER_IP_PORT + RC_NSERVERMAX; p++) {
     for (int p=RC_SERVER_IP_PORT+devid; p<RC_SERVER_IP_PORT + RC_NSERVERMAX; p++) {
@@ -191,39 +171,41 @@ static int unused_server_port(int devid) {
             }
         }
         if (!inuse) {
-            WARN(3, "unused_server_port: port found:%d\n", p);
+            DWARN(3, "unused_server_port: port found:%d\n", p);
             return p;
         }
     }
 
-    WARN(3, "unused_server_port: all ports in use.\n");
+    DWARN(3, "unused_server_port: all ports in use.\n");
     return -1;
 }
 
-static void spawn_server(int listening_sock) {
+static
+void spawn_server(int listening_sock)
+{
     int len, dev, sock, sport;
     pid_t pid;
     char *argv[16];
     char msg[256];
     char portstr[128], devstr[128], sockstr[128];
 
-    WARN(3, "listening request from client...\n");
+    DWARN(3, "listening request from client...\n");
     sock = accept(listening_sock, NULL, NULL);
     if (sock == -1) {
-        WARN(0, "accept() error\n");
+        DWARN(0, "accept() error\n");
         exit(1);
     }
     recvMsgBySocket(sock, msg, sizeof(msg));
     sscanf(msg, "deviceid:%d", &dev); // deviceid to be handled by the server.
-    WARN(3, "---> Recv message \"%s\"\n", msg);
+    DWARN(3, "---> Recv message \"%s\"\n", msg);
 
     sport = unused_server_port(dev);
     sprintf(msg, "sport:%d", sport); // server port to be connected by the client.
     sendMsgBySocket(sock, msg);
-    WARN(3, "<--- Send message \"%s\"\n", msg);        
+    DWARN(3, "<--- Send message \"%s\"\n", msg);        
 
     if (sport < 0) {
-        WARN(0, "spawn_server: max possible ports already in use.\n");
+        DWARN(0, "spawn_server: max possible ports already in use.\n");
         close(sock);
         return;
     }
@@ -232,7 +214,7 @@ static void spawn_server(int listening_sock) {
     pid = fork();
     if ( pid ) { // parent
         signal( SIGCHLD, signal_from_child );
-        WARN( 3, "spawn a server with sock: %d\n", sock );
+        DWARN( 3, "spawn a server with sock: %d\n", sock );
         register_server( pid, sport );
         close( sock );
     } else { // child
@@ -255,12 +237,12 @@ static void spawn_server(int listening_sock) {
         argv[3] = sockstr;
 	
         argv[4] = (char *)NULL;
-        WARN( 3, "exec %s %s %s %s\n", argv[0], argv[1], argv[2], argv[3] );
+        DWARN( 3, "exec %s %s %s %s\n", argv[0], argv[1], argv[2], argv[3] );
 	
         execvp( argv[0], (char **)argv );
         perror( argv[0] );
-        WARN( 0, "execvp() failed.\n" );
-        WARN( 0, "%s may not be in the PATH?\n", argv[0] );
+        DWARN( 0, "execvp() failed.\n" );
+        DWARN( 0, "%s may not be in the PATH?\n", argv[0] );
         exit( EXIT_FAILURE );
     }
 }
@@ -268,25 +250,26 @@ static void spawn_server(int listening_sock) {
 /*
  *
  */
-static void signal_from_child( int sig ) {
+static void signal_from_child( int sig )
+{
     int status;
     int pid = waitpid(-1, &status, WNOHANG);
 
     switch (pid) {
-      case -1:
-        WARN(0, "signal_from_child:waitpid failed.\n");
+    case -1:
+        DWARN(0, "signal_from_child:waitpid failed.\n");
         exit(1);
         break;
-      case 0:
-        WARN(0, "no child has exited.\n");
+    case 0:
+        DWARN(0, "no child has exited.\n");
         break;
-      default:
-        WARN(2, "exited a child (pid:%d).\n", pid);
-
+    default:
+        DWARN(2, "exited a child (pid:%d).\n", pid);
+	
         if (WIFEXITED(status)) {
-            WARN(2, "exit status:%d\n", WEXITSTATUS(status));
+            DWARN(2, "exit status:%d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            WARN(2, "terminated by signal %d.\n", WTERMSIG(status));
+            DWARN(2, "terminated by signal %d.\n", WTERMSIG(status));
         }
         Nserver--;
         unregister_server(pid);
@@ -296,7 +279,8 @@ static void signal_from_child( int sig ) {
 /*
  * Run in separated thread by pthread_create();
  */
-static void *response_to_search( void *arg ) {
+static void *response_to_search( void *arg )
+{
     char sendbuf[ SEARCH_BUFLEN_TX ];
     char recvbuf[ SEARCH_BUFLEN_RX ];
 
@@ -312,10 +296,10 @@ static void *response_to_search( void *arg ) {
 
     cuerr = cudaGetDeviceCount( &dev_count );
     if ( cuerr != cudaSuccess ) {
-	WARN( 0, "cudaGetDeviceCount() failed.\n");
+	DWARN( 0, "cudaGetDeviceCount() failed.\n");
 	return NULL;
     } else if ( dev_count == 0 ) {
-	WARN( 0, "cudaGetDeviceCount() returned 0.\n");
+	DWARN( 0, "cudaGetDeviceCount() returned 0.\n");
 	return NULL;
     }
     
@@ -361,9 +345,9 @@ static void *response_to_search( void *arg ) {
 	recvfrom( sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size );
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
-	WARN(2, "Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
+	DWARN(2, "Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
 	if ( Nserver > 0 ) {
-	    WARN(2, "Invoked %d dscudasvr%c, so I can't reply.\n", Nserver, Nserver?' ':'s');
+	    DWARN(2, "Invoked %d dscudasvr%c, so I can't reply.\n", Nserver, Nserver?' ':'s');
 	    memset( recvbuf, 0, SEARCH_BUFLEN_RX );
 	    continue;
 	}
@@ -373,7 +357,7 @@ static void *response_to_search( void *arg ) {
 	inet_aton( inet_ntoa( clt.sin_addr ), &(clt.sin_addr) );
 	
 	sendto( sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr) );
-	WARN(2, "---> Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
+	DWARN(2, "---> Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
 
@@ -384,7 +368,9 @@ static void *response_to_search( void *arg ) {
 /*
  *
  */
-static void initEnv(void) {
+static
+void initEnv(void)
+{
     static int firstcall = 1;
     char *env;
 
@@ -400,14 +386,15 @@ static void initEnv(void) {
         if (0 <= tmp) {
             WarnLevel = tmp;
         }
-        WARN(1, "WarnLevel: %d\n", WarnLevel);
+        DWARN(1, "WarnLevel: %d\n", WarnLevel);
     }
 }
 
 /*
  *
  */
-static void showUsage(char *command) {
+void showUsage(char *command)
+{
     fprintf(stderr,
             "usage: %s [-d]\n"
             "  -d: daemonize.\n",
@@ -416,7 +403,9 @@ static void showUsage(char *command) {
 
 extern char *optarg;
 extern int optind;
-static void parseArgv( int argc, char **argv ) {
+static
+void parseArgv( int argc, char **argv )
+{
     int c;
     char *param = "dfl:h";
 
@@ -439,7 +428,8 @@ static void parseArgv( int argc, char **argv ) {
     }
 }
 
-int main( int argc, char **argv ) {
+int main(int argc, char **argv)
+{
     int sock, nserver0;
     int errfd;
     pthread_t th;
@@ -464,7 +454,7 @@ int main( int argc, char **argv ) {
     
     sock = create_daemon_socket( RC_DAEMON_IP_PORT, NBACKLOG );
     if ( sock == -1 ) {
-	WARN(0, "create_daemon_socket() failed\n");
+	DWARN(0, "create_daemon_socket() failed\n");
 	exit(1);
     }
     nserver0 = Nserver;
@@ -474,16 +464,16 @@ int main( int argc, char **argv ) {
 
             if ( nserver0 != Nserver ) {
                 if ( Nserver < RC_NSERVERMAX ) {
-                    WARN(0, "%d servers active (%d max possible).\n", Nserver, RC_NSERVERMAX);
+                    DWARN(0, "%d servers active (%d max possible).\n", Nserver, RC_NSERVERMAX);
                 } else {
-                    WARN(0, "%d servers active. reached the limit.\n", Nserver);
+                    DWARN(0, "%d servers active. reached the limit.\n", Nserver);
                 }
             }
         }
         sleep(1);
         nserver0 = Nserver;
     }
-    WARN( 0, "%s: cannot be reached.\n", __FILE__ );
+    DWARN( 0, "%s: cannot be reached.\n", __FILE__ );
 
     pthread_join( th, NULL );
     exit(1);

@@ -14,11 +14,8 @@
 #include <cutil_inline.h>
 #include <rpc/rpc.h>
 
-static void showusage(int argc, char **argv);
-static void showstatus(int argc, char **argv);
 static void devwperf(int argc, char **argv);
 static void devrperf(int argc, char **argv);
-static void get_cputime(double *laptime, double *sprittime);
 
 static const double MEGA = 1e6;
 
@@ -33,6 +30,31 @@ static TestMode testmode[] =
         devwperf,    "measure device-memory write (host->GPU) performance.",
         devrperf,    "measure device-memory read (host<-GPU) performance.",
     };
+
+void showusage(int argc, char **argv)
+{
+    int i;
+    int nitems = sizeof(testmode)/sizeof(testmode[0]);
+
+    fprintf(stderr, "usage: %s <test_program_ID> [destination_IP_address]\n", argv[0]);
+    for (i = 0; i < nitems; i++) {
+	fprintf(stderr, "  %2d) %s\n", i, testmode[i].usage);
+    }
+}
+void showstatus(int argc, char **argv)
+{
+    fprintf(stderr, "this command is not implemented yet.\n"
+            "should be designed to show status of GPU(s).\n");
+}
+void get_cputime(double *splittime, double *laptime)
+{
+    struct timeval x;
+
+    gettimeofday(&x, NULL);
+
+    *splittime = x.tv_sec + x.tv_usec/1000000.0 - *laptime;
+    *laptime = x.tv_sec + x.tv_usec/1000000.0;
+}
 
 int
 main(int argc, char **argv)
@@ -55,24 +77,6 @@ main(int argc, char **argv)
     exit (0);
 }
 
-static void
-showusage(int argc, char **argv)
-{
-    int i;
-    int nitems = sizeof(testmode)/sizeof(testmode[0]);
-
-    fprintf(stderr, "usage: %s <test_program_ID> [destination_IP_address]\n", argv[0]);
-    for (i = 0; i < nitems; i++) {
-	fprintf(stderr, "  %2d) %s\n", i, testmode[i].usage);
-    }
-}
-
-static void
-showstatus(int argc, char **argv)
-{
-    fprintf(stderr, "this command is not implemented yet.\n"
-            "should be designed to show status of GPU(s).\n");
-}
 
 static void
 devwperf(int argc, char **argv)
@@ -142,13 +146,3 @@ devrperf(int argc, char **argv)
     free(dst);
 }
 
-static void
-get_cputime(double *splittime, double *laptime)
-{
-    struct timeval x;
-
-    gettimeofday(&x, NULL);
-
-    *splittime = x.tv_sec + x.tv_usec/1000000.0 - *laptime;
-    *laptime = x.tv_sec + x.tv_usec/1000000.0;
-}

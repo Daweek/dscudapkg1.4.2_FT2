@@ -124,19 +124,12 @@ static void *storeMemcpyToSymbolD2D(void *argp) {
     DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
 
     int nredundancy = dscudaNredundancy();
-    argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
-    if (argdst->moduleid == NULL) {
-	WARN(0, "%s():malloc failed.\n", __func__);
-	exit(1);
-    }
+    argdst->moduleid = (int *)xmalloc(sizeof(int) * nredundancy);
     
     memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
 
-    argdst->symbol = (char *)malloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
-    if (argdst->symbol == NULL) {
-	WARN(0, "%s():malloc failed.\n", __func__);
-	exit(1);
-    }
+    argdst->symbol = (char *)xmalloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
+
     strcpy(argdst->symbol, argsrc->symbol);
     
     return argdst;
@@ -350,11 +343,7 @@ HistRecList_t::HistRecList_t(void) {
     byte_size = 0;
     max_len   = 32;
     
-    histrec = (HistRec_t *)malloc( sizeof(HistRec) * max_len );
-    if (histrec == NULL) {
-	WARN(0, "HistRecList_t::%s():malloc() failed.\n", __func__);
-	exit(EXIT_FAILURE);
-    }
+    histrec = (HistRec_t *)xmalloc( sizeof(HistRec) * max_len );
 
     //<-- import from dscudaVerbInit()
     memset(storeArgsStub,   0, sizeof(DSCVMethod) * DSCVMethodEnd);
