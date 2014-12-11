@@ -8,11 +8,6 @@
 // Update Count     : 0.1
 // Status           : Unknown, Use with caution!
 //------------------------------------------------------------------------------
-/*
- * This file is included into the bottom of ...
- *     -> "libdscuda_ibv.cu"
- *     -> "libdscuda_rpc.cu"
- */
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -25,6 +20,7 @@
 #include <netdb.h>
 #include <pthread.h>
 #include "dscuda.h"
+#include "dscudautil.h"
 #include "libdscuda.h"
 
 static int   VdevidIndexMax = 0; //# of pthreads which utilize virtual devices.
@@ -112,10 +108,12 @@ void PtxRecord_t::set(char *name0, char *ptx_image0) {
 //*********************************************************
 //*** CLASS: PtxStore_t
 //*********************************************************
-PtxStore_t::PtxStore_t(void) {
+PtxStore_t::PtxStore_t(void)
+{
     used_count = 0;
 }
-PtxRecord_t *PtxStore_t::add(char *name0, char *ptx_image0) {
+PtxRecord_t *PtxStore_t::add(char *name0, char *ptx_image0)
+{
     PtxRecord_t *ptx_ptr = &ptx_record[used_count];
     if (used_count > RC_NKMODULEMAX) {
 	WARN(0, "PtxStore_t::%s(): PtxStore array FULL!\n");
@@ -204,7 +202,8 @@ int ServerArray::add(RCServer *svrptr) {
     return 0;
 }
 
-RCServer *ServerArray::findSpareOne(void) {
+RCServer *ServerArray::findSpareOne(void)
+{
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_SPARE) {
@@ -214,7 +213,8 @@ RCServer *ServerArray::findSpareOne(void) {
     return sp;
 }
 
-RCServer *ServerArray::findBrokenOne(void) {
+RCServer *ServerArray::findBrokenOne(void)
+{
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
 	if (svr[i].ft_mode == FT_BROKEN) {
@@ -224,7 +224,8 @@ RCServer *ServerArray::findBrokenOne(void) {
     return sp;
 }
 
-void ServerArray::captureEnv(char *env_str, FtMode ft_mode0) {
+void ServerArray::captureEnv(char *env_str, FtMode ft_mode0)
+{
     WARN(9, "   ServerArray::%s() {\n", __func__);
     char *env;
     char buf[1024*RC_NVDEVMAX];
@@ -269,7 +270,8 @@ void ServerArray::captureEnv(char *env_str, FtMode ft_mode0) {
     WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
-void ServerArray::print(void) {
+void ServerArray::print(void)
+{
     WARN(9, "   ServerArray::%s() {\n", __func__);
     WARN(5, "      + num = %d\n", num);
     for (int i=0; i<num; i++) {
@@ -281,7 +283,8 @@ void ServerArray::print(void) {
     WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
-int requestDaemonForDevice(char *ip, int devid, int useibv) {
+int requestDaemonForDevice(char *ip, int devid, int useibv)
+{
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
@@ -1293,8 +1296,31 @@ void *periodicCheckpoint(void *arg) {
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.
  */
-
-ClientState_t::ClientState_t(void) {
+ClientState_t::ClientState_t(void)
+{
+    // Open dscuda output file.
+    {
+	char curr_time[80];
+	sprintfDate( curr_time );
+	sprintf( dslog_filename, "c%s.dslog", curr_time );
+	sprintf( dserr_filename, "c%s.dserr", curr_time );
+	
+	dscuda_stdout = fopen( dslog_filename, "w" );
+	if (dscuda_stdout == NULL) {
+	    fprintf(stderr, "dscuda: failed to open file %s.", dslog_filename);
+	    exit(EXIT_FAILURE);
+	} else {
+	    fprintf(stderr, "dscuda: log file ==> %s\n", dslog_filename);
+	}
+	dscuda_stderr = fopen( dserr_filename, "w" );
+	if (dscuda_stderr == NULL) {
+	    fprintf(stderr, "dscuda: failed to open file %s.", dserr_filename);
+	    exit(EXIT_FAILURE);
+	} else {
+	    fprintf(stderr, "dscuda: err file ==> %s\n", dserr_filename);
+	}
+    }
+    
     WARN(9, "ClinetState_t::ClientState_t() {\n");
     ServerArray_t svr_array;
 
@@ -1367,9 +1393,12 @@ ClientState_t::ClientState_t(void) {
 
     WARN(9, "} ClinetState_t::ClientState_t()\n");
     WARN(9, "\n");
-}
-
-ClientState_t::~ClientState_t(void) {
+} //--> ClientState_t::ClientState_t(void)
+//--
+//--
+//--
+ClientState_t::~ClientState_t(void)
+{
     RCServer  *svr;
     time_t     exe_time;
     char       my_tfmt[64];	      
@@ -1405,9 +1434,10 @@ ClientState_t::~ClientState_t(void) {
 	}
     }
     WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
-}
+} //--> ClientState_t::~ClientState_t(void)
 
-void VirDev_t::invalidateAllModuleCache(void) {
+void VirDev_t::invalidateAllModuleCache(void)
+{
     for (int i=0; i<RC_NKMODULEMAX; i++) {
         if( modulelist[i].isValid() ){
 	    modulelist[i].invalidate();

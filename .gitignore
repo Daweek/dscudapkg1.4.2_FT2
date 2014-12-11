@@ -2,3 +2,5 @@
 a.out
 nohup.out
 dscudatmp
+*.log
+*.result

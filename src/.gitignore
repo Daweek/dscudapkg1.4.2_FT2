@@ -14,3 +14,12 @@ dscudasvr_fault
 libcudart.so.3
 libdscuda_rpc.a
 
+# log files
+*.log
+*.result
+
+# TAG info
+GTAGS
+GPATH
+GRTAGS
+GSYMS

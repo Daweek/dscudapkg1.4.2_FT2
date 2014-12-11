@@ -10,6 +10,8 @@
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
+#include "dscudadefs.h"
+#include "dscudarpc.h"
 #include "sockutil.h"
 
 //**************************************************************************
@@ -465,11 +467,11 @@ typedef struct VirDev_t {
 
 } Vdev_t;
 
-//*************************************************
-//***  Class Name: "ClientState_t"
-//***  Description:
-//***      - DS-CUDA Client Status class.
-//*************************************************
+//*******************************************************************************
+//***  Class Name: "ClientState_t"                                              *
+//***  Description:                                                             *
+//***      - DS-CUDA Client Status class.                                       *
+//*******************************************************************************
 void *periodicCheckpoint(void *arg);
 
 struct ClientState_t {
@@ -496,6 +498,13 @@ public:
     int cp_period;          // Period of checkpoint [sec]
     int daemon;
     int historical_calling;
+
+    //** <-- DS-CUDA client log/err output files.
+    FILE *dscuda_stdout;     // log-file descriptor.
+    FILE *dscuda_stderr;     // err-file descriptor.
+    char dslog_filename[80]; // ex.) "c20141224_235901.dslog", 'c' means clnt.
+    char dserr_filename[80]; // ex.) "c20141224_235901.dserr", 'c' means clnt.
+    //** --> DS-CUDA client log/err output files.
     
     /*CONSRUCTOR, DESTRUCTOR*/
     ClientState_t(void);

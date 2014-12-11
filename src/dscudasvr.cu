@@ -34,6 +34,8 @@
 #include <errno.h>
 
 #include "dscudarpc.h"
+#include "dscudasvr.h"
+#include "dscudasvr_rpc.h"
 #include "dscuda.h"
 #include "sockutil.h"
 
@@ -46,133 +48,45 @@
 //***  Description:
 //***      - CUDA Kernel function module management for Server.
 //********************************************************************
-typedef struct ServerModule_t {
-    unsigned int id;          /* Static and Serial Identical Number */
-    int          valid;       /* 1:valid, 0:invalid */
-    unsigned int ipaddr;
-    unsigned int pid;
-    time_t       loaded_time;
-    char         name[256];
-    CUmodule     handle;      /* CUDA module, loaded by "cuModuleLoadData()"  */
-    CUfunction   kfunc[RC_NKFUNCMAX]; // this is not used for now.
-    void validate(void)   { valid = 1; }
-    void invalidate(void) { valid = 0; }
-    int  isValid(void)    { return valid; }
-    int  isInvalid(void)  { if (isValid()) { return 0; } else { return 1; } }
-} ServerModule;
-static ServerModule SvrModulelist[RC_NKMODULEMAX] = {0};
+ServerModule SvrModulelist[RC_NKMODULEMAX] = {0};
 
-struct ServerState_t{
-    int  fault_injection; // fault injection pattarn. "0" means no faults.
-    int  force_timeout;
+ServerState_t DscudaSvr;
     
-    void setFaultInjection(int val=1) { fault_injection=val; }
-    void unsetFaultInjection(void)    { fault_injection=0; }
-    int  getFaultInjection(void)      { return fault_injection; }
-    ServerState_t() {
-	fault_injection = 0;
-	force_timeout = 0;
-    }
-};
-struct ServerState_t DscudaSvr;
-    
-static int D2Csock = -1; // socket for sideband communication to the client. inherited from the daemon.
-static int TcpPort = RC_SERVER_IP_PORT;
+int D2Csock = -1; // socket for sideband communication to the client. inherited from the daemon.
+int TcpPort = RC_SERVER_IP_PORT;
 static int Connected = 0;
 static int UseIbv = 0; // use IB Verbs if set to 1. use RPC by default.
-static int Ndevice = 1;                 // # of devices in the system.
-static int Devid[RC_NDEVICEMAX] = {0,}; // real device ids of the ones in the system.
-static int dscuDevice;                   // virtual device id of the one used in the current context.
-static CUcontext dscuContext = NULL;
-static int Devid2Vdevid[RC_NDEVICEMAX]; // device id conversion table from real to virtual.
+int Ndevice = 1;                 // # of devices in the system.
+int Devid[RC_NDEVICEMAX] = {0,}; // real device ids of the ones in the system.
+int dscuDevice;                   // virtual device id of the one used in the current context.
+CUcontext dscuContext = NULL;
+int Devid2Vdevid[RC_NDEVICEMAX]; // device id conversion table from real to virtual.
 
 static void notifyIamReady(void);
 static void showUsage(char *command);
 static void showConf(void);
 static void parseArgv(int argc, char **argv);
 static cudaError_t initDscuda(void);
-static cudaError_t createDscuContext(void);
-static cudaError_t destroyDscuContext(void);
+
 static void initEnv(void);
-static void releaseModules(bool releaseall);
-static CUresult getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid);
-static void getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size);
-static int dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image);
-static void *dscudaLaunchKernel(int moduleid, int kid, const char *kname, RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
-static cudaError_t setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DESCRIPTOR *descp = NULL);
-
-#undef WARN
-#define WARN(lv, fmt, args...)						\
-    if ( lv <= dscudaWarnLevel() ) {					\
-	time_t now = time(NULL);					\
-	struct tm *local = localtime( &now );				\
-	char tfmt[16];							\
-	strftime( tfmt, 16, "%T", local );				\
-	fprintf(stderr, "[%s]", tfmt);					\
-	fprintf(stderr, "(SVR[%d]-%d) " fmt, TcpPort - RC_SERVER_IP_PORT, lv, ## args); \
-    }
-
-#if 0
-inline void fatal_error(int exitcode) {
-    fprintf(stderr,
-            "%s(%i) : fatal_error().\n"
-            "Probably you need to restart dscudasvr.\n",
-            __FILE__, __LINE__);
-    exit(exitcode);
-}
-
-inline void check_cuda_error(cudaError err) {
-    if (cudaSuccess != err) {
-        fprintf(stderr,
-                "%s(%i) : check_cuda_error() Runtime API error : %s.\n"
-                "You may need to restart dscudasvr.\n",
-                __FILE__, __LINE__, cudaGetErrorString(err));
-    }
-}
-#else
-
-#define fatal_error(exitcode)\
-{\
-    fprintf(stderr,\
-            "%s(%i) : fatal_error().\n"\
-            "Probably you need to restart dscudasvr.\n",\
-            __FILE__, __LINE__);\
-    exit(exitcode);\
-}\
-
-#define check_cuda_error(err)\
-{\
-    if (cudaSuccess != err) {\
-        fprintf(stderr,\
-                "%s(%i) : check_cuda_error() Runtime API error : %s.\n"\
-                "You may need to restart dscudasvr.\n",\
-                __FILE__, __LINE__, cudaGetErrorString(err));\
-    }\
-}
-#endif
-
-#if !defined(RPC_ONLY)
-#    include "dscudasvr_ibv.cu"
-#endif
-#    include "dscudasvr_rpc.cu"
-
 
 static void notifyIamReady(void) {
     char msg[] = "ready";
     if (D2Csock >= 0) {
-        WARN(3, "send \"ready\" to the client.\n");
+        SWARN(3, "send \"ready\" to the client.\n");
         sendMsgBySocket(D2Csock, msg);
     }
 }
 
-static int receiveProtocolPreference(void) {
+static int receiveProtocolPreference(void)
+{
     char msg[256], rc[64];
 
     if (D2Csock >= 0) {
-        WARN(3, "wait for remotecall preference (\"rpc\" or \"ibv\") from the client.\n");
+        SWARN(3, "wait for remotecall preference (\"rpc\" or \"ibv\") from the client.\n");
         recvMsgBySocket(D2Csock, msg, sizeof(msg));
         sscanf(msg, "remotecall:%s", rc);
-        WARN(2, "method of remote procedure call: %s\n", rc);
+        SWARN(2, "method of remote procedure call: %s\n", rc);
         if (!strncmp("ibv", rc, strlen("ibv"))) {
             return 1;
         } else {
@@ -183,7 +97,8 @@ static int receiveProtocolPreference(void) {
     }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     parseArgv(argc, argv);
     initEnv();
     initDscuda();
@@ -217,20 +132,20 @@ static void showConf(void) {
     int i;
     char str[1024], str0[1024];
 
-    WARN(2, "TCP port : %d (base + %d)\n", TcpPort, TcpPort - RC_SERVER_IP_PORT);
-    WARN(2, "ndevice : %d\n", Ndevice);
+    SWARN(2, "TCP port : %d (base + %d)\n", TcpPort, TcpPort - RC_SERVER_IP_PORT);
+    SWARN(2, "ndevice : %d\n", Ndevice);
     sprintf(str, "real device%s      :", Ndevice > 1 ? "s" : " ");
     for (i = 0; i < Ndevice; i++) {
         sprintf(str0, " %d", Devid[i]);
         strcat(str, str0);
     }
-    WARN(2, "%s\n", str);
+    SWARN(2, "%s\n", str);
     sprintf(str, "virtual device%s   :", Ndevice > 1 ? "s" : " ");
     for (i = 0; i < Ndevice; i++) {
         sprintf(str0, " %d", Devid2Vdevid[Devid[i]]);
         strcat(str, str0);
     }
-    WARN(2, "%s\n", str);
+    SWARN(2, "%s\n", str);
 }
 
 extern char *optarg;
@@ -287,7 +202,7 @@ parseArgv(int argc, char **argv) {
     }
     if (!tcpport_set) {
         TcpPort = RC_SERVER_IP_PORT + serverid;
-        WARN(3, "TCP port number not given by '-p' option. Use default (%d).\n", TcpPort);
+        SWARN(3, "TCP port number not given by '-p' option. Use default (%d).\n", TcpPort);
     }
 }
 
@@ -296,7 +211,7 @@ static cudaError_t initDscuda(void) {
     unsigned int flags = 0; // should always be 0.
     CUresult err;
 
-    WARN(4, "#(info.)<--- %s()...\n", __func__);
+    SWARN(4, "#(info.)<--- %s()...\n", __func__);
 
     for (int i = 0; i < Ndevice; i++) {
         Devid2Vdevid[Devid[i]] = i;
@@ -308,36 +223,37 @@ static cudaError_t initDscuda(void) {
 
     err = cuInit(flags);
     if (err != CUDA_SUCCESS) {
-        WARN(0, "cuInit(%d) failed.\n", flags);
+        SWARN(0, "cuInit(%d) failed.\n", flags);
         exit(1);
     }
     err = (CUresult)cudaSetValidDevices(Devid, Ndevice);
     if (err != CUDA_SUCCESS) {
-        WARN(0, "cudaSetValidDevices(%p, %d) failed.\n", Devid, Ndevice);
+        SWARN(0, "cudaSetValidDevices(%p, %d) failed.\n", Devid, Ndevice);
         exit(1);
     }
     dscuDevice = Devid[0];
-    WARN(3, "cudaSetValidDevices(%p, %d). dscuDevice:%d\n",
+    SWARN(3, "cudaSetValidDevices(%p, %d). dscuDevice:%d\n",
          Devid, Ndevice, dscuDevice);
-    WARN(4, "#(info.)---> %s() done.\n", __func__);
+    SWARN(4, "#(info.)---> %s() done.\n", __func__);
     return (cudaError_t)err;
 }
 
-static cudaError_t createDscuContext(void) {
+cudaError_t createDscuContext(void)
+{
     //    unsigned int flags = 0; // should always be 0.
     CUdevice dev = 0;
     CUresult err;
 
     err = cuDeviceGet(&dev, dscuDevice);
     if (err != CUDA_SUCCESS) {
-        WARN(0, "cuDeviceGet() failed.\n");
+        SWARN(0, "cuDeviceGet() failed.\n");
         return (cudaError_t)err;
     }
 
 #if 0
     err = cuCtxCreate(&dscuContext, flags, dev);
     if (err != CUDA_SUCCESS) {
-        WARN(0, "cuCtxCreate() failed.\n");
+        SWARN(0, "cuCtxCreate() failed.\n");
         return (cudaError_t)err;
     }
 #else // not used. set a dummy value not to be called repeatedly.
@@ -347,25 +263,26 @@ static cudaError_t createDscuContext(void) {
     return (cudaError_t)err;
 }
 
-static cudaError_t destroyDscuContext(void) {
+cudaError_t destroyDscuContext(void)
+{
 #if 0
 
     CUresult cuerr;
     bool all = true;
 
-    WARN(3, "destroyDscuContext(");
+    SWARN(3, "destroyDscuContext(");
     releaseModules(all);
 
     cuerr = cuCtxDestroy(dscuContext);
-    WARN(4, "cuCtxDestroy(0x%08llx", dscuContext);
+    SWARN(4, "cuCtxDestroy(0x%08llx", dscuContext);
     if (cuerr != CUDA_SUCCESS) {
-        WARN(0, "cuCtxDestroy() failed.\n");
+        SWARN(0, "cuCtxDestroy() failed.\n");
         fatal_error(1);
         return (cudaError_t)cuerr;
     }
     dscuContext = NULL;
-    WARN(4, ") done.\n");
-    WARN(3, ") done.\n");
+    SWARN(4, ") done.\n");
+    SWARN(3, ") done.\n");
 
 #else
 
@@ -391,17 +308,17 @@ static void initEnv(void) {
         if (0 <= tmp) {
             dscudaSetWarnLevel(tmp);
         }
-        WARN(1, "WarnLevel: %d\n", dscudaWarnLevel());
+        SWARN(1, "WarnLevel: %d\n", dscudaWarnLevel());
     }
 
     // DSCUDA_REMOTECALL
     env = getenv("DSCUDA_REMOTECALL");
 #if defined(RPC_ONLY)
     UseIbv = 0;
-    WARN(2, "method of remote procedure call: RPC\n");
+    SWARN(2, "method of remote procedure call: RPC\n");
 #else
     if (D2Csock >= 0) { // launched by daemon.
-        WARN(3, "A server launched by the daemon "
+        SWARN(3, "A server launched by the daemon "
              "does not use the evironment variable 'DSCUDA_REMOTECALL'.\n");
     }
     else { // launched by hand.
@@ -411,15 +328,15 @@ static void initEnv(void) {
         }
         if (!strcmp(env, "ibv")) {
             UseIbv = 1;
-            WARN(2, "method of remote procedure call: InfiniBand Verbs\n");
+            SWARN(2, "method of remote procedure call: InfiniBand Verbs\n");
         }
         else if (!strcmp(env, "rpc")) {
             UseIbv = 0;
-            WARN(2, "method of remote procedure call: RPC\n");
+            SWARN(2, "method of remote procedure call: RPC\n");
         }
         else {
             UseIbv = 0;
-            WARN(2, "method of remote procedure call '%s' is not available. use RPC.\n", env);
+            SWARN(2, "method of remote procedure call '%s' is not available. use RPC.\n", env);
         }
     }
 #endif
@@ -435,7 +352,7 @@ static void initEnv(void) {
 	    DscudaSvr.setFaultInjection(tmp2[0]);
 	}
     }
-    WARN(1, "Fault Injection Config: 0x%x\n", DscudaSvr.getFaultInjection());
+    SWARN(1, "Fault Injection Config: 0x%x\n", DscudaSvr.getFaultInjection());
 
     /* Timed out */
     env = getenv("DSCUDA_FORCE_TIMEOUT"); // integer type.
@@ -448,7 +365,7 @@ static void initEnv(void) {
 	    DscudaSvr.force_timeout = tmp2[0];
 	}
     }
-    WARN(1, "Force Timeout Config: 0x%x\n", DscudaSvr.force_timeout);
+    SWARN(1, "Force Timeout Config: 0x%x\n", DscudaSvr.force_timeout);
 
     // --> add by Oikawa
 }
@@ -456,8 +373,7 @@ static void initEnv(void) {
 /*
  * Unload Modules never been used for a long time.
  */
-static void
-releaseModules(bool releaseall = false)
+void releaseModules(bool releaseall = false)
 {
     ServerModule *mp;
     int i;
@@ -470,7 +386,7 @@ releaseModules(bool releaseall = false)
             for (i = 0; i < RC_NKFUNCMAX; i++) {
                 mp->kfunc[i] = NULL;
             }
-            WARN(3, "%s() unloaded a module. name:%s pid:%d ip:%s age:%d\n",
+            SWARN(3, "%s() unloaded a module. name:%s pid:%d ip:%s age:%d\n",
 		 __func__, mp->name, mp->pid, dscudaGetIpaddrString(mp->ipaddr),
                  time(NULL) - mp->loaded_time);
         }
@@ -482,72 +398,71 @@ printSvrModuleList(ServerModule *module_list)
 {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	if (module_list[i].isValid()) {
-	    WARN(10, "#--- SvrModulelist[%d]\n", i);
-	    WARN(10, "#---    + ID=%u, ip=%u\n", module_list[i].id, module_list[i].ipaddr);
-	    WARN(10, "#---    + name=%s\n",   module_list[i].name);
+	    SWARN(10, "#--- SvrModulelist[%d]\n", i);
+	    SWARN(10, "#---    + ID=%u, ip=%u\n", module_list[i].id, module_list[i].ipaddr);
+	    SWARN(10, "#---    + name=%s\n",   module_list[i].name);
 	}
     }
 }
 
-static CUresult
+CUresult
 getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
-    WARN(10, "   + %s(kname=%s) {\n", __func__, kname);
+    SWARN(10, "   + %s(kname=%s) {\n", __func__, kname);
     CUresult cuerr;
     ServerModule *mp = SvrModulelist + moduleid;
 
     cuerr = cuModuleGetFunction(kfuncp, mp->handle, kname);
     if (cuerr == CUDA_SUCCESS) {
-        WARN(3, "(^_^) cuModuleGetFunction() : function '%s' found.\n", kname);
-	WARN(3, "(^_^) moduleid=%d, valid=%d, id=%d, name=%s\n",
+        SWARN(3, "(^_^) cuModuleGetFunction() : function '%s' found.\n", kname);
+	SWARN(3, "(^_^) moduleid=%d, valid=%d, id=%d, name=%s\n",
 	     moduleid, mp->valid, mp->id, mp->name);
 	printSvrModuleList(SvrModulelist);
     } else {
-        WARN(0, "(;_;) cuModuleGetFunction() : function:'%s'. %s\n",
+        SWARN(0, "(;_;) cuModuleGetFunction() : function:'%s'. %s\n",
              kname, cudaGetErrorString((cudaError_t)cuerr));
-	WARN(0, "(;_;) moduleid=%d, valid=%d, id=%d, name=%s\n",
+	SWARN(0, "(;_;) moduleid=%d, valid=%d, id=%d, name=%s\n",
 	     moduleid, mp->valid, mp->id, mp->name);
 	switch (cuerr) {
 	  case CUDA_ERROR_DEINITIALIZED:
-	    WARN(0, "CUDA_ERROR_DEINITIALIZED.\n");   break;
+	    SWARN(0, "CUDA_ERROR_DEINITIALIZED.\n");   break;
 	  case CUDA_ERROR_NOT_INITIALIZED:
-	    WARN(0, "CUDA_ERROR_NOT_INITIALIZED.\n"); break;
+	    SWARN(0, "CUDA_ERROR_NOT_INITIALIZED.\n"); break;
 	  case CUDA_ERROR_INVALID_CONTEXT:
-	    WARN(0, "CUDA_ERROR_INVALID_CONTEXT.\n"); break;
+	    SWARN(0, "CUDA_ERROR_INVALID_CONTEXT.\n"); break;
 	  case CUDA_ERROR_INVALID_VALUE:
-	    WARN(0, "CUDA_ERROR_INVALID_VALUE.\n");   break;
+	    SWARN(0, "CUDA_ERROR_INVALID_VALUE.\n");   break;
 	  case CUDA_ERROR_NOT_FOUND:
-	    WARN(0, "CUDA_ERROR_NOT_FOUND.\n");       break;
+	    SWARN(0, "CUDA_ERROR_NOT_FOUND.\n");       break;
 	  case CUDA_ERROR_INVALID_HANDLE:
-	    WARN(0, "CUDA_ERROR_INVALID_HANDLE.\n");  break;
+	    SWARN(0, "CUDA_ERROR_INVALID_HANDLE.\n");  break;
 	  default:
-	    WARN(0, "(unknown error code: %d)\n", cuerr);
+	    SWARN(0, "(unknown error code: %d)\n", cuerr);
 	}
         fatal_error(1);
     }
-    WARN(10, "   + }\n");
+    SWARN(10, "   + }\n");
     return cuerr;
 }
 
-static void
-getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
+void getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
 {
     CUresult cuerr;
     ServerModule *mp;
 
     if (moduleid < 0 || RC_NKMODULEMAX <= moduleid) {
-        WARN(0, "getGlobalSymbol() : invalid module id:%d.\n", moduleid);
+        SWARN(0, "getGlobalSymbol() : invalid module id:%d.\n", moduleid);
         fatal_error(1);
     }
     mp = SvrModulelist + moduleid;
     cuerr = cuModuleGetGlobal(dptr, size, mp->handle, symbolname);
     if (cuerr == CUDA_SUCCESS) {
-	WARN(3, "cuModuleGetGlobal(%p, %p, %p, %s) done."
+	SWARN(3, "cuModuleGetGlobal(%p, %p, %p, %s) done."
 	 " modulename:%s  symbolname:%s  *dptr:0x%08lx\n",
 	 dptr, size, mp->handle, symbolname,
 	 mp->name, symbolname, *dptr);
     }
     else {
-        WARN(0, "cuModuleGetGlobal(%p, %p, %p, 0x%08llx) failed."
+        SWARN(0, "cuModuleGetGlobal(%p, %p, %p, 0x%08llx) failed."
              " modulename:%s  symbolname:%s  %s\n",
              dptr, size, mp->handle, symbolname,
              mp->name, symbolname, cudaGetErrorString((cudaError_t)cuerr));
@@ -555,12 +470,12 @@ getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
     }
 }
 
-static int
-dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
+int dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
+{
     CUresult cuerr;
     ServerModule   *mp;
     int      i;
-    WARN(10, "<---Entering %s()\n", __func__);
+    SWARN(10, "<---Entering %s()\n", __func__);
 
 #if RC_CACHE_MODULE
     // look for mname in the module list, which may found if the client
@@ -574,13 +489,13 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
             found = 1;
             break;
         }
-	WARN(4, "ip:%x  %x    pid:%d  %d    name:%s  %s\n",
+	SWARN(4, "ip:%x  %x    pid:%d  %d    name:%s  %s\n",
 	     (unsigned int)ipaddr, mp->ipaddr, pid, mp->pid, mname, mp->name);
 	mp++;
     }
 
     if (found) { // module found. i.e, it's already loaded.
-        WARN(3, "\n\n------------------------------------------------------------------\n"
+        SWARN(3, "\n\n------------------------------------------------------------------\n"
              "dscudaloadmoduleid_1_svc() got multiple requests for\n"
              "  the same module name : %s,\n"
              "  the same process id  : %d, and\n"
@@ -591,7 +506,7 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
              "for better performance.\n"
              "------------------------------------------------------------------\n\n",
              mname, pid, dscudaGetIpaddrString(ipaddr));
-        WARN(3, "cuModuleLoadData() : a module found in the cache. id:%d  name:%s  age:%d\n",
+        SWARN(3, "cuModuleLoadData() : a module found in the cache. id:%d  name:%s  age:%d\n",
              mp->id, mname, time(NULL) - mp->loaded_time);
     }
     else  // module not found in the cache. load it from image.
@@ -600,13 +515,13 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
     {
         for (i=0, mp=SvrModulelist; i < RC_NKMODULEMAX; i++, mp++) { /* look for .valid==0 */
             if (mp->isInvalid()) break;
-            if (i >= RC_NKMODULEMAX) { WARN(0, "(+_+) module cache is full.\n"); fatal_error(1); }
+            if (i >= RC_NKMODULEMAX) { SWARN(0, "(+_+) module cache is full.\n"); fatal_error(1); }
         }
 	/* Register new SvrModulelist[i] */
         /* mp->id = i; */
         cuerr = cuModuleLoadData(&mp->handle, image); /* load .ptx string */
         if (cuerr != CUDA_SUCCESS) {
-            WARN(0, "cuModuleLoadData() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
+            SWARN(0, "cuModuleLoadData() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
             fatal_error(1);
         }
         mp->validate(); /* mp->valid  = 1;*/
@@ -614,27 +529,26 @@ dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
         mp->pid    = pid;
         strncpy(mp->name, mname, sizeof(SvrModulelist[0].name));
         for (i=0; i<RC_NKFUNCMAX; i++) { mp->kfunc[i] = NULL; }
-        WARN(3, "cuModuleLoadData() : a module loaded. id:%d  name:%s\n", mp->id, mname);
+        SWARN(3, "cuModuleLoadData() : a module loaded. id:%d  name:%s\n", mp->id, mname);
     }
     mp->loaded_time = time(NULL); // (re)set the lifetime of the cache.
     releaseModules();
 
-    WARN(10, "--->Exiting  %s()\n", __func__);
+    SWARN(10, "--->Exiting  %s()\n", __func__);
     return mp->id;
 }
 
-static void *
-dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
+void *dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
                    RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args)
 {
     static int called_count = 0;
     static int dummyres     = 123;
-    WARN(10, "%s(int moduleid=%d, int kid=%d, char *kname=%s), %d called.\n",
+    SWARN(10, "%s(int moduleid=%d, int kid=%d, char *kname=%s), %d called.\n",
 	 __func__, moduleid, kid, kname, called_count);
 
     if ( DscudaSvr.force_timeout > 0 ) {
 	if ( called_count >= 3 ) {
-	    WARN(2, "sleeping 60 sec...\n");
+	    SWARN(2, "sleeping 60 sec...\n");
 	    sleep(60);
 	}
     }
@@ -651,7 +565,7 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
     // load a kernel function into Module[moduleid].kfunc[kid]
     // form Module[moduleid].handle.
     if (moduleid < 0 || RC_NKMODULEMAX <= moduleid) {
-        WARN(0, "dscudalaunchkernelid_1_svc() : invalid module id:%d.\n", moduleid);
+        SWARN(0, "dscudalaunchkernelid_1_svc() : invalid module id:%d.\n", moduleid);
         fatal_error(1);
     }
 
@@ -674,60 +588,60 @@ dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/
     // now make it run.
     if (UseIbv) {
 #if !defined(RPC_ONLY)
-	WARN(10, "ibvUnpackKernelParam()\n");
+	SWARN(10, "ibvUnpackKernelParam()\n");
         paramsize = ibvUnpackKernelParam(&kfunc, args.RCargs_len, (IbvArg *)args.RCargs_val);
 #endif
     } else {
-	WARN(10, "rpcUnpackKernelParam()\n");
+	SWARN(10, "rpcUnpackKernelParam()\n");
         paramsize = rpcUnpackKernelParam(&kfunc, &args);
     }
     cuerr = cuParamSetSize(kfunc, paramsize);
     if (cuerr != CUDA_SUCCESS) {
-        WARN(0, "cuParamSetSize() failed. size:%d %s\n",
+        SWARN(0, "cuParamSetSize() failed. size:%d %s\n",
              paramsize, cudaGetErrorString((cudaError_t)cuerr));
         fatal_error(1);
     }
-    WARN(5, "cuParamSetSize() done.\n");
+    SWARN(5, "cuParamSetSize() done.\n");
 
     cuerr = cuFuncSetBlockShape(kfunc, bdim.x, bdim.y, bdim.z);
     if (cuerr != CUDA_SUCCESS) {
-        WARN(0, "cuFuncSetBlockShape() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
+        SWARN(0, "cuFuncSetBlockShape() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
         fatal_error(1);
     }
-    WARN(5, "cuFuncSetBlockShape() done.\n");
+    SWARN(5, "cuFuncSetBlockShape() done.\n");
 
     if (smemsize != 0) {
         cuerr = cuFuncSetSharedSize(kfunc, smemsize);
         if (cuerr != CUDA_SUCCESS) {
-            WARN(0, "cuFuncSetSharedSize() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
+            SWARN(0, "cuFuncSetSharedSize() failed. %s\n", cudaGetErrorString((cudaError_t)cuerr));
             fatal_error(1);
         }
-        WARN(5, "cuFuncSetSharedSize() done.\n");
+        SWARN(5, "cuFuncSetSharedSize() done.\n");
     }
 
     if ((cudaStream_t)stream == NULL) {
         cuerr = cuLaunchGrid(kfunc, gdim.x, gdim.y);  /* Launch Kernel Function */
         if (cuerr != CUDA_SUCCESS) {
-            WARN(0, "cuLaunchGrid() failed. kname:%s %s\n",
+            SWARN(0, "cuLaunchGrid() failed. kname:%s %s\n",
                  kname, cudaGetErrorString((cudaError_t)cuerr));
             fatal_error(1);
         }
-        WARN(3, "cuLaunchGrid() done. kname:%s\n", kname);
+        SWARN(3, "cuLaunchGrid() done. kname:%s\n", kname);
     } else {
         cuerr = cuLaunchGridAsync(kfunc, gdim.x, gdim.y, (cudaStream_t)stream);
         if (cuerr != CUDA_SUCCESS) {
-            WARN(0, "cuLaunchGridAsync() failed. kname:%s  %s\n",
+            SWARN(0, "cuLaunchGridAsync() failed. kname:%s  %s\n",
                  kname, cudaGetErrorString((cudaError_t)cuerr));
             fatal_error(1);
         }
-        WARN(3, "cuLaunchGridAsync() done.  kname:%s  stream:0x%08llx\n", kname, stream);
+        SWARN(3, "cuLaunchGridAsync() done.  kname:%s  stream:0x%08llx\n", kname, stream);
     }
-    WARN(10, "+--- Done. %s() %d called.\n", __func__, called_count );
+    SWARN(10, "+--- Done. %s() %d called.\n", __func__, called_count );
     called_count++;
     return &dummyres; // seems necessary to return something even if it's not used by the client.
 }
 
-static cudaError_t
+cudaError_t
 setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DESCRIPTOR *descp)
 {
     cudaError_t err;
@@ -799,7 +713,7 @@ setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DE
         fmt_low = 2;
         break;
       default:
-        WARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.x:%d\n",
+        SWARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.x:%d\n",
              texname, texbuf.x);
         err = cudaErrorInvalidValue;
         return err;
@@ -818,13 +732,13 @@ setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DE
         break;
 
       case cudaChannelFormatKindNone:
-        WARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.f:%s\n",
+        SWARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.f:%s\n",
              texname, "cudaChannelFormatKindNone");
         err = cudaErrorInvalidValue;
         return err;
 
       default:
-        WARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.f:%s\n",
+        SWARN(0, "cuModuleGetTexRef() invalid channel format. texture name:%s descriptor.f:%s\n",
              texname, texbuf.f);
         err = cudaErrorInvalidValue;
         return err;
@@ -838,7 +752,7 @@ setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DE
         descp->Format = fmt[fmt_index];
         descp->NumChannels = ncomponent;
     }
-    WARN(4, "cuTexRefSetFormat(%p, %d, %d)\n", texref, fmt[fmt_index], ncomponent);
+    SWARN(4, "cuTexRefSetFormat(%p, %d, %d)\n", texref, fmt[fmt_index], ncomponent);
     err = (cudaError_t)cuTexRefSetFormat(texref, fmt[fmt_index], ncomponent);
     if (err != cudaSuccess) {
         check_cuda_error(err);

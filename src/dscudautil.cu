@@ -73,3 +73,26 @@ double RCgetCputime(double *t0) {
     *t0 = tnow;
     return dt;
 }
+//--
+//--
+//--
+int sprintfDate(char *s, int fmt)
+{
+    time_t now;
+    struct tm *local;
+    //--
+    now   = time(NULL);
+    local = localtime(&now);
+    switch (fmt) {
+    case 0: // "MMDD_hhmmss"
+	strftime(s, 32, "%m%d_%H%M%S", local);
+	break;
+    case 1:
+	strftime(s, 32, "%H%M%S", local);
+	break;
+    default:
+	fprintf(stderr, "%s():error undefined switch branch.\n");
+	exit(1);
+    }
+    return 0;
+}

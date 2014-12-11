@@ -99,19 +99,22 @@ dummyclient :	dummyclient.c
 ### Generate "dscudasvr"
 ###
 DSCUDASVR_OBJ = $(RPCBASE)_svc.o $(RPCBASE)_xdr.o dscudautil.o sockutil.o
-dscudasvr: dscudasvr.o $(DSCUDASVR_OBJ)
+dscudasvr: dscudasvr.o dscudasvr_rpc.o $(DSCUDASVR_OBJ)
 	@echo "//******************"
 	@echo "//**  dscudasvr  ***"
 	@echo "//******************"
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 #----
-dscudasvr.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h
+dscudasvr_rpc.o: dscudasvr_rpc.cu dscudasvr_rpc.h
+	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
+#----
+dscudasvr.o: dscudasvr.cu dscuda.h dscudarpc.h sockutil.h
 	@echo "//********************"
 	@echo "//**  dscudasvr.o  ***"
 	@echo "//********************"
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
 #----
-dscudasvr_fault:  dscudasvr_fault.o $(DSCUDASVR_OBJ)
+dscudasvr_fault:  dscudasvr_fault.o dscudasvr_rpc.o $(DSCUDASVR_OBJ)
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
 dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  

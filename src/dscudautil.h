@@ -10,6 +10,7 @@
 //------------------------------------------------------------------------------
 #ifndef DSCUDAUTIL_H
 #define DSCUDAUTIL_H
+int         sprintfDate(char *s, int fmt=0);
 int         dscudaWarnLevel(void);
 void        dscudaSetWarnLevel(int level);
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);

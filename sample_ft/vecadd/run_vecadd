@@ -1,24 +1,25 @@
 #!/bin/bash
 
+cmdname=${0}
 mode=${1}
 
 if [ "${mode}" = "MONO" ]; then
-    echo "MONO"
+    echo "${cmdname}:MONO"
     DSCUDA_SERVER="ds15:0"
 elif [ "${mode}" = "POLY2" ]; then
-    echo "POLY2"
+    echo "${cmdname}:POLY2"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1"
 elif [ "${mode}" = "POLY3" ]; then
-    echo "POLY3"
+    echo "${cmdname}:POLY3"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2"
 elif [ "${mode}" = "POLY4" ]; then
-    echo "POLY4"
+    echo "${cmdname}:POLY4"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3"
 elif [ "${mode}" = "POLY8" ]; then
-    echo "POLY8"
+    echo "${cmdname}:POLY8"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2,c4hdn:3,c5hdn:0,c5hdn:1,c5hdn:2,c5hdn:3"
 else
-    echo "add MONO or POLYn for 1st parameter"
+    echo "${cmdname}:add MONO or POLYn for 1st parameter"
     exit 1
 fi
 export DSCUDA_SERVER
