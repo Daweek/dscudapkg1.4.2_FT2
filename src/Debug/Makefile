@@ -10,7 +10,7 @@ endif
 GCCVER = 4.4
 RPCGEN        = rpcgen -N -D__LP64__=$(LP64)
 CC           ?= /usr/bin/gcc-$(GCCVER)
-CFLAGS       ?= -O0 -g -ffast-math -funroll-loops
+CFLAGS       ?= -O0 -g 
 CXX          ?= /usr/bin/g++-$(GCCVER)
 CXXFLAGS     ?= -O0 -g -ffast-math -funroll-loops
 CUDAPATH     ?= /usr/local/cuda

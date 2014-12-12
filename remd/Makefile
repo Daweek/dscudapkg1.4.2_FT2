@@ -11,15 +11,15 @@
 #CCLIB		= -lpthread -lgomp
 CUDAPATH        ?= /usr/local/cuda-4.2/cuda
 CUDALIB		= -L$(CUDAPATH)/lib64 -lcudart -lGLU -lGL
-DSCUDA_PATH     = /home/m_oikawa/dscudapkg
+DSCUDA_PATH     ?= /home/m_oikawa/dscudapkg
 DSCUDAFLAGS     = -I$(DSCUDA_PATH)/include
 DSCUDALIB_IBV	= -ldscuda_ibv -lrdmacm -libverbs 
 DSCUDALIB_RPC   = -ldscuda_rpc
 
 #### compilers selection 
-CC = gcc
-CXX = g++
-NVCC = $(CUDAPATH)/bin/nvcc
+CC ?= gcc
+CXX ?= g++
+NVCC ?= $(CUDAPATH)/bin/nvcc
 DSCUDACPP ?= /bin/dscudacpp
 
 CPPFLAGS = 
@@ -29,22 +29,22 @@ NVCCFLAGS = -O2 -g -I${CUDASDKPATH}/CUDALibraries/common/inc -I${HOME} \
 
 OUTPUT_FILE = histogram/histogram*.dat index_replica.dat energy_replica.dat input.txt acceptance_ratio.dat
 
-SRCS = mytools.C mytools.H calc_force.cu calc_force.H comm_save.cu comm_save.H \
+SRCS = calc_force.cu calc_force.H comm_save.cu comm_save.H \
        init_cond.cu  init_cond.H integ.cu integ.H \
        remd_top.cu remd_typedef.H switch_float_double.H \
        remd_config.idata config_dev.idata config_hst.idata test_debug.cu
 
 EXES = remd_top
 
-OBJS_HST = remd_top_hst.o init_cond.o integ_hst.o comm_save_hst.o mytools.o
+OBJS_HST = remd_top_hst.o init_cond.o integ_hst.o comm_save_hst.o 
 
 OBJS_DEV = remd_top_dev.o init_cond.o integ_dev.o comm_save_dev.o mytools.o
 
 OBJS_DEV_FJ = remd_top_dev.o init_cond.o integ_dev.fault.o comm_save_dev.o mytools.o
 
-OBJS_DS  = remd_top_ds.o  init_cond.o integ_ds.o  comm_save_ds.o  mytools.o
+OBJS_DS  = remd_top_ds.o  init_cond.o integ_ds.o  comm_save_ds.o mytools.o
 
-OBJS_DS_RCUT = remd_top_ds.o  init_cond.o integ_ds_rcut.o  comm_save_ds.o  mytools.o
+OBJS_DS_RCUT = remd_top_ds.o  init_cond.o integ_ds_rcut.o  comm_save_ds.o 
 
 curr : remd_rpc
 
@@ -63,7 +63,7 @@ remd_local : $(OBJS_DEV)
 	@echo "//"
 	@echo "// Generate remd_local"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 $^ $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 $^ $(CCLIB) -lrt -o $@
 
 remd_local.fault : $(OBJS_DEV_FJ)
 	@echo "//"
@@ -98,8 +98,10 @@ remd_rpc_rcut : $(OBJS_DS_RCUT)
 #
 remd_top_hst.o : remd_top.cu
 	$(NVCC) -c -D"HOST_RUN" $(NVCCFLAGS) $< -o $@
+
 remd_top_dev.o : remd_top.cu
 	$(NVCC) -c -D"DEVICE_RUN" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o $@
+
 remd_top_ds.o  : remd_top.cu
 	$(DSCUDACPP) -c -D"DEVICE_RUN" -I. $(NVCCFLAGS) -i $< -o $@
 
@@ -107,31 +109,34 @@ remd_top.cu : init_cond.H remd_typedef.H mytools.H
 #
 # integ.cu : cpu(*_hst.o) / cuda(*_dev.o) / ds-cuda(*_ds.o)
 #
-integ_hst.o : integ.cu
+integ_hst.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(NVCC) -c -D"HOST_RUN" $(NVCCFLAGS) $< -o $@
-integ_dev.o : integ.cu
+
+integ_dev.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(NVCC) -c -D"DEVICE_RUN" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o $@
-integ_dev.fault.o : integ.cu
+
+integ_dev.fault.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(NVCC) -c -D"DEVICE_RUN" -D"FAULT_ON" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o $@
-integ_dev_meas_kernel.o : integ.cu
+
+integ_dev_meas_kernel.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(NVCC) -c -D"DEVICE_RUN" -D"MEAS_CUDA_EVENT" $(NVCCFLAGS)  $< -o $@
-integ_ds.o  : integ.cu
+
+integ_ds.o  : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"__DSCUDA__" -I. $(NVCCFLAGS) -i $< -o $@
-integ_ds_rcut.o : integ.cu
+
+integ_ds_rcut.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"RCUT_COUNT" -I. $(NVCCFLAGS) -i $< -o $@
-integ.cu : switch_float_double.H remd_typedef.H mytools.H init_cond.H \
-           calc_force.cu integ.H
 #
 # comm_save.cu
 #
-comm_save_hst.o : comm_save.cu
+comm_save_hst.o : comm_save.cu switch_float_double.H mytools.H remd_typedef.H init_cond.H integ.H comm_save.H
 	$(NVCC) -c -D"HOST_RUN" $(NVCCFLAGS) $< -o $@
-comm_save_dev.o : comm_save.cu
+#
+comm_save_dev.o : comm_save.cu switch_float_double.H mytools.H remd_typedef.H init_cond.H integ.H comm_save.H
 	$(NVCC) -c -D"DEVICE_RUN" $(NVCCFLAGS) $< -o $@
-comm_save_ds.o  : comm_save.cu
+#
+comm_save_ds.o  : comm_save.cu switch_float_double.H mytools.H remd_typedef.H init_cond.H integ.H comm_save.H
 	$(DSCUDACPP) -c -D"DEVICE_RUN" -I. $(NVCCFLAGS) -i $< -o $@
-comm_save.cu : switch_float_double.H mytools.H remd_typedef.H init_cond.H \
-               integ.H comm_save.H
 #
 # init_cond.cu
 #
@@ -142,8 +147,8 @@ init_cond.H : mytools.H
 #
 # etc
 #
-mytools.o : mytools.cu
-	$(NVCC) -c $(NVCCFLAGS) $< -o $@
+mytools.o : mytools.C mytools.H
+	$(NVCC) -c -x cu $(NVCCFLAGS) $< -o $@
 #---
 #--- PHONY
 #---

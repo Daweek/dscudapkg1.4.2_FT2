@@ -1,5 +1,5 @@
 #!/bin/bash
-
+###-----------------------------------------------------------------------------
 cmdname=${0}
 mode=${1}
 
@@ -8,7 +8,7 @@ if [ "${mode}" = "MONO" ]; then
     DSCUDA_SERVER="ds15:0"
 elif [ "${mode}" = "POLY2" ]; then
     echo "${cmdname}:POLY2"
-    DSCUDA_SERVER="c4hdn:0,c4hdn:1"
+    DSCUDA_SERVER="ds15:0,ds16:0"
 elif [ "${mode}" = "POLY3" ]; then
     echo "${cmdname}:POLY3"
     DSCUDA_SERVER="c4hdn:0,c4hdn:1,c4hdn:2"
@@ -39,6 +39,13 @@ export OMP_NUM_THREADS=1
 
 #~/bin/env_dscuda
 
+#gnome-terminal -e "bash -c ./dslogmon" &> /dev/null & 
+#xterm -e "bash -c ./dslogmon" -geometry 105x25+0+0 &> /dev/null &
+gnome-terminal --geometry=105x25+0+0 -e "bash -c ./dslogmon" &> /dev/null & 
+
 ./vecadd_rpc
+#gdb -tui ./vecadd_rpc
+
 #./vecadd_rpc 2>&1 | tee vecadd_rpc.log
-#emacs vecadd.cu 
+#emacs vecadd.cu
+

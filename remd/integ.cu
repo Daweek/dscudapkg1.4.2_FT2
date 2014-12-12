@@ -384,8 +384,8 @@ void simRemd( Remd_t &remd, Simu_t &simu)
 	}
 	
 #if defined(__DSCUDA__)
-	dscudaClearHist();     /*** <--- Clear Recall List.        ***/
-	dscudaRecordHistOff();  /*** <--- Enable recording history. ***/ 
+	//	dscudaClearHist();     /*** <--- Clear Recall List.        ***/
+	//dscudaRecordHistOff();  /*** <--- Enable recording history. ***/ 
 #endif
 	if (simu.report_posi >= 1)  { savePosAll(t0 * step_exch);      } // cudaMemcpyD2H * Nrep
 	if (simu.report_velo >= 1)  { saveVelAll(t0 * step_exch);      } // cudaMemcpyD2H * Nrep
@@ -413,7 +413,7 @@ void simRemd( Remd_t &remd, Simu_t &simu)
 	}
 
 #if defined( __DSCUDA__ )
-	dscudaRecordHistOn();  /*** <--- Enable recording history. ***/ 
+	//dscudaRecordHistOn();  /*** <--- Enable recording history. ***/ 
 #endif
 
 	//	printf("checksum: Pos[t0=%d before]= %d\n",
@@ -439,12 +439,12 @@ void simRemd( Remd_t &remd, Simu_t &simu)
 	copyEnergy( D2H, remd, simu );       /* Correct data of potential energy. */
 
 #if defined( __DSCUDA__ )
-	dscudaRecordHistOff();
+	//dscudaRecordHistOff();
 #endif
 	//savePosAll(t0 * step_exch + 100000);
 #if defined( __DSCUDA__ )
-	dscudaAutoVerbOn();
-	dscudaClearHist();          /*** <--- Clear Recall List.        ***/
+	//dscudaAutoVerbOn();
+	//dscudaClearHist();          /*** <--- Clear Recall List.        ***/
 #endif
 	if( simu.report_ene >= 2)   { saveEne(remd, t0); }
 #if 0

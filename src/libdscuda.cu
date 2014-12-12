@@ -1086,7 +1086,8 @@ static void updateSpareServerList(void) {
     SvrSpare.num = spare_count;
 }
 
-static void getenvWarnLevel(void) {
+static void getenvWarnLevel(void)
+{
     char *env = getenv("DSCUDA_WARNLEVEL");
     int val;
     if ( env ) {
@@ -1100,24 +1101,27 @@ static void getenvWarnLevel(void) {
     } else {
 	dscudaSetWarnLevel(RC_WARNLEVEL_DEFAULT);
     }
-    WARN(1, "Found DSCUDA_WARNLEVEL= %d\n", dscudaWarnLevel());
+
 }
 
-static void getenvDscudaPath(void) {
+static void
+getenvDSCUDA_PATH(void)
+{
     char *env = getenv("DSCUDA_PATH");
-    if ( env != NULL ) {
+    if (env != NULL) {
 	strncpy(DscudaPath, env, sizeof(DscudaPath)); //"DscudaPath" has global scape.
     } else {
         fprintf(stderr, "(;_;)Not Found the environment variable 'DSCUDA_PATH'.\n");
         exit(EXIT_FAILURE);
     }
-    WARN(2, "Found DSCUDA_PATH= %s\n", DscudaPath);
 }
 
 /*
  *
  */
-void ClientState_t::setFaultTolerantMode(void) {
+void
+ClientState_t::setFaultTolerantMode(void)
+{
     char *env;
 
     env = getenv( "DSCUDA_USEDAEMON" );
@@ -1187,21 +1191,6 @@ void ClientState_t::setFaultTolerantMode(void) {
 	}
     }
 
-    WARN( 2, "Found DSCUDA_USEDAEMON=%d\n", daemon    );
-    WARN( 2, "Found DSCUDA_AUTOVERB=%d\n",  autoverb  );
-    WARN( 2, "Found DSCUDA_MIGRATION=%d\n", migration );
-    WARN( 2, "*****************************************************\n");
-    WARN( 2, "***  Configured Fault Tolerant Mode as ");
-    switch ( ft_mode ) {
-    case FT_PLAIN: WARN0( 2, "\"FT_PLAIN\" ***\n"); break;
-    case FT_REDUN: WARN0( 2, "\"FT_REDUN\" ***\n"); break;
-    case FT_MIGRA: WARN0( 2, "\"FT_MIGRA\" ***\n"); break;
-    case FT_BOTH:  WARN0( 2, "\"FT_BOTH\"  ***\n"); break;
-    default:
-	WARN0( 0, "(UNKNOWN).\n");
-	exit( EXIT_FAILURE );
-    }
-    WARN( 2, "*****************************************************\n");
     return;
 }
 
@@ -1321,24 +1310,67 @@ ClientState_t::ClientState_t(void)
 	}
     }
     
-    WARN(9, "ClinetState_t::ClientState_t() {\n");
+    INFO0("\
+###******************************************************************************\n\
+###***                                                                          *\n\
+###***   Start process of DS-CUDA client library.                               *\n\
+###***                                                                          *\n\
+###******************************************************************************\n");
+    INFO0("[ DS-CUDA Version      ] %s\n", RC_DSCUDA_VER);
+    {
+	/* Capture start time and print to logfile. */
+	char s_time[80];
+	struct tm *timebuf;
+	start_time = time(NULL);
+	timebuf = localtime(&start_time);
+	strftime(s_time, 80, "%T (%F)", timebuf);
+	INFO0("[ Start time           ] %s\n", s_time);
+    }
+    {
+	/* Print IP address of DS-CUDA client host. */
+	struct sockaddr_in addrin;
+	get_myaddress(&addrin);
+	setIpAddress(addrin.sin_addr.s_addr);
+	INFO0("[ IP address of client ] %s\n",dscudaGetIpaddrString(St.getIpAddress()));
+    }
+    {
+	char path[1024];
+	getcwd(path, 1024);
+	INFO0("[ Working Directory    ] %s\n", path);
+	INFO0("[ Process ID (PID)     ] %d\n", getpid());
+    }
     ServerArray_t svr_array;
 
-    start_time = time( NULL);
-    WARN(1, "Found DSCUDA_VERSION= %s\n", RC_DSCUDA_VER);
-
-    ip_addr     = 0;
     use_ibv     = 0;
     autoverb    = 0;
     migration   = 0;
     daemon      = 0;
     historical_calling = 0;
+    {
+	getenvDSCUDA_PATH();      /* set from DSCUDA_PATH */
+	INFO0("[ Environment varialbe ] DSCUDA_PATH      = %s\n", DscudaPath);
+    }
+    {
+	getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
+	INFO0("[ Environment variable ] DSCUDA_WARNLEVEL = %d\n", dscudaWarnLevel());
+    }
+    {
+	setFaultTolerantMode();
+	INFO0("[ Environment variable ] DSCUDA_USEDAEMON = %d\n", daemon);
+	INFO0("[ Environment variable ] DSCUDA_AUTOVERB  = %d\n", autoverb);
+	INFO0("[ Environment variable ] DSCUDA_MIGRATION = %d\n", migration);
+	INFO0("[ Fault Tolerant Mode  ] ");
+	switch (ft_mode) {
+	case FT_PLAIN: INFO0("\"FT_PLAIN\"\n"); break;
+	case FT_REDUN: INFO0("\"FT_REDUN\"\n"); break;
+	case FT_MIGRA: INFO0("\"FT_MIGRA\"\n"); break;
+	case FT_BOTH:  INFO0("\"FT_BOTH\"\n"); break;
+	default:
+	    WARN0(0, "(UNKNOWN).\n");
+	    exit(EXIT_FAILURE);
+	}
+    }
 
-    getenvDscudaPath();      /* set from DSCUDA_PATH */
-    getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
-    
-	
-    setFaultTolerantMode();
     dscudaSearchDaemon();
     initVirtualDeviceList();  /* Update the list of virtual devices */
 
@@ -1377,22 +1409,20 @@ ClientState_t::ClientState_t(void)
 		 i, j, Vdev[i].server[j].Clnt);
         }
     }
-    struct sockaddr_in addrin;
-    get_myaddress(&addrin);
-    setIpAddress(addrin.sin_addr.s_addr);
 
-    WARN(2, "Client IP address : %s\n", dscudaGetIpaddrString(St.getIpAddress()));
-    
-    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+    switch (ft_mode) {
+    case FT_REDUN: // thru
+    case FT_MIGRA: // thru
+    case FT_BOTH:
 	WARN(1, "[ERRORSTATICS] start.\n" );
 	/********************************************
 	 ***>  Create the CHECKPOINTING thread.  <***
-	 ********************************************/
+	     ********************************************/
 	pthread_create(&tid, NULL, periodicCheckpoint, (void *)&cp_period);
+	break;
+    default:
+	WARN(1, "[ERRORSTATICS] disabled.\n" );
     }
-
-    WARN(9, "} ClinetState_t::ClientState_t()\n");
-    WARN(9, "\n");
 } //--> ClientState_t::ClientState_t(void)
 //--
 //--
@@ -1411,29 +1441,42 @@ ClientState_t::~ClientState_t(void)
     stop_time = time( NULL);
     exe_time = stop_time - start_time;
 
-    WARN( 1, "[ERRORSTATICS] stop.\n" );
-    WARN( 1, "[ERRORSTATICS] ************** Summary *******************************\n" );
-    
-    my_local = localtime( &start_time);
-    strftime( my_tfmt, 64, "%c", my_local);
-    WARN( 1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
-    
-    my_local = localtime( &stop_time);
-    strftime( my_tfmt, 64, "%c", my_local);
-    WARN( 1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
-
-    my_local = localtime( &exe_time);
-    strftime( my_tfmt, 64, "%s", my_local);
-    WARN( 1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
-    for (int i=0; i<Nvdev; i++) {
-	WARN( 1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
-	for (int j=0; j<Vdev[i].nredundancy; j++) {
+    switch (ft_mode) {
+    case FT_REDUN: // thru
+    case FT_MIGRA: // thru
+    case FT_BOTH:  // thru
+	WARN(1, "[ERRORSTATICS] stop.\n" );
+	WARN(1, "[ERRORSTATICS] ************** Summary *******************************\n" );
+	
+	my_local = localtime( &start_time);
+	strftime( my_tfmt, 64, "%c", my_local);
+	WARN(1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
+	
+	my_local = localtime( &stop_time);
+	strftime( my_tfmt, 64, "%c", my_local);
+	WARN(1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
+	
+	my_local = localtime( &exe_time);
+	strftime( my_tfmt, 64, "%s", my_local);
+	WARN(1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
+	for (int i=0; i<Nvdev; i++) {
+	    WARN(1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
+	    for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    svr = &Vdev[i].server[j];
-	    WARN( 1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
+	    WARN(1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
 		  j, svr->ip, svr->hostname, svr->stat_error, svr->stat_correct);
+	    }
 	}
-    }
-    WARN( 1, "[ERRORSTATICS] ******************************************************\n" );
+	WARN(1, "[ERRORSTATICS] ******************************************************\n" );
+	break;
+    default:
+	WARN(1, "[ERRORSTATICS] none.\n");
+    } // switch
+    INFO("*****************************************************************\n");
+    INFO("***                                                           ***\n");
+    INFO("***    DS-CUDA client library process was completed. (^_^)/   ***\n");
+    INFO("***                                                           ***\n");
+    INFO("*****************************************************************\n");
 } //--> ClientState_t::~ClientState_t(void)
 
 void VirDev_t::invalidateAllModuleCache(void)

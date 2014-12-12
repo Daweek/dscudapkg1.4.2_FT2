@@ -39,7 +39,7 @@ void testFuncCopyExch(Remd_t &remd, Simu_t &simu);
 //===============================================================================
 int main(int argc, char **argv)
 {
-  Stopwatch_t timer[3];
+  Stopwatch timer[3];
   int ndev;
   cudaError_t cu_err;
 

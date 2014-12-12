@@ -11,6 +11,9 @@
 #ifndef DSCUDAUTIL_H
 #define DSCUDAUTIL_H
 
+#include <stdio.h>
+#include <time.h>
+
 int         dscudaWarnLevel(void);
 void        dscudaSetWarnLevel(int level);
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);
@@ -20,6 +23,8 @@ int         sprintfDate(char *s, int fmt=0);
 void*       xmalloc(size_t size);
 void        xfree(void *p);
 
+extern struct ClientState_t St;
+
 #define MACRO_TSTAMP_FORMAT						\
 	time_t now = time(NULL);					\
 	struct tm *local = localtime( &now );				\
@@ -28,28 +33,32 @@ void        xfree(void *p);
 
 #define INFO(fmt, args...) {						\
 	MACRO_TSTAMP_FORMAT						\
-	fprintf(stderr, "[%s](DSC-INFO) ", tfmt);			\
-	fprintf(stderr, fmt, ## args);					\
+	fprintf(St.dscuda_stdout, "[%s]info: ", tfmt);			\
+	fprintf(St.dscuda_stdout, fmt, ## args);			\
+    }
+
+#define INFO0(fmt, args...) {\
+	fprintf(St.dscuda_stdout, fmt, ## args);\
     }
 
 #define ERROR(fmt, args...) {						\
     	MACRO_TSTAMP_FORMAT						\
-	fprintf(stderr, "[%s](DSC-ERROR) ", tfmt);			\
-	fprintf(stderr, fmt, ## args);					\
+	fprintf(St.dscuda_stdout, "[%s](DSC-ERROR) ", tfmt);	\
+	fprintf(St.dscuda_stdout, fmt, ## args);			\
     }
 
 //-- [DSCUDA CLIENT] WARING Message.
 #define WARN(lv, fmt, args...) {					\
 	if (lv <= dscudaWarnLevel()) {					\
 	    MACRO_TSTAMP_FORMAT						\
-	    fprintf( St.dscuda_stdout, "[%s](DSC-%d) ", tfmt, lv);	\
-	    fprintf( St.dscuda_stdout, fmt, ## args);			\
+	    fprintf(St.dscuda_stdout, "[%s](%d) ", tfmt, lv);	\
+	    fprintf(St.dscuda_stdout, fmt, ## args);			\
 	}								\
     }
 
 #define WARN0(lv, fmt, args...) {			       \
 	if (lv <= dscudaWarnLevel()) {			       \
-	    fprintf( stderr, fmt, ## args);	       \
+	    fprintf( St.dscuda_stdout, fmt, ## args);	       \
 	}						       \
     }
 
@@ -68,6 +77,11 @@ void        xfree(void *p);
 	fprintf(stderr, "[%s]", tfmt);					\
 	fprintf(stderr, "(SVR[%d]-%d) " fmt, TcpPort - RC_SERVER_IP_PORT, lv, ## args); \
     }
+#define SWARN0(lv, fmt, args...) {			       \
+	if (lv <= dscudaWarnLevel()) {			       \
+	    fprintf(stderr, fmt, ## args);		       \
+	}						       \
+    }
 
 //-- [DSCUDA DAEMON] WARNING Message.
 #define DWARN(lv, fmt, args...) {					\
@@ -77,7 +91,6 @@ void        xfree(void *p);
 	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\
 	}								\
     }
-
 
 #define check_cuda_error(err) {						\
 	if (cudaSuccess != err) {					\

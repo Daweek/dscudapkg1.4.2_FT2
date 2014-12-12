@@ -20,8 +20,6 @@
 #include "dscudautil.h"
 #include "dscudarpc.h"
 #include "dscudadefs.h"
-//#include "dscudamacros.h"
-//#include "dscudaverb.h"
 #include "libdscuda.h"
 
 typedef unsigned long DscudaUva_t; /* Global virtual address type */
