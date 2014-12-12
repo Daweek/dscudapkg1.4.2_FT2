@@ -28,7 +28,7 @@
 #include "dscuda.h"
 #include "libdscuda.h"
 #include "dscudadefs.h"
-#include "dscudamacros.h"
+#include "dscudautil.h"
 #include "dscudarpc.h"
 #include "dscudasvr.h"
 #include "dscudasvr_rpc.h"

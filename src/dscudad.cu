@@ -26,7 +26,7 @@
 #include <time.h>
 #include "dscuda.h"
 #include "dscudadefs.h"
-#include "dscudamacros.h"
+#include "dscudautil.h"
 #include "sockutil.h"
 
 #define NBACKLOG 1   // max # of servers can be put into the listening queue.

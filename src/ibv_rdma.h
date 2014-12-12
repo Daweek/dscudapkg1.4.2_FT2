@@ -26,7 +26,7 @@ typedef struct {
 #include <cuda_runtime_api.h>
 #include "dscudadefs.h"
 #include "dscudarpc.h"
-#include "dscudamacros.h"
+#include "dscudautil.h"
 
 #define TEST_NZ(x) do { if ( (x)) {WARN(0, #x " failed (returned non-zero).\n" ); exit(EXIT_FAILURE); } } while (0)
 #define TEST_Z(x)  do { if (!(x)) {WARN(0, #x " failed (returned zero/null).\n"); exit(EXIT_FAILURE); } } while (0)

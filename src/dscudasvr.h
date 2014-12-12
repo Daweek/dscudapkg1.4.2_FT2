@@ -2,7 +2,8 @@
 #define DSCUDASVR_H
 
 #include "dscudadefs.h"
-#include "dscudamacros.h"
+//#include "dscudamacros.h"
+#include "dscudautil.h"
 
 typedef struct ServerModule_t {
     unsigned int id;          /* Static and Serial Identical Number */

@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include "dscudarpc.h"
 #include "dscudadefs.h"
-#include "dscudamacros.h"
+#include "dscudautil.h"
 #include "libdscuda.h"
 
 /*

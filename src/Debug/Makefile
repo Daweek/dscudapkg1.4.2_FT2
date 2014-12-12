@@ -87,7 +87,7 @@ dscudad: dscudad.o sockutil.o dscudautil.o
 	@echo "//**  dscudad  ***"
 	@echo "//****************"
 	$(NVCC) -o $@ $(CUDAINCLUDES) $^ -lpthread
-dscudad.o: dscudad.cu dscuda.h dscudadefs.h dscudamacros.h sockutil.h
+dscudad.o: dscudad.cu dscuda.h dscudadefs.h dscudautil.h sockutil.h
 	$(NVCC) -c -o $@ $(CUDAINCLUDES) $<
 #----
 dscudad_rpc: dscudad.cu sockutil.o
@@ -154,8 +154,8 @@ dscudad.cu :       dscudadefs.h sockutil.h dscudarpc.h
 dscudaverb.cu:     dscuda.h libdscuda.h dscudaverb.h dscudarpc.h
 dscudatest.cu:     dscuda.h ibv_rdma.h
 ibv_rdma.cpp:      ibv_rdma.h 
-ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudamacros.h
-dscuda.h:          dscudadefs.h dscudarpc.h dscudamacros.h ibv_rdma.h
+ibv_rdma.h:        dscudadefs.h dscudarpc.h dscudautil.h
+dscuda.h:          dscudadefs.h dscudarpc.h dscudautil.h ibv_rdma.h
 
 .PHONY: install clean
 install:
@@ -164,7 +164,6 @@ install:
 	@echo "//************************************************"
 	ln -fs ../src/dscuda.h       ../include/
 	ln -fs ../src/dscudadefs.h   ../include/
-	ln -fs ../src/dscudamacros.h ../include/
 	ln -fs ../src/dscudarpc.h    ../include/
 	ln -fs ../src/dscudaverb.h   ../include/
 	ln -fs ../src/dscudautil.h   ../include/

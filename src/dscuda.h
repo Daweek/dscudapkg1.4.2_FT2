@@ -20,7 +20,7 @@
 #include "dscudautil.h"
 #include "dscudarpc.h"
 #include "dscudadefs.h"
-#include "dscudamacros.h"
+//#include "dscudamacros.h"
 //#include "dscudaverb.h"
 #include "libdscuda.h"
 
