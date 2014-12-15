@@ -73,7 +73,7 @@ void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz)
 {
     v_region   = uva_ptr;
     d_region   = d_ptr;
-    h_region = (void *)xmalloc(sz);
+    h_region = (void *)dscuda::xmalloc(sz);
     
 #if 0
     WARN(10, "%s():v_region=%p, d_region=%p, h_region=%p\n",
@@ -192,7 +192,7 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size)
 {
     BkupMem *mem;
     
-    mem = (BkupMem *)xmalloc( sizeof(BkupMem) );
+    mem = (BkupMem *)dscuda::xmalloc( sizeof(BkupMem) );
     
     mem->init(uva_ptr, d_ptr, size);
 

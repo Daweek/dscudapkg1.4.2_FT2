@@ -84,7 +84,7 @@ remd_rpc : $(OBJS_DS)
 	@echo "//"
 	@echo "// Generate remd_ds_rpc"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lrt $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lpthread -lrt $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 #	$(CXX) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 
 remd_rpc_rcut : $(OBJS_DS_RCUT)
@@ -122,7 +122,7 @@ integ_dev_meas_kernel.o : integ.cu switch_float_double.H remd_typedef.H mytools.
 	$(NVCC) -c -D"DEVICE_RUN" -D"MEAS_CUDA_EVENT" $(NVCCFLAGS)  $< -o $@
 
 integ_ds.o  : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
-	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"__DSCUDA__" -I. $(NVCCFLAGS) -i $< -o $@
+	$(DSCUDACPP) -c -DRPC_ONLY -D"DEVICE_RUN" -D"__DSCUDA__" -I. $(NVCCFLAGS) -i $< -o $@
 
 integ_ds_rcut.o : integ.cu switch_float_double.H remd_typedef.H mytools.H init_cond.H calc_force.cu integ.H
 	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"RCUT_COUNT" -I. $(NVCCFLAGS) -i $< -o $@

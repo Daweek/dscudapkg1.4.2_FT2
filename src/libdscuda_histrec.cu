@@ -71,18 +71,24 @@ static DSCVMethod funcID2DSCVMethod(int funcID) {
 }
 
 //stubs for store args
-static void *storeSetDevice(void *argp) {
+static void*
+storeSetDevice(void *argp)
+{
     WARN(3, "add hist cudaSetDevice\n");
     DSCUDAVERB_STORE_ARGS(SetDevice); 
     return argdst;
 }
 
-static void *storeMalloc(void *argp) {
+static void *
+storeMalloc(void *argp)
+{
     //nothing to do
     return NULL;
 }
 
-static void *storeMemcpyH2D(void *argp) {
+static void *
+storeMemcpyH2D(void *argp)
+{
     WARN(3, "add hist cudaMemcpyH2D\n");
     DSCUDAVERB_STORE_ARGS(Memcpy);
     argdst->src = malloc(argsrc->count + 1);
@@ -124,11 +130,11 @@ static void *storeMemcpyToSymbolD2D(void *argp) {
     DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
 
     int nredundancy = dscudaNredundancy();
-    argdst->moduleid = (int *)xmalloc(sizeof(int) * nredundancy);
+    argdst->moduleid = (int *)dscuda::xmalloc(sizeof(int) * nredundancy);
     
     memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
 
-    argdst->symbol = (char *)xmalloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
+    argdst->symbol = (char *)dscuda::xmalloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
 
     strcpy(argdst->symbol, argsrc->symbol);
     
@@ -339,11 +345,12 @@ static void recallRpcLaunchKernel(void *argp) {
  *  CONSTRUCTOR
  */
 HistRecList_t::HistRecList_t(void) {
+    add_count = 0;
     length    = 0;
     byte_size = 0;
     max_len   = 32;
     
-    histrec = (HistRec_t *)xmalloc( sizeof(HistRec) * max_len );
+    histrec = (HistRec_t *)dscuda::xmalloc( sizeof(HistRec) * max_len );
 
     //<-- import from dscudaVerbInit()
     memset(storeArgsStub,   0, sizeof(DSCVMethod) * DSCVMethodEnd);
@@ -394,7 +401,9 @@ void HistRecList_t::extendLen(void) {
 /*
  * Add one item to called histry of CUDA API. 
  */
-void HistRecList_t::add(int funcID, void *argp) {
+void
+HistRecList_t::add(int funcID, void *argp)
+{
     int DSCVMethodId;
 
     if (length == max_len) { /* Extend the existing memory region. */
@@ -402,12 +411,15 @@ void HistRecList_t::add(int funcID, void *argp) {
     }
 
     DSCVMethodId = funcID2DSCVMethod(funcID);
-    histrec[length].args   = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
-    histrec[length].funcID = funcID;
+    histrec[length].seq_num = add_count;
+    histrec[length].args    = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
+    histrec[length].funcID  = funcID;
     
     length++; /* Increment the count of cuda call */
     byte_size += sizeof(funcID);
     byte_size += sizeof(int);// dev_id
+    add_count++; // count up.
+    
     switch (funcID) {
     case dscudaSetDeviceId:
 	byte_size += sizeof(struct CudaSetDeviceArgs_t);
@@ -439,8 +451,8 @@ void HistRecList_t::add(int funcID, void *argp) {
 	WARN(0, "%s():unknown kind of cuda api.\n", __func__);
 	exit(1);
     }
+    
 
-    return;
 }
 /*
  * Clear all hisotry of calling cuda functions.
@@ -463,28 +475,29 @@ void HistRecList_t::clrRecallFlag(void) {
     recall_flag = 0;
 }
 
-void HistRecList_t::print(void) {
-    WARN(1, "%s(): *************************************************\n", __func__);
+void HistRecList_t::print(void)
+{
+    WARN0(1, "<--- Record of CUDA API history Stack*************************************\n");
     if (this->length == 0) {
-	WARN(1, "%s(): RecList[]> (Empty).\n", __func__);
+	WARN0(1, "%s(): RecList[]> (Empty).\n", __func__);
 	return;
     }
-    for (int i=0; i < length; i++) { /* Print recall history. */
-	WARN(1, "%s(): Recall History[%d]> ", __func__, i);
+    for (int i=0; i<length; i++) { /* Print recall history. */
+	WARN0(1, "    [%d] = #%lld:", i, histrec[i].seq_num);
 	switch (histrec[i].funcID) { /* see "dscudarpc.h" */
-	  case 305: WARN0(1, "cudaSetDevice()\n");        break;
-	  case 504: WARN0(1, "cudaEventRecord()\n");      break;
-	  case 505: WARN0(1, "cudaEventSynchronize()\n"); break;
-	  case 600: WARN0(1, "kernel-call<<< >>>()\n");   break;
-	  case 700: WARN0(1, "cudaMalloc()\n");           break;
-	  case 701: WARN0(1, "cudaFree()\n");             break;
-	  case 703: WARN0(1, "cudaMemcpy(H2D)\n");        break;
-	  case 704: WARN0(1, "cudaMemcpy(D2H)\n");        break;
-	  default:  WARN0(1, "/* %d */()\n", histrec[i].funcID);
+	case 305: WARN0(1, "cudaSetDevice()\n");        break;
+	case 504: WARN0(1, "cudaEventRecord()\n");      break;
+	case 505: WARN0(1, "cudaEventSynchronize()\n"); break;
+	case 600: WARN0(1, "kernel-call<<< >>>()\n");   break;
+	case 700: WARN0(1, "cudaMalloc()\n");           break;
+	case 701: WARN0(1, "cudaFree()\n");             break;
+	case 703: WARN0(1, "cudaMemcpy(H2D)\n");        break;
+	case 704: WARN0(1, "cudaMemcpy(D2H)\n");        break;
+	default:  WARN0(1, "/* %d */()\n", histrec[i].funcID);
 	}
     }
-    WARN(1, "%s(): Occupied size is %d Byte.\n", __func__, byte_size);
-    WARN(1, "%s(): *************************************************\n", __func__);
+    WARN0(1, "Occupied memory size is %d Byte.\n",  byte_size);
+    WARN0(1, "---> Record of CUDA API history  ******************************************\n");
 }
 /*
  * Rerun the recorded history of cuda function series.

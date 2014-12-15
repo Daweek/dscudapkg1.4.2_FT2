@@ -19,11 +19,11 @@ static int WarnLevel = 2; /* warning message output level. the higher the more v
                              2: default
                              >= 3: for debugging purpose
                           */
-int dscudaWarnLevel(void)
+int dscuda::getWarnLevel(void)
 {
     return WarnLevel;
 }
-void dscudaSetWarnLevel(int level)
+void dscuda::setWarnLevel(int level)
 {
     WarnLevel = level;
 }
@@ -80,7 +80,7 @@ double RCgetCputime(double *t0)
 //--
 //--
 //--
-int sprintfDate(char *s, int fmt)
+int dscuda::sprintfDate(char *s, int fmt)
 {
     time_t now;
     struct tm *local;
@@ -100,7 +100,7 @@ int sprintfDate(char *s, int fmt)
     }
     return 0;
 }
-void *xmalloc(size_t size)
+void *dscuda::xmalloc(size_t size)
 {
     void *p;
     size_t sz=size;
@@ -115,7 +115,7 @@ void *xmalloc(size_t size)
     return p;
 }
 
-void xfree(void *p)
+void dscuda::xfree(void *p)
 {
     if (p == NULL) {
 	fprintf(stderr, "xfree() called with NULL. \n");

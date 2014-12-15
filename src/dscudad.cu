@@ -31,6 +31,9 @@
 
 #define NBACKLOG 1   // max # of servers can be put into the listening queue.
 
+using dscuda::xmalloc;
+using dscuda::xfree;
+
 static int WarnLevel = 2;
 static int CallFaultServer = 0;
 

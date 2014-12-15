@@ -23,6 +23,10 @@
 #include "dscudautil.h"
 #include "libdscuda.h"
 
+namespace dscuda {
+    int searchDaemon(void);
+}
+
 static int   VdevidIndexMax = 0; //# of pthreads which utilize virtual devices.
 const  char *DEFAULT_SVRIP = "localhost";
 static char  DscudaPath[512];
@@ -61,8 +65,6 @@ void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 
 //struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
-
-//ClientModule CltModulelist[RC_NKMODULEMAX];
 
 struct ClientState_t St;
 struct PtxStore_t    PtxStore;
@@ -772,7 +774,9 @@ void printModuleList(void) {
     }
 }
 
-static int dscudaSearchDaemon(void) {
+int
+dscuda::searchDaemon(void)
+{
     int sendsock;
     int recvsock;
 
@@ -801,14 +805,14 @@ static int dscudaSearchDaemon(void) {
     sendsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if ( sendsock == -1 || recvsock == -1 ) {
-	perror("dscudaSearchDaemon: socket()");
+	perror("searchDaemon: socket()");
 	//return -1;
 	exit(1);
     }
     
     setsockopt_ret = setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
     if ( setsockopt_ret != 0 ) {
-	perror("dscudaSearchDaemon: setsockopt()");
+	perror("searchDaemon: setsockopt()");
 	exit(1);
     }
 
@@ -841,7 +845,7 @@ static int dscudaSearchDaemon(void) {
     tout.tv_usec = 0;
     setsockopt_ret = setsockopt(recvsock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tout, sizeof(tout));
     if ( setsockopt_ret != 0 ) {
-	perror("dscudaSearchDaemon: setsockopt(recvsock)");
+	perror("searchDaemon: setsockopt(recvsock)");
 	exit(1);
     }
     
@@ -849,7 +853,7 @@ static int dscudaSearchDaemon(void) {
     if( bind_ret != 0 ) {
 	fprintf(stderr, "Error: bind() returned %d. recvsock=%d, port=%d\n",
 		bind_ret, recvsock, svr.sin_port); //port:38655
-	perror("dscudaSearchDaemon: bind()");
+	perror("searchDaemon: bind()");
 	return -1;
     }
     
@@ -1093,13 +1097,13 @@ static void getenvWarnLevel(void)
     if ( env ) {
         val = atoi(strtok(env, " "));
         if ( val >= 0 ) {
-	    dscudaSetWarnLevel( val );
+	    dscuda::setWarnLevel( val );
 	} else {
 	    WARN(0, "(;_;) Invalid DSCUDA_WARNLEVEL(%d), set 0 or positive integer.\n", val);
 	    exit(EXIT_FAILURE);
 	}
     } else {
-	dscudaSetWarnLevel(RC_WARNLEVEL_DEFAULT);
+	dscuda::setWarnLevel(RC_WARNLEVEL_DEFAULT);
     }
 
 }
@@ -1230,7 +1234,7 @@ void *periodicCheckpoint(void *arg) {
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_lock( &cudaKernelRun_mutex );
 	
-	WARN(9, "periodicCheckpoint( period = %d[sec], age=%d ) {\n",
+	WARN_CP(9, "periodicCheckpoint( period = %d[sec], age=%d ) {\n",
 	     cp_period, age++);
 
 	St.collectEntireRegions();
@@ -1249,7 +1253,7 @@ void *periodicCheckpoint(void *arg) {
 	    //*** Then, collect clean device memory regions to host memory.
 	    //*** and clear CUDA API called history.
 	    //***
-	    WARN(1, "(^_^)Ready to update clean backup region.\n");
+	    WARN_CP(1, "(^_^)Ready to update clean backup region.\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].updateMemlist(0); // 0 means server[0].
 		St.Vdev[i].clearReclist();
@@ -1260,12 +1264,12 @@ void *periodicCheckpoint(void *arg) {
 	    //*** Then, restore clean memory regions to all devices, and
 	    //*** redo the historical cuda API calls.
 	    //***
-	    WARN(1, "(+_+)Detected corrupted device region.\n");
-	    WARN(1, "(+_+)Restore the device memory using backup.\n");
+	    WARN_CP(1, "(+_+)Detected corrupted device region.\n");
+	    WARN_CP(1, "(+_+)Restore the device memory using backup.\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
-	    WARN(1, "(+_+)Redo the CUDA APIs Rollbacked.\n");	    
+	    WARN_CP(1, "(+_+)Redo the CUDA APIs Rollbacked.\n");	    
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
 		St.Vdev[i].reclist.recall();
@@ -1276,7 +1280,7 @@ void *periodicCheckpoint(void *arg) {
 	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_unlock( &cudaKernelRun_mutex );
 	
-	WARN(9, "} periodicCheckpoint().\n");
+	WARN_CP(9, "} periodicCheckpoint().\n");
 	pthread_testcancel();/* cancelation available */
     }//for (;;)
 } // periodicCheckpoint()
@@ -1285,12 +1289,14 @@ void *periodicCheckpoint(void *arg) {
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.
  */
+using dscuda::searchDaemon;
+
 ClientState_t::ClientState_t(void)
 {
     // Open dscuda output file.
     {
 	char curr_time[80];
-	sprintfDate( curr_time );
+	dscuda::sprintfDate( curr_time );
 	sprintf( dslog_filename, "c%s.dslog", curr_time );
 	sprintf( dserr_filename, "c%s.dserr", curr_time );
 	
@@ -1352,7 +1358,7 @@ ClientState_t::ClientState_t(void)
     }
     {
 	getenvWarnLevel();       /* set from DSCUDA_WARNLEVEL */
-	INFO0("[ Environment variable ] DSCUDA_WARNLEVEL = %d\n", dscudaWarnLevel());
+	INFO0("[ Environment variable ] DSCUDA_WARNLEVEL = %d\n", dscuda::getWarnLevel());
     }
     {
 	setFaultTolerantMode();
@@ -1361,17 +1367,28 @@ ClientState_t::ClientState_t(void)
 	INFO0("[ Environment variable ] DSCUDA_MIGRATION = %d\n", migration);
 	INFO0("[ Fault Tolerant Mode  ] ");
 	switch (ft_mode) {
-	case FT_PLAIN: INFO0("\"FT_PLAIN\"\n"); break;
-	case FT_REDUN: INFO0("\"FT_REDUN\"\n"); break;
-	case FT_MIGRA: INFO0("\"FT_MIGRA\"\n"); break;
-	case FT_BOTH:  INFO0("\"FT_BOTH\"\n"); break;
+	case FT_PLAIN:
+	    INFO0("\"FT_PLAIN\"\n");
+	    break;
+	case FT_REDUN:
+	    INFO0("\"FT_REDUN\"\n");
+	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	    break;
+	case FT_MIGRA:
+	    INFO0("\"FT_MIGRA\"\n");
+	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	    break;
+	case FT_BOTH:
+	    INFO0("\"FT_BOTH\"\n");
+	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	    break;
 	default:
 	    WARN0(0, "(UNKNOWN).\n");
 	    exit(EXIT_FAILURE);
 	}
     }
 
-    dscudaSearchDaemon();
+    searchDaemon();
     initVirtualDeviceList();  /* Update the list of virtual devices */
 
     // dummy
@@ -1417,18 +1434,27 @@ ClientState_t::ClientState_t(void)
 	WARN(1, "[ERRORSTATICS] start.\n" );
 	/********************************************
 	 ***>  Create the CHECKPOINTING thread.  <***
-	     ********************************************/
+	 ********************************************/
 	pthread_create(&tid, NULL, periodicCheckpoint, (void *)&cp_period);
 	break;
     default:
 	WARN(1, "[ERRORSTATICS] disabled.\n" );
     }
+    INFO0("\
+###******************************************************************************\n\
+###***   Start user application process.                                        *\n\
+###******************************************************************************\n");
 } //--> ClientState_t::ClientState_t(void)
 //--
 //--
 //--
 ClientState_t::~ClientState_t(void)
 {
+    INFO0("\
+###******************************************************************************\n\
+###***   Completed user application process.                                    *\n\
+###******************************************************************************\n");
+
     RCServer  *svr;
     time_t     exe_time;
     char       my_tfmt[64];	      
@@ -1445,38 +1471,39 @@ ClientState_t::~ClientState_t(void)
     case FT_REDUN: // thru
     case FT_MIGRA: // thru
     case FT_BOTH:  // thru
-	WARN(1, "[ERRORSTATICS] stop.\n" );
-	WARN(1, "[ERRORSTATICS] ************** Summary *******************************\n" );
+	WARN0(1, "[ERRORSTATICS] ************** Summary *******************************\n" );
 	
 	my_local = localtime( &start_time);
 	strftime( my_tfmt, 64, "%c", my_local);
-	WARN(1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
+	WARN0(1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
 	
 	my_local = localtime( &stop_time);
 	strftime( my_tfmt, 64, "%c", my_local);
-	WARN(1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
+	WARN0(1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
 	
 	my_local = localtime( &exe_time);
 	strftime( my_tfmt, 64, "%s", my_local);
-	WARN(1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
+	WARN0(1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
 	for (int i=0; i<Nvdev; i++) {
-	    WARN(1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
+	    WARN0(1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
 	    for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    svr = &Vdev[i].server[j];
-	    WARN(1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
+	    WARN0(1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
 		  j, svr->ip, svr->hostname, svr->stat_error, svr->stat_correct);
 	    }
 	}
-	WARN(1, "[ERRORSTATICS] ******************************************************\n" );
+	WARN0(1, "[ERRORSTATICS] ******************************************************\n" );
 	break;
     default:
-	WARN(1, "[ERRORSTATICS] none.\n");
+	WARN0(1, "[ERRORSTATICS] none.\n");
     } // switch
-    INFO("*****************************************************************\n");
-    INFO("***                                                           ***\n");
-    INFO("***    DS-CUDA client library process was completed. (^_^)/   ***\n");
-    INFO("***                                                           ***\n");
-    INFO("*****************************************************************\n");
+
+    INFO0("\
+###******************************************************************************\n\
+###***                                                                          *\n\
+###***   Completed process of DS-CUDA client library.                           *\n\
+###***                                                                          *\n\
+###******************************************************************************\n");
 } //--> ClientState_t::~ClientState_t(void)
 
 void VirDev_t::invalidateAllModuleCache(void)

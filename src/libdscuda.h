@@ -155,9 +155,10 @@ typedef enum {
 //***      - Recording the sequential CUDA-call.
 //********************************************************************
 typedef struct HistRec_t {
-    int    funcID;   // Recorded cuda*() function.
-    void  *args;     // And its arguments.
-    int    dev_id;   // The Device ID, set by last cudaSetDevice().
+    int64_t seq_num;  // unique id.
+    int     funcID;   // Recorded cuda*() function.
+    void   *args;     // And its arguments.
+    int     dev_id;   // The Device ID, set by last cudaSetDevice().
 } HistRec;
 
 //********************************************************************
@@ -170,6 +171,7 @@ typedef struct HistRecList_t {
     int      length;    /* # of recorded function calls to be recalled */
     int      byte_size; // Total size of this history
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
+    int64_t  add_count; // incremented by method add().
 
     // stubs for store/release args, and recall functions.
     // pointer array to arbitary functions.
@@ -190,7 +192,6 @@ private:
     void     setRecallFlag(void);
     void     clrRecallFlag(void);
     void     extendLen(void);
-
 } HistRecList;
 
 //********************************************************************
@@ -495,7 +496,7 @@ public:
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int autoverb;           /* 1:Redundant calculation */
     int migration;
-    int cp_period;          // Period of checkpoint [sec]
+    int cp_period;          // Period of checkpoint [sec] defined by DSCUDA_CP_PERIOD
     int daemon;
     int historical_calling;
 

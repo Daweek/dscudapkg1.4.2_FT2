@@ -17,8 +17,9 @@
 //==============================================================================
 // return a value of square of abs(vector r).
 //------------------------------------------------------------------------------
-__host__ __device__ Real_t
-normSq(const Real3_t &r) {
+__host__ __device__
+Real_t normSq(const Real3_t &r)
+{
    return (r.x * r.x) + (r.y * r.y) + (r.z * r.z);
 }
 //==============================================================================
@@ -31,24 +32,24 @@ normSq(const Real3_t &r) {
 __host__ __device__ static void
 calcLjCore(Real3_t &force, Real_t &potential,
 	   Real3_t r_ij, Real_t r_normsq, Real_t lj_sigma, Real_t lj_epsilon) {
-  Real_t  sigma_r_pow2  = (lj_sigma * lj_sigma) / r_normsq;
-  Real_t  sigma_r_pow6  = sigma_r_pow2 * sigma_r_pow2 * sigma_r_pow2;
-  Real_t  sigma_r_pow12 = sigma_r_pow6 * sigma_r_pow6;
-  Real_t  f_scaled_factor = (UNIT_TIME * UNIT_TIME) / 
-    (UNIT_LENGTH * UNIT_LENGTH) * (UNIT_ENERGY / UNIT_MASS);
-  Real_t  f_tmp;
+    Real_t  sigma_r_pow2  = (lj_sigma * lj_sigma) / r_normsq;
+    Real_t  sigma_r_pow6  = sigma_r_pow2 * sigma_r_pow2 * sigma_r_pow2;
+    Real_t  sigma_r_pow12 = sigma_r_pow6 * sigma_r_pow6;
+    Real_t  f_scaled_factor = (UNIT_TIME * UNIT_TIME) / 
+	(UNIT_LENGTH * UNIT_LENGTH) * (UNIT_ENERGY / UNIT_MASS);
+    Real_t  f_tmp;
 
-  f_tmp = lj_epsilon * (48.0 * sigma_r_pow12 - 24.0 * sigma_r_pow6) / r_normsq;
-  f_tmp *= f_scaled_factor;
+    f_tmp = lj_epsilon * (48.0 * sigma_r_pow12 - 24.0 * sigma_r_pow6) / r_normsq;
+    f_tmp *= f_scaled_factor;
 
-  /* outputs */
-  force.x = f_tmp * r_ij.x; /* LJ-force.x */
-  force.y = f_tmp * r_ij.y; /* LJ-force.y */
-  force.z = f_tmp * r_ij.z; /* LJ-force.z */
+    /* outputs */
+    force.x = f_tmp * r_ij.x; /* LJ-force.x */
+    force.y = f_tmp * r_ij.y; /* LJ-force.y */
+    force.z = f_tmp * r_ij.z; /* LJ-force.z */
 #ifdef RCUT_COUNT //
-  potential = 1.0;  // ++
+    potential = 1.0;  // ++
 #else
-  potential = 4.0 * lj_epsilon * (sigma_r_pow12 - sigma_r_pow6);
+    potential = 4.0 * lj_epsilon * (sigma_r_pow12 - sigma_r_pow6);
 #endif
 }
 //==============================================================================
@@ -59,19 +60,19 @@ calcLjCore(Real3_t &force, Real_t &potential,
 __host__ __device__ void
 getClosestPBC(Real3_t &r_ij,
 	      const Real3_t &pos_i, const Real3_t &pos_j, Real_t cellsize) {
-   Real3_t sub;
-   Real3_t round;
-   sub.x = pos_i.x - pos_j.x;
-   sub.y = pos_i.y - pos_j.y;
-   sub.z = pos_i.z - pos_j.z;
+    Real3_t sub;
+    Real3_t round;
+    sub.x = pos_i.x - pos_j.x;
+    sub.y = pos_i.y - pos_j.y;
+    sub.z = pos_i.z - pos_j.z;
    
-   round.x = rint(sub.x / cellsize);
-   round.y = rint(sub.y / cellsize);
-   round.z = rint(sub.z / cellsize);
+    round.x = rint(sub.x / cellsize);
+    round.y = rint(sub.y / cellsize);
+    round.z = rint(sub.z / cellsize);
 
-   r_ij.x = sub.x - (cellsize * round.x);
-   r_ij.y = sub.y - (cellsize * round.y);
-   r_ij.z = sub.z - (cellsize * round.z);
+    r_ij.x = sub.x - (cellsize * round.x);
+    r_ij.y = sub.y - (cellsize * round.y);
+    r_ij.z = sub.z - (cellsize * round.z);
 }
 //===============================================================================
 // lj(), calculate Lennard-Jones potential/force
@@ -81,17 +82,17 @@ __host__ __device__ void
 lj(Real3_t &f_ij, Real_t &p_ij, const Real3_t &pos_i, const Real3_t &pos_j,
    Real_t rcut, Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
    
-   Real3_t r_ij; // closest atom position vector in neighboring cell.
-   Real_t  rcut_sq = rcut * rcut;
-   Real_t  r_normsq;
-   getClosestPBC(r_ij, pos_i, pos_j, cellsize);
-   r_normsq = normSq(r_ij);
-   if ( rcut_sq > r_normsq ) { // calc inside the "rcut"
-      calcLjCore(f_ij, p_ij, r_ij, r_normsq, lj_sigma, lj_epsilon);
-   }
-   else {
-      f_ij.x = f_ij.y = f_ij.z = p_ij = 0.0;
-   }
+    Real3_t r_ij; // closest atom position vector in neighboring cell.
+    Real_t  rcut_sq = rcut * rcut;
+    Real_t  r_normsq;
+    getClosestPBC(r_ij, pos_i, pos_j, cellsize);
+    r_normsq = normSq(r_ij);
+    if (rcut_sq > r_normsq) { // calc inside the "rcut"
+	calcLjCore(f_ij, p_ij, r_ij, r_normsq, lj_sigma, lj_epsilon);
+    }
+    else {
+	f_ij.x = f_ij.y = f_ij.z = p_ij = 0.0;
+    }
 }
 //==============================================================================
 // calcForce()
@@ -101,43 +102,43 @@ void
 zeroForce_hst(Real3_t *f_ar, Real_t *poten_ar,
 	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
-   Real3_t f_ij;
-   Real_t  p_ij;
-   for (int i=0; i<Nmol; i++) {
-      f_ar[i].x = f_ar[i].y = f_ar[i].z = 0.0;
-      poten_ar[i] = 0.0;
-   }
-   for (int i=0; i<(Nmol - 1); i++) {
-      for (int j=(i + 1); j<Nmol; j++) {
-	 lj(f_ij, p_ij, pos_ar[i], pos_ar[j], rcut, cellsize, lj_sigma, lj_epsilon);
-	 poten_ar[i] += p_ij;
-      }
-   }
+    Real3_t f_ij;
+    Real_t  p_ij;
+    for (int i=0; i<Nmol; i++) {
+	f_ar[i].x = f_ar[i].y = f_ar[i].z = 0.0;
+	poten_ar[i] = 0.0;
+    }
+    for (int i=0; i<(Nmol - 1); i++) {
+	for (int j=(i + 1); j<Nmol; j++) {
+	    lj(f_ij, p_ij, pos_ar[i], pos_ar[j], rcut, cellsize, lj_sigma, lj_epsilon);
+	    poten_ar[i] += p_ij;
+	}
+    }
 }
 
 void
 calcForce_hst(Real3_t *f_ar, Real_t *poten_ar,
 	      const Real3_t *pos_ar, int Nmol, Real_t rcut,
 	      Real_t cellsize, Real_t lj_sigma, Real_t lj_epsilon) {
-   Real3_t f_ij;
-   Real_t  p_ij;
-   for (int i=0; i<Nmol; i++) {
-      f_ar[i].x = f_ar[i].y = f_ar[i].z = 0.0;
-      poten_ar[i] = 0.0;
-   }
-   for (int i=0; i<(Nmol - 1); i++) {
+    Real3_t f_ij;
+    Real_t  p_ij;
+    for (int i=0; i<Nmol; i++) {
+	f_ar[i].x = f_ar[i].y = f_ar[i].z = 0.0;
+	poten_ar[i] = 0.0;
+    }
+    for (int i=0; i<(Nmol - 1); i++) {
       for (int j=(i + 1); j<Nmol; j++) {
-	 lj(f_ij, p_ij, pos_ar[i], pos_ar[j], rcut, cellsize, lj_sigma, lj_epsilon);
-	 
-	 f_ar[i].x += f_ij.x; // * i <-- j */
-	 f_ar[i].y += f_ij.y;
-	 f_ar[i].z += f_ij.z;
-	 poten_ar[i] += p_ij;
+	  lj(f_ij, p_ij, pos_ar[i], pos_ar[j], rcut, cellsize, lj_sigma, lj_epsilon);
+	  
+	  f_ar[i].x += f_ij.x; // * i <-- j */
+	  f_ar[i].y += f_ij.y;
+	  f_ar[i].z += f_ij.z;
+	  poten_ar[i] += p_ij;
       
-	 f_ar[j].x -= f_ij.x; // * i --> j */
-	 f_ar[j].y -= f_ij.y;
-	 f_ar[j].z -= f_ij.z;
-	 //poten_ar[j] += p_ij; // not "-=" but "+=" ,  refer to Muguruma et al(2004), avoid double counting.
+	  f_ar[j].x -= f_ij.x; // * i --> j */
+	  f_ar[j].y -= f_ij.y;
+	  f_ar[j].z -= f_ij.z;
+	  //poten_ar[j] += p_ij; // not "-=" but "+=" ,  refer to Muguruma et al(2004), avoid double counting.
       }
    }
 }

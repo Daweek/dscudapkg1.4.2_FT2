@@ -958,7 +958,8 @@ cudaError_t cudaFree(void *d_ptr)
 /*
  * cudaMemcpy( HostToDevice )
  */
-cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count)
+cudaError_t
+VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count)
 {
     WARN( 4, "   Vdev[%d].%s() {\n", id, __func__);
     cudaError_t    cuda_error = cudaSuccess;
@@ -992,7 +993,9 @@ cudaError_t VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count
     return cuda_error;
 }
 
-cudaError_t RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc_err *rpc_result) {
+cudaError_t
+RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc_err *rpc_result)
+{
     dscudaResult *rp;
     RCbuf srcbuf;
     void *d_ptr;
@@ -1209,8 +1212,10 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     return err;
 }
 
-void RCServer::collectEntireRegions(void) {
-    WARN(9, "      + RCServer[%d]::%s() {\n", id, __func__);
+void
+RCServer::collectEntireRegions(void)
+{
+    WARN_CP(9, "      + RCServer[%d]::%s() {\n", id, __func__);
     BkupMem *bkupmem;
     dscudaMemcpyD2HResult *rp;
     struct rpc_err rpc_error;
@@ -1225,7 +1230,7 @@ void RCServer::collectEntireRegions(void) {
 	d_ptr = bkupmem->d_region;
 	h_ptr = bkupmem->h_region;
 	size  = bkupmem->size;
-	WARN(9, "         + correct region[%d], %d[Byte]...", i, size);
+	WARN_CP(9, "         + correct region[%d], %d[Byte]...", i, size);
 	rp = dscudamemcpyd2hid_1((RCadr)d_ptr, size, Clnt);
 	WARN0(9, "done.\n");
 	
@@ -1233,7 +1238,7 @@ void RCServer::collectEntireRegions(void) {
 	clnt_geterr(Clnt, &rpc_error);
 	if (rpc_error.re_status == RPC_SUCCESS) {
 	    if (rp == NULL) {
-		WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
+		WARN_CP( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
 		clnt_perror(Clnt, ip);
 		exit(EXIT_FAILURE);
 	    } else {
@@ -1254,11 +1259,11 @@ void RCServer::collectEntireRegions(void) {
 	bkupmem = bkupmem->next;
 	i++;
     } // while (...);
-    WARN(9, "      + } RCServer[%d]::%s()\n", id, __func__);
+    WARN_CP(9, "      + } RCServer[%d]::%s()\n", id, __func__);
 }
 
 void VirDev_t::collectEntireRegions(void) {
-    WARN(9, "   + VirDev_t[%d]::%s()\n", id, __func__);
+    WARN_CP(9, "   + VirDev_t[%d]::%s()\n", id, __func__);
     BkupMem *bkupmem;
     dscudaMemcpyD2HResult *rp;
     void *d_ptr;
@@ -1267,24 +1272,24 @@ void VirDev_t::collectEntireRegions(void) {
     for (int n=0; n<nredundancy; n++) {
 	server[n].collectEntireRegions();
     }
-    WARN(9, "   + } VirDev_t[%d]::%s()\n", id, __func__);
+    WARN_CP(9, "   + } VirDev_t[%d]::%s()\n", id, __func__);
 }
 
 void ClientState_t::collectEntireRegions(void) {
-    WARN(9, "ClientState_t::%s() {\n", __func__);
+    WARN_CP(9, "ClientState_t::%s() {\n", __func__);
     
     for (int n=0; n<Nvdev; n++) {
 	Vdev[n].collectEntireRegions();
     }
     
-    WARN(9, "} ClientState_t::%s()\n", __func__);
+    WARN_CP(9, "} ClientState_t::%s()\n", __func__);
 }
 
 
 int
 VirDev_t::verifyEntireRegions(void)
 {
-    WARN(9, "   + VirDev_t::%s() {\n", __func__);
+    WARN_CP(9, "   + VirDev_t::%s() {\n", __func__);
     BkupMem *bkupmem;
     void *v_region;
     void *h_ptr_i;
@@ -1299,16 +1304,16 @@ VirDev_t::verifyEntireRegions(void)
 	for (int i=0; i<nredundancy-1; i++) {
 	    h_ptr_i = server[i].memlist.queryHostPtr(v_region);
 	    if (h_ptr_i == NULL) {
-		WARN(0, "%s():not found host pointer.\n");
+		WARN_CP(0, "%s():not found host pointer.\n");
 		exit(-1);
 	    }
 	    for (int j=i+1; j<nredundancy; j++) {
 		h_ptr_j = server[j].memlist.queryHostPtr(v_region);
 		if (h_ptr_j == NULL) {
-		    WARN(0, "%s():not found host pointer.\n");
+		    WARN_CP(0, "%s():not found host pointer.\n");
 		    exit(-1);
 		}
-		WARN(9, "      + memcmp(phy[%d], phy[%d], %d[Byte])\n",
+		WARN_CP(9, "      + memcmp(phy[%d], phy[%d], %d[Byte])\n",
 		     i, j, size);
 		if ( memcmp( h_ptr_i, h_ptr_j, size) != 0 ) {
 		    all_matched = -1;
@@ -1318,18 +1323,18 @@ VirDev_t::verifyEntireRegions(void)
 	bkupmem = bkupmem->next;
     }//while
     if (all_matched) {
-	WARN(9, "   + ALL MATCHED\n");
+	WARN_CP(9, "   + ALL MATCHED\n");
     } else {
-	WARN(9, "   + NOT MATCHED *************************\n");
+	WARN_CP(9, "   + NOT MATCHED *************************\n");
     }
-    WARN(9, "   + } VirDev_t::%s()\n", __func__);
+    WARN_CP(9, "   + } VirDev_t::%s()\n", __func__);
     return all_matched;
 }
 
 int
 ClientState_t::verifyEntireRegions(void)
 {
-    WARN(9, "ClientState_t::%s() {\n", __func__);
+    WARN_CP(9, "ClientState_t::%s() {\n", __func__);
     int virdev_matched;
     int all_devices_matched = 1;
     
@@ -1340,7 +1345,7 @@ ClientState_t::verifyEntireRegions(void)
 	}
     }
     
-    WARN(9, "} ClientState_t::%s()\n", __func__);
+    WARN_CP(9, "} ClientState_t::%s()\n", __func__);
     return all_devices_matched;
 }
 
@@ -1733,7 +1738,7 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     WARN(5, "      + RCServer[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
-    lo_args.RCargs_val = (RCarg *)xmalloc(args.RCargs_len * sizeof(RCarg));
+    lo_args.RCargs_val = (RCarg *)dscuda::xmalloc(args.RCargs_len * sizeof(RCarg));
 
     for (int k=0; k<lo_args.RCargs_len; k++) {
 	lo_args.RCargs_val[k] = args.RCargs_val[k];
@@ -3315,7 +3320,7 @@ cublasSetVector(int n, int elemSize, const void *x, int incx, void *devicePtr, i
     rcublasResult *rp;
 
     RCbuf buf;
-    buf.RCbuf_val = (char *)xmalloc(n * elemSize);
+    buf.RCbuf_val = (char *)dscuda::xmalloc(n * elemSize);
     buf.RCbuf_len = n;
     memcpy(buf.RCbuf_val, x, n);
 

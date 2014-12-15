@@ -14,14 +14,17 @@
 #include <stdio.h>
 #include <time.h>
 
-int         dscudaWarnLevel(void);
-void        dscudaSetWarnLevel(int level);
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);
 const char *dscudaGetIpaddrString(unsigned int addr);
 double      RCgetCputime(double *t0);
-int         sprintfDate(char *s, int fmt=0);
-void*       xmalloc(size_t size);
-void        xfree(void *p);
+
+namespace dscuda {
+    void    setWarnLevel(int level);
+    int     getWarnLevel(void);
+    int     sprintfDate(char *s, int fmt=0);
+    void*   xmalloc(size_t size);
+    void    xfree(void *p);
+}
 
 extern struct ClientState_t St;
 
@@ -41,28 +44,30 @@ extern struct ClientState_t St;
 	fprintf(St.dscuda_stdout, fmt, ## args);\
     }
 
-#define ERROR(fmt, args...) {						\
-    	MACRO_TSTAMP_FORMAT						\
+#define ERROR(fmt, args...) {\
+    	MACRO_TSTAMP_FORMAT\
 	fprintf(St.dscuda_stdout, "[%s](DSC-ERROR) ", tfmt);	\
 	fprintf(St.dscuda_stdout, fmt, ## args);			\
     }
 
 //-- [DSCUDA CLIENT] WARING Message.
-#define WARN(lv, fmt, args...) {					\
-	if (lv <= dscudaWarnLevel()) {					\
-	    MACRO_TSTAMP_FORMAT						\
-	    fprintf(St.dscuda_stdout, "[%s](%d) ", tfmt, lv);	\
-	    fprintf(St.dscuda_stdout, fmt, ## args);			\
-	}								\
+#define WARN(lv, fmt, args...) {\
+	if (lv <= dscuda::getWarnLevel()) {\
+	    MACRO_TSTAMP_FORMAT\
+            fprintf( St.dscuda_stdout, "[%s](%d) ", tfmt, lv);\
+	    fprintf( St.dscuda_stdout, fmt, ## args);\
+	    fflush( St.dscuda_stdout );\
+	}\
     }
 
 #define WARN0(lv, fmt, args...) {			       \
-	if (lv <= dscudaWarnLevel()) {			       \
+	if (lv <= dscuda::getWarnLevel()) {		       \
 	    fprintf( St.dscuda_stdout, fmt, ## args);	       \
+	    fflush( St.dscuda_stdout );			       \
 	}						       \
     }
 
-#define WARNONCE(lv, fmt, args...) if (lv <= dscudaWarnLevel()) { \
+#define WARNONCE(lv, fmt, args...) if (lv <= dscuda::getWarnLevel()) {	\
       static int firstcall = 1;					  \
       if (firstcall) {						  \
 	 firstcall = 0;						  \
@@ -70,22 +75,33 @@ extern struct ClientState_t St;
       }								  \
    }
 
+//-- [DSCUDA CLIENT] Foult Tolerant's checkpointing
+#define WARN_CP(lv, fmt, args...) {\
+	if (lv <= dscuda::getWarnLevel()) {\
+	    MACRO_TSTAMP_FORMAT\
+            fprintf( St.dscuda_stdout, "[%s](%d)CP: ", tfmt, lv);\
+	    fprintf( St.dscuda_stdout, fmt, ## args);\
+	    fflush( St.dscuda_stdout );\
+	}\
+    }
+
+
 //-- [DSCUDA SERVER] WARNING Message.
 #define SWARN(lv, fmt, args...)						\
-    if ( lv <= dscudaWarnLevel() ) {					\
+    if ( lv <= dscuda::getWarnLevel() ) {				\
 	MACRO_TSTAMP_FORMAT						\
 	fprintf(stderr, "[%s]", tfmt);					\
 	fprintf(stderr, "(SVR[%d]-%d) " fmt, TcpPort - RC_SERVER_IP_PORT, lv, ## args); \
     }
 #define SWARN0(lv, fmt, args...) {			       \
-	if (lv <= dscudaWarnLevel()) {			       \
+	if (lv <= dscuda::getWarnLevel()) {		       \
 	    fprintf(stderr, fmt, ## args);		       \
 	}						       \
     }
 
 //-- [DSCUDA DAEMON] WARNING Message.
 #define DWARN(lv, fmt, args...) {					\
-	if (lv <= WarnLevel) {						\
+	if (lv <= dscuda::getWarnLevel()) {				\
 	    MACRO_TSTAMP_FORMAT						\
 	    fprintf( stderr, "[%s]", tfmt);				\
 	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\

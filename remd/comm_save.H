@@ -1,6 +1,9 @@
 #ifndef COMM_SAVE_H
 #define COMM_SAVE_H
 
+extern Remd_t remd;  /* Only one instance of Remd_t in this program. */
+extern Simu_t simu;  /* Only one instance of Simu_t in this program. */
+
 // copy*() //
 void copyPos(int rep_i, CopyKind_t dir);
 void copyVel(int rep_i, CopyKind_t dir);

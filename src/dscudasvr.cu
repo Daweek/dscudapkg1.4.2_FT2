@@ -305,9 +305,9 @@ static void initEnv(void) {
     if (env) {
         tmp = atoi(strtok(env, " "));
         if (0 <= tmp) {
-            dscudaSetWarnLevel(tmp);
+	    dscuda::setWarnLevel(tmp);
         }
-        SWARN(1, "WarnLevel: %d\n", dscudaWarnLevel());
+        SWARN(1, "WarnLevel: %d\n", dscuda::getWarnLevel());
     }
 
     // DSCUDA_REMOTECALL

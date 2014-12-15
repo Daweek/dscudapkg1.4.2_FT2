@@ -86,7 +86,6 @@ install:
 	ln -fs ../src/dscuda.h       ../include/
 	ln -fs ../src/dscudadefs.h   ../include/
 	ln -fs ../src/dscudarpc.h    ../include/
-	ln -fs ../src/dscudaverb.h   ../include/
 	ln -fs ../src/dscudautil.h   ../include/
 	ln -fs ../src/libdscuda.h    ../include/
 	ln -fs ../src/sockutil.h     ../include/
