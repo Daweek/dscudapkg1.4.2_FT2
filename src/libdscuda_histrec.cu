@@ -43,31 +43,33 @@ checkSum(void *targ, int size)
   *argdst = *(Cuda ## mthd ## Args *)argp;
 
 //mapping RPCfunctionID to DSCUDAVerbMethodID
-static DSCVMethod funcID2DSCVMethod(int funcID) {
+static DSCVMethod
+funcID2DSCVMethod(int funcID)
+{
     switch (funcID) {
-      case dscudaSetDeviceId:
+    case dscudaSetDeviceId:
 	return DSCVMethodSetDevice;
-      case dscudaMallocId:
+    case dscudaMallocId:
 	return DSCVMethodMalloc;
-      case dscudaMemcpyH2DId:
+    case dscudaMemcpyH2DId:
 	return DSCVMethodMemcpyH2D;
-      case dscudaMemcpyD2DId:
+    case dscudaMemcpyD2DId:
 	return DSCVMethodMemcpyD2D;
-      case dscudaMemcpyD2HId:
+    case dscudaMemcpyD2HId:
 	return DSCVMethodMemcpyD2H;
-      case dscudaMemcpyToSymbolH2DId:
+    case dscudaMemcpyToSymbolH2DId:
 	return DSCVMethodMemcpyToSymbolH2D;
-      case dscudaMemcpyToSymbolD2DId:
+    case dscudaMemcpyToSymbolD2DId:
 	return DSCVMethodMemcpyToSymbolD2D;
-      case dscudaFreeId:
+    case dscudaFreeId:
 	return DSCVMethodFree;
 	/*    
 	      case dscudaLoadModuleId:
 	      return DSCVMethodLoadModule;
 	*/
-      case dscudaLaunchKernelId:
+    case dscudaLaunchKernelId:
 	return DSCVMethodRpcLaunchKernel;
-      default:
+    default:
 	return DSCVMethodNone;
     }
 }
@@ -482,17 +484,19 @@ HistList::add(int funcID, void *argp)
     case dscudaMallocId:
 	byte_size += sizeof( CudaMallocArgs );
 	break;
-    case dscudaMemcpyH2DId: //thru
+    case dscudaMemcpyH2DId:
 	byte_size += sizeof( CudaMemcpyArgs );
 	break;
-    case dscudaMemcpyD2HId: //thru
+    case dscudaMemcpyD2HId:
 	byte_size += sizeof( CudaMemcpyArgs );
 	break;
     case dscudaMemcpyD2DId:
 	byte_size += sizeof( CudaMemcpyArgs );
 	WARN(3, "add hist cudaMemcpyD2D\n");
 	break;
-    case dscudaMemcpyToSymbolH2DId: //thru
+    case dscudaMemcpyToSymbolH2DId:
+	byte_size += sizeof( CudaMemcpyToSymbolArgs );
+	break;
     case dscudaMemcpyToSymbolD2DId:
 	byte_size += sizeof( CudaMemcpyToSymbolArgs );
 	break;

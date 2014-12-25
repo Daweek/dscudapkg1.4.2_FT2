@@ -2313,7 +2313,9 @@ cudaMallocHost(void **ptr, size_t size)
 #endif
 }
 
-cudaError_t cudaHostAlloc(void **pHost, size_t size, unsigned int flags) {
+cudaError_t
+cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
+{
 #if RC_SUPPORT_PAGELOCK
     cudaError_t err = cudaSuccess;
     dscudaHostAllocResult *rp;

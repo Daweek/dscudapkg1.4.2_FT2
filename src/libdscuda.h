@@ -10,10 +10,10 @@
 //------------------------------------------------------------------------------
 #ifndef __LIBDSCUDA_H__
 #define __LIBDSCUDA_H__
+
 #include "dscudadefs.h"
 #include "dscudarpc.h"
 #include "sockutil.h"
-
 //**************************************************************************
 //*** "Cuda*Args_t"
 //*** CUDA API arguments packing list.
@@ -25,19 +25,19 @@ struct CudaSetDeviceArgs
 };
 struct CudaMallocArgs
 {
-    void    *devPtr;
+    void*    devPtr;
     size_t   size;
     CudaMallocArgs(void) { devPtr = NULL, size = 0; }
     CudaMallocArgs( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
 };
 struct CudaMemcpyArgs
 {
-    void    *dst;
-    void    *src;
+    void*    dst;
+    void*    src;
     size_t   count;
-    enum cudaMemcpyKind kind;
+    cudaMemcpyKind kind;
     CudaMemcpyArgs( void ) { dst = src = NULL; count = 0; }
-    CudaMemcpyArgs( void *d, void *s, size_t c, enum cudaMemcpyKind k ) {
+    CudaMemcpyArgs( void *d, void *s, size_t c, cudaMemcpyKind k ) {
 	dst = d; src = s; count = c; kind = k;
     }
 };
@@ -48,7 +48,7 @@ struct CudaMemcpyToSymbolArgs
     void    *src;
     size_t   count;
     size_t   offset;
-    enum cudaMemcpyKind kind;
+    cudaMemcpyKind kind;
 };
 struct CudaFreeArgs
 {
@@ -82,24 +82,23 @@ struct CudaRpcLaunchKernelArgs
 //************************************************************************
 struct BkupMem
 {
-    void  *v_region;        // UVA, Search index, and also Virtual device address.
-    void  *d_region;        //!UVA, server device memory space.
-    void  *h_region;        //
-    int    size;            // in Byte.
-    int    update_rdy;      // 1:"*dst" has valid data, 0:invalid.
-    BkupMem *next; // For double-linked-list prev.
-    BkupMem *prev; // For double-linked-list next.
+    void*    v_region;        // UVA, Search index, and also Virtual device address.
+    void*    d_region;        //!UVA, server device memory space.
+    void*    h_region;        //
+    int      size;            // in Byte.
+    int      update_rdy;      // 1:"*dst" has valid data, 0:invalid.
+    BkupMem* next;            // For double-linked-list prev.
+    BkupMem* prev;            // For double-linked-list next.
     /*constructor/destructor.*/
-    BkupMem(void);
+             BkupMem(void);
     //--- methods
-    void   init(void *uva_ptr, void *d_ptr, int isize);
-    int    isHead(void);
-    int    isTail(void);
-    int    calcSum(void);
-    void  *translateAddrVtoD(const void *v_ptr);
-    void  *translateAddrVtoH(const void *v_ptr);
+    void     init(void *uva_ptr, void *d_ptr, int isize);
+    int      isHead(void);
+    int      isTail(void);
+    int      calcSum(void);
+    void*    translateAddrVtoD(const void *v_ptr);
+    void*    translateAddrVtoH(const void *v_ptr);
 };
-
 //********************************************************************
 //***  Class Name: "BkupMemList"
 //***  Description:
@@ -129,44 +128,41 @@ public:
     void*    queryDevicePtr(const void *v_ptr);
     void     restructDeviceRegion(void);              /* ReLoad backups */
 };
-
 //********************************************************************
 //***
 //*** CUDA API call record stub.
 //***
 //********************************************************************
-typedef enum {
-    DSCVMethodNone = 0,
-    DSCVMethodSetDevice,
-    //DSCVMethodGetDeviceProperties,
-    DSCVMethodMalloc,
-    DSCVMethodMemcpyH2D,
-    DSCVMethodMemcpyD2D,
-    DSCVMethodMemcpyD2H,
-    DSCVMethodMemcpyToSymbolH2D,
-    DSCVMethodMemcpyToSymbolD2D,
-    DSCVMethodFree,
-    //DSCVMethodLoadModule,
-    DSCVMethodRpcLaunchKernel,
-    //DSCVMethodIbvLaunchKernel,
-    DSCVMethodEnd
-} DSCVMethod;
+enum DSCVMethod { DSCVMethodNone = 0,
+		  DSCVMethodSetDevice,
+		  //DSCVMethodGetDeviceProperties,
+		  DSCVMethodMalloc,
+		  DSCVMethodMemcpyH2D,
+		  DSCVMethodMemcpyD2D,
+		  DSCVMethodMemcpyD2H,
+		  DSCVMethodMemcpyToSymbolH2D,
+		  DSCVMethodMemcpyToSymbolD2D,
+		  DSCVMethodFree,
+		  //DSCVMethodLoadModule,
+		  DSCVMethodRpcLaunchKernel,
+		  //DSCVMethodIbvLaunchKernel,
+		  DSCVMethodEnd };
 //********************************************************************
 //***  Class Name: "HistCell"
 //***  Description:
 //***      - Recording the sequential CUDA-call.
 //********************************************************************
+typedef int64_t HistID;
 struct HistCell
 {
-    int64_t seq_num;  // unique serial ID.
+    HistID  seq_num;  // unique serial ID.
     int     funcID;   // Recorded cuda*() function.
-    void   *args;     // And its arguments.
+    void*   args;     // And its arguments.
     int     dev_id;   // The Device ID, set by last cudaSetDevice().
 };
 //********************************************************************
 //***  Class Name: "HistList"
-//***  Description:
-//***      - 
+//***  Description: List structure of previously defined "HistCell"
 //********************************************************************
 struct HistList
 {
@@ -311,16 +307,16 @@ struct RCuva
 //**
 //** define FT mode for ClientState, VirtualDevice, and Physical one.
 //**
-enum FTmode { FT_NONE    = 0,   //-> No any Redundant or fault toleant behavior.
-	      FT_ERRSTAT = 1,   //-> count errors only, not corrected.
-	      FT_BYCPY   = 2,   //-> redundant data is verified every cudaMemcpyD2H.
-	      FT_BYTIMER = 3,   //-> redundant data is verified specified period.
+enum FTmode { FT_NONE    =0,   //-> No any Redundant or fault toleant behavior.
+	      FT_ERRSTAT =1,   //-> count errors only, not corrected.
+	      FT_BYCPY   =2,   //-> redundant data is verified every cudaMemcpyD2H.
+	      FT_BYTIMER =3,   //-> redundant data is verified specified period.
 	      //;
-	      FT_SPARE   = 4,   //-> spare device
-	      FT_BROKEN  = 5,   //-> broken and replaced device
-	      FT_IGNORE  = 6,
+	      FT_SPARE   =4,   //-> spare device
+	      FT_BROKEN  =5,   //-> broken and replaced device
+	      FT_IGNORE  =6,
 	      //;
-	      FT_UNDEF   = 999 };  //-> (Initial value, actually unused.)
+	      FT_UNDEF   =999 };  //-> (Initial value, actually unused.)
 //********************************************************************
 //***  Class Name: "RCServer"
 //***  Description:
@@ -343,7 +339,7 @@ struct RCServer
     
     int        *d_faultconf;  //
 
-    enum FTmode ft_mode;      // Fault Tolerant mode.
+    FTmode      ft_mode;      // Fault Tolerant mode.
     int         stat_error;   // Error  statics in redundant calculation.
     int         stat_correct; // Corrct statics in redundant calculation.
     
@@ -369,7 +365,7 @@ struct RCServer
     void setCID(int cid0);
     void setCID(char *cir_sz);
     void setUNIQ(int uniq0);
-    void setFTMODE(enum FTmode ft_mode0);
+    void setFTMODE(FTmode ft_mode0);
     /*METHODS*/
     int  setupConnection(void); // 0:success, -1:fail.
     void dupServer(RCServer *dup);
@@ -402,7 +398,7 @@ struct RCServer
 //*************************************************
 struct ServerArray
 {
-    int num;                      /* # of server candidates.         */
+    int      num;               /* # of server candidates.         */
     RCServer svr[RC_NVDEVMAX];  /* a list of candidates of server. */
     /*CONSTRUCTOR*/
     ServerArray(void);
@@ -413,18 +409,14 @@ struct ServerArray
 //    void      removeArray(ServerArray *sub);
     RCServer *findSpareOne(void);
     RCServer *findBrokenOne(void);
-    void      captureEnv(char *env, enum FTmode ft_mode0);
+    void      captureEnv(char *env, FTmode ft_mode0);
     void      print(void);
 };
 
-
-typedef enum VdevConf_e {
-    VDEV_MONO = 0, //VirDev.nredundancy == 1
-    VDEV_POLY = 1, //                   >= 2
-    VDEV_INVALID = 8,
-    VDEV_UNKNOWN = 9
-} VdevConf;
-
+enum VdevConf {  VDEV_MONO    = 0, //VirDev.nredundancy == 1
+		 VDEV_POLY    = 1, //                   >= 2
+		 VDEV_INVALID = 8,
+		 VDEV_UNKNOWN = 9   };
 //*************************************************
 //***  Class Name: "VirDev"
 //***  Description:
@@ -436,7 +428,7 @@ struct VirDev
     RCServer    server[RC_NREDUNDANCYMAX]; //Physical Device array.
     int         nredundancy;               //Redundant count
 
-    enum FTmode ft_mode;
+    FTmode      ft_mode;
     VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
@@ -456,7 +448,7 @@ struct VirDev
     int         isRecordOn(void);
     int         setRecord(int rec_en0); // return current rec_en.
     
-    void        setFaultMode(enum FTmode fault_mode);
+    void        setFaultMode(FTmode fault_mode);
     void        setConfInfo(int redun);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
@@ -494,7 +486,7 @@ public:
     int    Nvdev;             // # of virtual devices available.
     VirDev Vdev[RC_NVDEVMAX]; // list of virtual devices.
 
-    enum FTmode  ft_mode;
+    FTmode  ft_mode;
                               /*** Static Information ***/
     unsigned int ip_addr;     // Client IP address.
     time_t       start_time;  // Clinet start time.
@@ -646,7 +638,7 @@ cudaError_t dscudaBindTextureWrapper(int *moduleid, char *texname,
 cudaError_t
 dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
                                        size_t count, size_t offset = 0,
-                                       enum cudaMemcpyKind kind = cudaMemcpyHostToDevice);
+                                       cudaMemcpyKind kind = cudaMemcpyHostToDevice);
 cudaError_t dscudaBindTexture2DWrapper(int *moduleid, char *texname,
                                       size_t *offset,
                                       const struct textureReference *tex,
@@ -707,17 +699,17 @@ dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata
 cudaError_t
 dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
 			      size_t count, size_t offset = 0,
-			      enum cudaMemcpyKind kind = cudaMemcpyDeviceToHost);
+			      cudaMemcpyKind kind = cudaMemcpyDeviceToHost);
 cudaError_t
 dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func);
 cudaError_t
 dscudaMemcpyToSymbolAsyncWrapper(int *moduleid, const char *symbol, const void *src,
 				 size_t count, size_t offset = 0,
-				 enum cudaMemcpyKind kind = cudaMemcpyHostToDevice, cudaStream_t stream = 0);
+				 cudaMemcpyKind kind = cudaMemcpyHostToDevice, cudaStream_t stream = 0);
 cudaError_t
 dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
 				   size_t count, size_t offset = 0,
-				   enum cudaMemcpyKind kind = cudaMemcpyDeviceToHost, cudaStream_t stream = 0);
+				   cudaMemcpyKind kind = cudaMemcpyDeviceToHost, cudaStream_t stream = 0);
 void
 rpcDscudaLaunchKernelWrapper(int moduleid, int kid, char *kname,
 			     RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
