@@ -17,9 +17,10 @@
 #include "libdscuda.h"
 
 /*
- * Constructor of "Bkupmem_t" class.
+ * Constructor of "Bkupmem" class.
  */
-BkupMem_t::BkupMem_t(void) {
+BkupMem::BkupMem(void)
+{
     v_region      = NULL;
     d_region      = NULL;
     h_region      = NULL;
@@ -27,20 +28,26 @@ BkupMem_t::BkupMem_t(void) {
     update_rdy    = 0;
 }
 /*
- * Is this BkupMem_t is the "head" of list?
+ * Is this BkupMem is the "head" of list?
  */
-int BkupMem_t::isHead(void) {
+int
+BkupMem::isHead(void)
+{
     if (prev == NULL) { return 1; }
     else              { return 0; }
 }
 /*
- * Is this BkupMem_t is the "tail" of list?
+ * Is this BkupMem is the "tail" of list?
  */
-int BkupMem_t::isTail( void ) {
+int
+BkupMem::isTail( void )
+{
     if (next == NULL) { return 1; }
     else              { return 0; }
 }
-void *BkupMem_t::translateAddrVtoD(const void *v_ptr) {
+void*
+BkupMem::translateAddrVtoD(const void *v_ptr)
+{
     char *v_cptr       = (char *)v_ptr;
     char *v_region_end = (char *)v_region + size;
     long  d_offset;
@@ -53,7 +60,9 @@ void *BkupMem_t::translateAddrVtoD(const void *v_ptr) {
 	return NULL;
     }
 }
-void *BkupMem_t::translateAddrVtoH(const void *v_ptr) {
+void*
+BkupMem::translateAddrVtoH(const void *v_ptr)
+{
     char *v_cptr       = (char *)v_ptr;
     char *v_region_end = (char *)v_region + size;
     long  h_offset;
@@ -69,7 +78,8 @@ void *BkupMem_t::translateAddrVtoH(const void *v_ptr) {
 /*
  * 
  */
-void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz)
+void
+BkupMem::init( void *uva_ptr, void *d_ptr, int sz)
 {
     v_region   = uva_ptr;
     d_region   = d_ptr;
@@ -86,7 +96,9 @@ void BkupMem_t::init( void *uva_ptr, void *d_ptr, int sz)
     prev = NULL;
     next = NULL;
 }
-int BkupMem_t::calcSum(void) {
+int
+BkupMem::calcSum(void)
+{
     int sum=0;
     int *ptr = (int *)h_region;
 
@@ -98,9 +110,10 @@ int BkupMem_t::calcSum(void) {
 }
 //========================================================================
 /*
- * Constuctor of "BkupMemList_t" class.
+ * Constuctor of "BkupMemList" class.
  */
-BkupMemList_t::BkupMemList_t(void) {
+BkupMemList::BkupMemList(void)
+{
     int   autoverb;
 
     head       = NULL;
@@ -111,13 +124,16 @@ BkupMemList_t::BkupMemList_t(void) {
 }
 
 /*
- * Destructor of "BkupMemList_t" class.
+ * Destructor of "BkupMemList" class.
  */
-BkupMemList_t::~BkupMemList_t(void) {
+BkupMemList::~BkupMemList(void)
+{
 
 }
 
-void BkupMemList_t::print(void) {
+void
+BkupMemList::print(void)
+{
     BkupMem *mem_ptr = head;
     int i=0;
 
@@ -128,15 +144,21 @@ void BkupMemList_t::print(void) {
 	i++;
     }
 }
-int BkupMemList_t::getLen(void) {
+int
+BkupMemList::getLen(void)
+{
     return length;
 }
 
-long BkupMemList_t::getTotalSize(void) {
+long
+BkupMemList::getTotalSize(void)
+{
     return total_size;
 }
 
-int BkupMemList_t::isEmpty( void ) {
+int
+BkupMemList::isEmpty( void )
+{
     if      ( head==NULL && tail==NULL ) return 1;
     else if ( head!=NULL && tail!=NULL ) return 0;
     else {
@@ -145,7 +167,9 @@ int BkupMemList_t::isEmpty( void ) {
     }
 }
 
-int BkupMemList_t::countRegion( void ) {
+int
+BkupMemList::countRegion( void )
+{
     BkupMem *mem = head;
     int count = 0;
     while ( mem != NULL ) {
@@ -156,7 +180,8 @@ int BkupMemList_t::countRegion( void ) {
 }
 
 int
-BkupMemList_t::checkSumRegion( void *targ, int size ) {
+BkupMemList::checkSumRegion( void *targ, int size )
+{
     int sum=0;
     int  *ptr = (int *)targ;
     
@@ -166,12 +191,13 @@ BkupMemList_t::checkSumRegion( void *targ, int size ) {
     }
     return sum;
 }
-/* Class: "BkupMemList_t"
+/* Class: "BkupMemList"
  * Method: query()
  *
  */
 BkupMem*
-BkupMemList_t::query(void *uva_ptr) {
+BkupMemList::query(void *uva_ptr)
+{
     BkupMem *mem = head;
     int i = 0;
     while (mem != NULL) { // Search the target from head to tail in the list.
@@ -186,9 +212,10 @@ BkupMemList_t::query(void *uva_ptr) {
     return NULL;
 }
 /*
- * Add the BkupMem_t cell at the tail of List.
+ * Add the BkupMem cell at the tail of List.
  */
-void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size)
+void
+BkupMemList::add(void *uva_ptr, void *d_ptr, int size)
 {
     BkupMem *mem;
     
@@ -212,10 +239,12 @@ void BkupMemList_t::add(void *uva_ptr, void *d_ptr, int size)
     }
 }
 /*
- * Class: "BkupMemlist_t"
+ * Class: "BkupMemlist"
  * Method: removeRegion()
  */
-void BkupMemList_t::remove(void *uva_ptr) {
+void
+BkupMemList::remove(void *uva_ptr)
+{
     BkupMem *mem = query(uva_ptr);
     
     if (mem == NULL) { // not found.
@@ -245,7 +274,9 @@ void BkupMemList_t::remove(void *uva_ptr) {
     }
 }
 
-void *BkupMemList_t::queryHostPtr(const void *v_ptr) {
+void*
+BkupMemList::queryHostPtr(const void *v_ptr)
+{
     BkupMem *mem = head;
     void *h_ptr = NULL;
     int   i = 0;
@@ -262,7 +293,9 @@ void *BkupMemList_t::queryHostPtr(const void *v_ptr) {
     return NULL;
 }
 
-void *BkupMemList_t::queryDevicePtr(const void *v_ptr) {
+void*
+BkupMemList::queryDevicePtr(const void *v_ptr)
+{
     BkupMem *mem = head;
     void *d_ptr = NULL;
     int   i = 0;
@@ -283,7 +316,8 @@ void *BkupMemList_t::queryDevicePtr(const void *v_ptr) {
  * Resore the all data of a GPU device with backup data on client node.
  */
 void
-BkupMemList_t::restructDeviceRegion(void) {
+BkupMemList::restructDeviceRegion(void)
+{
     BkupMem *mem = head;
     int      verb = St.isAutoVerb();
     int      copy_count = 0;

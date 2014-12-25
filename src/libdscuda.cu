@@ -57,25 +57,27 @@ int    Vdevid[RC_NPTHREADMAX] = {0};   // the virtual device currently in use.
 /*
  * Physical GPU device server
  */
-ServerArray_t SvrCand;
-ServerArray_t SvrSpare;   // Alternative GPU Device Servers.
-ServerArray_t SvrIgnore;  // Forbidden GPU Device Servers.
+ServerArray SvrCand;
+ServerArray SvrSpare;   // Alternative GPU Device Servers.
+ServerArray SvrIgnore;  // Forbidden GPU Device Servers.
 
 void (*errorHandler)(void *arg) = NULL;
 void *errorHandlerArg = NULL;
 
 //struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
 
-struct ClientState_t St;
-struct PtxStore_t    PtxStore;
+ClientState St;
+PtxStore    Ptx;
 
-ServerArray::ServerArray(void) {
+ServerArray::ServerArray(void)
+{
     num = 0;
 }
 //*********************************************************
-//*** CLASS: PtxRecord_t
+//*** CLASS: PtxRecord
 //*********************************************************
-PtxRecord_t::PtxRecord_t(void) {
+PtxRecord::PtxRecord(void)
+{
     if (RC_KMODULENAMELEN < 16) {
 	WARN(0, "%s():RC_KMODULENAMELEN is too small.\n", __func__);
 	exit(1);
@@ -88,12 +90,16 @@ PtxRecord_t::PtxRecord_t(void) {
     strcpy(ptx_image, "empty");
     valid = 0;
 }
-void PtxRecord_t::invalidate(void) {
+void
+PtxRecord::invalidate(void)
+{
     strncpy(name, "unknown", RC_KMODULENAMELEN);
     strncpy(ptx_image, "empty", RC_KMODULEIMAGELEN);
     valid = 0;
 }
-void PtxRecord_t::set(char *name0, char *ptx_image0) {
+
+void PtxRecord::set(char *name0, char *ptx_image0)
+{
     strncpy(name,      name0,      RC_KMODULENAMELEN);
     strncpy(ptx_image, ptx_image0, RC_KMODULEIMAGELEN);
     valid = 1;
@@ -108,50 +114,60 @@ void PtxRecord_t::set(char *name0, char *ptx_image0) {
     }
 }
 //*********************************************************
-//*** CLASS: PtxStore_t
+//*** CLASS: PtxStore
 //*********************************************************
-PtxStore_t::PtxStore_t(void)
+PtxStore::PtxStore(void)
 {
     used_count = 0;
 }
-PtxRecord_t *PtxStore_t::add(char *name0, char *ptx_image0)
+PtxRecord*
+PtxStore::add(char *name0, char *ptx_image0)
 {
-    PtxRecord_t *ptx_ptr = &ptx_record[used_count];
+    PtxRecord *ptx_ptr = &ptx_record[used_count];
     if (used_count > RC_NKMODULEMAX) {
-	WARN(0, "PtxStore_t::%s(): PtxStore array FULL!\n");
+	WARN(0, "PtxStore::%s(): PtxStore array FULL!\n");
 	exit(1);
     }
     ptx_ptr->set(name0, ptx_image0);
     used_count++;
     return ptx_ptr;
 }
-PtxRecord_t *PtxStore_t::query(char *name0) {
-    PtxRecord_t *ptx_ptr;
+
+PtxRecord*
+PtxStore::query(char *name0)
+{
+    PtxRecord *ptx_ptr;
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	ptx_ptr = &ptx_record[i];
 	if ( strcmp(name0, ptx_ptr->name)==0 ) {/*found*/
-	    WARN(9, "      +PtxStore_t::query(): Found ptx.\n")
+	    WARN(9, "      +PtxStore::query(): Found ptx.\n")
 	    return ptx_ptr;
 	}
     }
-    WARN(5, "      + PtxStore_t::query(): Not found ptx.\n");
+    WARN(5, "      + PtxStore::query(): Not found ptx.\n");
     return NULL;
 }
-void PtxStore_t::print(int n) {
+
+void
+PtxStore::print(int n)
+{
     for (int i=0; i<n; i++) {
 	WARN(1, "ptx_record[%d]: valid=%d, name=%s.\n",
 	     i, ptx_record[i].valid, ptx_record[i].name); 
     }
 }
 
-ClientModule_t::ClientModule_t(void) {
+ClientModule::ClientModule(void)
+{
     //WARN( 5, "The constructor %s() called.\n", __func__ );
     valid  = -1;
     id     = -1;
     ptx_data = NULL;
 }
 
-int ClientModule_t::isValid(void) {
+int
+ClientModule::isValid(void)
+{
     if (valid<-1 || valid>1) {
 	fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
 	exit(1);
@@ -162,7 +178,9 @@ int ClientModule_t::isValid(void) {
     }
 }
 
-int ClientModule_t::isInvalid(void) {
+int
+ClientModule::isInvalid(void)
+{
     if (valid<-1 || valid>1) {
 	fprintf(stderr, "Unexpected error. %s:%d\n", __FILE__, __LINE__);
 	exit(1);
@@ -173,7 +191,9 @@ int ClientModule_t::isInvalid(void) {
     }
 }
 
-int ServerArray::add(const char *ip, int ndev, const char *hname) {
+int
+ServerArray::add(const char *ip, int ndev, const char *hname)
+{
     if ( num >= (RC_NVDEVMAX - 1) ) {
 	WARN(0, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n",
 	     RC_NVDEVMAX);
@@ -188,7 +208,9 @@ int ServerArray::add(const char *ip, int ndev, const char *hname) {
     return 0;
 }
 
-int ServerArray::add(RCServer *svrptr) {
+int
+ServerArray::add(RCServer *svrptr)
+{
     if ( num >= (RC_NVDEVMAX - 1) ) {
 	WARN(0, "(+_+) Too many DS-CUDA daemons, exceeds RC_NVDEVMAX(=%d)\n",
 	     RC_NVDEVMAX);
@@ -204,7 +226,8 @@ int ServerArray::add(RCServer *svrptr) {
     return 0;
 }
 
-RCServer *ServerArray::findSpareOne(void)
+RCServer*
+ServerArray::findSpareOne(void)
 {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
@@ -215,7 +238,8 @@ RCServer *ServerArray::findSpareOne(void)
     return sp;
 }
 
-RCServer *ServerArray::findBrokenOne(void)
+RCServer*
+ServerArray::findBrokenOne(void)
 {
     RCServer *sp = NULL;
     for (int i=0; i<num; i++) {
@@ -226,24 +250,27 @@ RCServer *ServerArray::findBrokenOne(void)
     return sp;
 }
 
-void ServerArray::captureEnv(char *env_str, FtMode ft_mode0)
+void
+ServerArray::captureEnv(  char  *env_str,
+                     enum FTmode ft_mode0 )
 {
-    WARN(9, "   ServerArray::%s() {\n", __func__);
-    char *env;
+
     char buf[1024*RC_NVDEVMAX];
     char *svr_token;
     char svr_token_ar[RC_NVDEVMAX][256];
-    
-    env = getenv(env_str);
-    if (env == NULL) {
-	WARN(1, "Not found %s\n", env_str);
-	return;
+
+    {/* update buf[] */
+	char *env = getenv(env_str);
+	if (env == NULL) {
+	    INFO0("[ Environment variable ] %s = (Not found)\n", env_str);
+	    return;
+	}
+	if (sizeof(buf) < strlen(env)) {
+	    WARN(0, "Too long length of DSCUDA_SERVER.\n");
+	    exit(EXIT_FAILURE);
+	}
+	strncpy(buf, env, sizeof(buf));
     }
-    if (sizeof(buf) < strlen(env)) {
-	WARN(0, "Too long length of DSCUDA_SERVER.\n");
-	exit(EXIT_FAILURE);
-    }
-    strncpy(buf, env, sizeof(buf));
 
     //<--- svr_token_sr[x]="hostname:n"
     int  svr_count = 0;    
@@ -269,23 +296,22 @@ void ServerArray::captureEnv(char *env_str, FtMode ft_mode0)
     }
 
     this->num = svr_count;
-    WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
-void ServerArray::print(void)
+void
+ServerArray::print(void)
 {
-    WARN(9, "   ServerArray::%s() {\n", __func__);
-    WARN(5, "      + num = %d\n", num);
+    WARN(5, "ServerArray.num = %d\n", num);
     for (int i=0; i<num; i++) {
 	WARN(1, "      + svrarr[%d].id= %d\n", i, svr[i].id);
 	WARN(1, "      + svrarr[%d].cid= %d\n", i, svr[i].cid);
 	WARN(1, "      + svrarr[%d].ip= %s\n", i, svr[i].ip);
 	WARN(1, "      + svrarr[%d].hostname= %s\n", i, svr[i].hostname);
     }
-    WARN(9, "   } ServerArray::%s()\n", __func__);
 }
 
-int requestDaemonForDevice(char *ip, int devid, int useibv)
+int
+requestDaemonForDevice(char *ip, int devid, int useibv)
 {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
@@ -344,7 +370,9 @@ int requestDaemonForDevice(char *ip, int devid, int useibv)
  * Obtain a small integer unique for each thread.
  * The integer is used as an index to 'Vdevid[]'.
  */
-int vdevidIndex(void) {
+int
+vdevidIndex(void)
+{
     int i;
     pthread_t ptid = pthread_self();
 
@@ -368,7 +396,9 @@ int vdevidIndex(void) {
     return i;
 }
 
-void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
+void
+RCmappedMemRegister(void *pHost, void* pDevice, size_t size)
+{
     RCmappedMem *mem = (RCmappedMem *)malloc(sizeof(RCmappedMem));
     if (!mem) {
         perror("RCmappedMemRegister");
@@ -386,7 +416,9 @@ void RCmappedMemRegister(void *pHost, void* pDevice, size_t size) {
     RCmappedMemListTail = mem;
 }
 
-RCmappedMem* RCmappedMemQuery(void *pHost) {
+RCmappedMem*
+RCmappedMemQuery(void *pHost)
+{
     RCmappedMem *mem = RCmappedMemListTop;
     while (mem) {
         if (mem->pHost == pHost) {
@@ -397,7 +429,9 @@ RCmappedMem* RCmappedMemQuery(void *pHost) {
     return NULL; // pHost not found in the list.
 }
 
-void RCmappedMemUnregister(void *pHost) {
+void
+RCmappedMemUnregister(void *pHost)
+{
     RCmappedMem *mem = RCmappedMemQuery(pHost);
     if (!mem) return;
 
@@ -422,8 +456,9 @@ void RCmappedMemUnregister(void *pHost) {
  * Others, i.e., streams[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-static
-void RCstreamArrayRegister(cudaStream_t *streams) {
+static void
+RCstreamArrayRegister(cudaStream_t *streams)
+{
     RCstreamArray *st = (RCstreamArray *)malloc(sizeof(RCstreamArray));
     if (!st) {
         perror("RCstreamArrayRegister");
@@ -442,8 +477,9 @@ void RCstreamArrayRegister(cudaStream_t *streams) {
 }
 
 #if 0
-static
-void showsta(void) {
+static void
+showsta(void)
+{
     RCstreamArray *st = RCstreamArrayListTop;
     while (st) {
         fprintf(stderr, ">>> 0x%08llx    prev:%p  next:%p\n", st, st->prev, st->next);
@@ -452,7 +488,9 @@ void showsta(void) {
 }
 #endif
 
-RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0) {
+RCstreamArray*
+RCstreamArrayQuery(cudaStream_t stream0)
+{
     static RCstreamArray default_stream = { 0,};
 
     if (stream0 == 0) {
@@ -469,8 +507,9 @@ RCstreamArray* RCstreamArrayQuery(cudaStream_t stream0) {
     return NULL;
 }
 
-static
-void RCstreamArrayUnregister(cudaStream_t stream0) {
+static void
+RCstreamArrayUnregister(cudaStream_t stream0)
+{
     RCstreamArray *st = RCstreamArrayQuery(stream0);
     if (!st) return;
 
@@ -497,7 +536,8 @@ void RCstreamArrayUnregister(cudaStream_t stream0) {
  * Others, i.e., cuarrays[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-void RCcuarrayArrayRegister(cudaArray **cuarrays)
+void
+RCcuarrayArrayRegister(cudaArray **cuarrays)
 {
     RCcuarrayArray *ca = (RCcuarrayArray *)malloc(sizeof(RCcuarrayArray));
     if (!ca) {
@@ -516,7 +556,8 @@ void RCcuarrayArrayRegister(cudaArray **cuarrays)
     RCcuarrayArrayListTail = ca;
 }
 
-RCcuarrayArray* RCcuarrayArrayQuery(cudaArray *cuarray0)
+RCcuarrayArray*
+RCcuarrayArrayQuery(cudaArray *cuarray0)
 {
     RCcuarrayArray *ca = RCcuarrayArrayListTop;
     while (ca) {
@@ -528,7 +569,8 @@ RCcuarrayArray* RCcuarrayArrayQuery(cudaArray *cuarray0)
     return NULL;
 }
 
-void RCcuarrayArrayUnregister(cudaArray *cuarray0)
+void
+RCcuarrayArrayUnregister(cudaArray *cuarray0)
 {
     RCcuarrayArray *ca = RCcuarrayArrayQuery(cuarray0);
     if (!ca) return;
@@ -554,7 +596,8 @@ void RCcuarrayArrayUnregister(cudaArray *cuarray0)
  * Others, i.e., events[1..Nredunddancy-1], are used by this library
  * to handle redundant calculation mechanism.
  */
-void RCeventArrayRegister(cudaEvent_t *events)
+void
+RCeventArrayRegister(cudaEvent_t *events)
 {
     RCeventArray *ev = (RCeventArray *)malloc(sizeof(RCeventArray));
     if (!ev) {
@@ -585,7 +628,8 @@ RCeventArray* RCeventArrayQuery(cudaEvent_t event0)
     return NULL;
 }
 
-void RCeventArrayUnregister(cudaEvent_t event0)
+void
+RCeventArrayUnregister(cudaEvent_t event0)
 {
     RCeventArray *ev = RCeventArrayQuery(event0);
     if (!ev) return;
@@ -606,7 +650,8 @@ void RCeventArrayUnregister(cudaEvent_t event0)
 /*
  * Compose UVA from GPU local address and its deviceID.
  */
-void* dscudaUvaOfAdr( void *adr, int devid ) {
+void*
+dscudaUvaOfAdr( void *adr, int devid ) {
     DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
     adri |= ((DscudaUva_t)devid << 48);
@@ -616,7 +661,8 @@ void* dscudaUvaOfAdr( void *adr, int devid ) {
 /*====================================================================
  * Get GPU deviceID from UVA.
  */
-int dscudaDevidOfUva( void *adr ) {
+int
+dscudaDevidOfUva( void *adr ) {
 #if __LP64__
     DscudaUva_t adri = (DscudaUva_t)adr;
     int devid = adri >> 48;
@@ -628,7 +674,8 @@ int dscudaDevidOfUva( void *adr ) {
 /*
  * Get GPU local address from UVA.
  */
-void *dscudaAdrOfUva( void *adr ) {
+void*
+dscudaAdrOfUva( void *adr ) {
     DscudaUva_t adri = (DscudaUva_t)adr;
 #if __LP64__
     adri &= 0x0000ffffffffffffLL;
@@ -636,7 +683,8 @@ void *dscudaAdrOfUva( void *adr ) {
     return (void *)adri;
 }
 
-static char* readServerConf(char *fname) {
+static char*
+readServerConf(char *fname) {
     FILE *fp = fopen(fname, "r");
     char linebuf[1024];
     int len;
@@ -669,24 +717,25 @@ static char* readServerConf(char *fname) {
 /*
  *
  */
-void printVirtualDeviceList( void ) {
-    Vdev_t     *pVdev;
-    RCServer_t *pSvr;
+void
+printVirtualDeviceList( void )
+{
+    VirDev     *pVdev;
+    RCServer   *pSvr;
     int         i,j;
     
-    WARN( 0, "/*** Virtual Device Information. (Nvdev=%d) ***/\n", St.Nvdev);
-    for ( i=0, pVdev=St.Vdev; i<St.Nvdev; i++, pVdev++ ) {
-	if ( i >= RC_NVDEVMAX ) {
-	    WARN(0, "(;_;) Too many virtual devices. %s().\nexit.", __func__);
-	    exit( EXIT_FAILURE );
+    INFO0("###***   <---Start Virtual Device Construction. (Total %d device%s)\n", St.Nvdev, (St.Nvdev>1)? "s":"" );
+    for (i=0, pVdev=St.Vdev; i<St.Nvdev; i++, pVdev++) {
+	if (i >= RC_NVDEVMAX) {
+	    INFO0("(;_;) Too many virtual devices. %s().\nexit.", __func__);
+	    exit(EXIT_FAILURE);
 	}
-	
-	if ( pVdev->nredundancy == 1 ) {
-	    WARN( 0, "Virtual[%d] (MONO)\n", i );
+	if (pVdev->nredundancy == 1) {
+	    INFO0("    Virt[%d] (MONO)\n", i );
 	} else if ( pVdev->nredundancy > 1 ) {
-	    WARN( 0, "Virtual[%d] (POLY:%d)\n", i, pVdev->nredundancy );
+	    INFO0("    Virt[%d] (POLY:%d)\n", i, pVdev->nredundancy );
 	} else {
-	    WARN( 0, "Virtual[%d] (????:%d)\n", i, pVdev->nredundancy );
+	    INFO0("    Virt[%d] (????:%d)\n", i, pVdev->nredundancy );
 	}
 	
 	for (j=0, pSvr=pVdev->server; j<pVdev->nredundancy; j++, pSvr++) {
@@ -694,41 +743,43 @@ void printVirtualDeviceList( void ) {
 		WARN(0, "(;_;) Too many redundant devices %d. %s().\nexit.\n", __func__);
 		exit( EXIT_FAILURE );
 	    }
-	    WARN( 0, "    + Physical[%d]: id=%d, cid=%d, IP=%s(%s), uniq=%d.\n", j,
+	    INFO0("    +  Phy[%d]: id=%d, cid=%d, IP=%s(%s), uniq=%d.\n", j,
 		   pSvr->id, pSvr->cid, pSvr->ip, pSvr->hostname, pSvr->uniq);
 	}
     }
+    INFO0("###***   --->Stop Virtual Device Construction.\n\n");
 
-    if ( St.ft_mode==FT_MIGRA || St.ft_mode==FT_BOTH ) {
+    if (St.ft_mode==FT_BYCPY || St.ft_mode==FT_BYTIMER) {
 	/*
 	 * Device Candidates
 	 */
-	WARN( 0, "*** Physical Device Candidates. (Ncand=%d)\n", SvrCand.num );
+	INFO0("###*** Physical Device Candidates. (Ncand=%d)\n", SvrCand.num );
 	for( i=0, pSvr=SvrCand.svr; i < SvrCand.num; i++, pSvr++ ){
 	    if (i >= RC_NVDEVMAX) {
 		WARN(0, "(;_;) Too many candidate devices. %s().\nexit.", __func__);
 		exit( EXIT_FAILURE );
 	    }
-	    WARN( 0, "    - Cand[%2d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
+	    INFO0("###***    - Cand[%2d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
 		  pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
 	}
 	/*
 	 * Alternate Devices
 	 */
-	WARN( 0, " *** Spare Server Info.(Nspare=%d)\n", SvrSpare.num);
+	INFO0("###*** Spare Server Info.(Nspare=%d)\n", SvrSpare.num);
 	for( i=0, pSvr=SvrSpare.svr; i < SvrSpare.num; i++, pSvr++ ){
 	    if (i >= RC_NVDEVMAX) {
 		WARN(0, "(;_;) Too many spare devices. %s().\nexit.", __func__);
 		exit( EXIT_FAILURE );
 	    }
-	    WARN( 0, "    - Spare[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
+	    INFO0("###***    - Spare[%d]: id=%d, cid=%d, IP=%s, uniq=%d.\n", i,
 		  pSvr->id, pSvr->cid, pSvr->ip, pSvr->uniq);
 	}
     }
-    return;
 }
 
-void VirDev_t::setConfInfo(int redun) {
+void
+VirDev::setConfInfo(int redun)
+{
     nredundancy = redun; //Update Vdev.nredundancy.
     if (redun == 1) {
 	conf = VDEV_MONO;
@@ -742,13 +793,15 @@ void VirDev_t::setConfInfo(int redun) {
     }
 }
 
-void VirDev_t::printModuleList(void) {
+void
+VirDev::printModuleList(void)
+{
     const int len = 256;
     char printbuf[len];
     int valid_cnt = 0;
     
     WARN(5, "====================================================\n");
-    WARN(5, "===  VirDev_t::%s(void)\n", __func__ );
+    WARN(5, "===  VirDev::%s(void)\n", __func__ );
     WARN(5, "====================================================\n");
     WARN(5, "RC_NKMODULEMAX= %d\n", RC_NKMODULEMAX);
     
@@ -768,7 +821,9 @@ void VirDev_t::printModuleList(void) {
     
 }
 
-void printModuleList(void) {
+void
+printModuleList(void)
+{
     for (int i=0; i<St.Nvdev; i++) {
 	St.Vdev[i].printModuleList();
     }
@@ -788,34 +843,30 @@ dscuda::searchDaemon(void)
     int num_device = 0;
     int num_ignore = 0;
 
-    int val = 1;
     unsigned int adr, mask;
-    socklen_t sin_size;
-    
-    int setsockopt_ret;
-    int bind_ret;
-    int close_ret;
+    socklen_t    sin_size;
+    int          setsockopt_ret;
 
     struct sockaddr_in addr, svr;
     struct ifreq ifr[2];
     struct ifconf ifc;
     struct passwd *pwd;
-    
-    WARN(2, "RC_DAEMON_IP_PORT = %d\n", RC_DAEMON_IP_PORT);
+
+    INFO0("[ Constant             ] RC_DAEMON_IP_PORT = %d\n", RC_DAEMON_IP_PORT);
     sendsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     recvsock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if ( sendsock == -1 || recvsock == -1 ) {
 	perror("searchDaemon: socket()");
-	//return -1;
 	exit(1);
     }
-    
-    setsockopt_ret = setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
-    if ( setsockopt_ret != 0 ) {
-	perror("searchDaemon: setsockopt()");
-	exit(1);
+    {
+	int val = 1;
+	setsockopt_ret = setsockopt(sendsock, SOL_SOCKET, SO_BROADCAST, &val, sizeof(val));
+	if (setsockopt_ret != 0) {
+	    perror("searchDaemon: setsockopt()");
+	    exit(1);
+	}
     }
-
     ifc.ifc_len = sizeof(ifr) * 2;
     ifc.ifc_ifcu.ifcu_buf = (char *)ifr;
     ioctl(sendsock, SIOCGIFCONF, &ifc);
@@ -832,7 +883,7 @@ dscuda::searchDaemon(void)
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN_TX - 1 );
     sendto( sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
-    WARN(2, "Broadcast message \"%s\"...\n", SEARCH_PING);
+    INFO0("Broadcast \"%s\" message\n", SEARCH_PING);
     sin_size = sizeof(struct sockaddr_in);
 
     svr.sin_family      = AF_INET;
@@ -840,21 +891,25 @@ dscuda::searchDaemon(void)
     svr.sin_addr.s_addr = htonl(INADDR_ANY);
     
     // Set timeout for recvsock.
-    struct timeval tout;
-    tout.tv_sec  = RC_SEARCH_DAEMON_TIMEOUT ;
-    tout.tv_usec = 0;
-    setsockopt_ret = setsockopt(recvsock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tout, sizeof(tout));
-    if ( setsockopt_ret != 0 ) {
-	perror("searchDaemon: setsockopt(recvsock)");
-	exit(1);
+    {
+	struct timeval tout;
+	tout.tv_sec  = RC_SEARCH_DAEMON_TIMEOUT ;
+	tout.tv_usec = 0;
+	setsockopt_ret = setsockopt(recvsock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tout, sizeof(tout));
+	if (setsockopt_ret != 0) {
+	    perror("searchDaemon: setsockopt(recvsock)");
+	    exit(1);
+	}
     }
-    
-    bind_ret = bind( recvsock, (struct sockaddr *)&svr, sizeof(svr) );
-    if( bind_ret != 0 ) {
-	fprintf(stderr, "Error: bind() returned %d. recvsock=%d, port=%d\n",
-		bind_ret, recvsock, svr.sin_port); //port:38655
-	perror("searchDaemon: bind()");
-	return -1;
+
+    {
+	int bind_ret = bind( recvsock, (struct sockaddr *)&svr, sizeof(svr) );
+	if( bind_ret != 0 ) {
+	    fprintf(stderr, "Error: bind() returned %d. recvsock=%d, port=%d\n",
+		    bind_ret, recvsock, svr.sin_port); //port:38655
+	    perror("searchDaemon: bind()");
+	    return -1;
+	}
     }
     
     pwd = getpwuid( getuid() );
@@ -871,7 +926,7 @@ dscuda::searchDaemon(void)
 
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     while(( recvlen = recvfrom( recvsock, recvbuf, SEARCH_BUFLEN_RX - 1, 0, (struct sockaddr *)&svr, &sin_size)) > 0) {
-	WARN(2, "    + Recieved ACK \"%s\" ", recvbuf);
+	INFO0(" + Detect ACK \"%s\" ", recvbuf);
 	/*
 	 * Analyze message.
 	 */
@@ -885,10 +940,10 @@ dscuda::searchDaemon(void)
 	    WARN(0, "\n\n###(ERROR) Unexpected token in %s().\n\n", __func__);
 	    exit(1);
 	} else {
-	    WARN0(2, "from server \"%s\" ", ipaddr );
+	    INFO0("from \"%s\" ", ipaddr );
 	    if ( strcmp( magic_word, SEARCH_ACK   )==0 &&
 		 strcmp( user_name,  pwd->pw_name )==0 ) { /* Found */
-		WARN0(2, "valid.\n");
+		INFO0("valid.\n");
 		/*
 		 * Updata SvrCand;
 		 */
@@ -898,76 +953,86 @@ dscuda::searchDaemon(void)
 		num_daemon += 1;
 		num_device += num_eachdev;
 	    } else {
-		WARN0(2, "ignored.\n");
+		INFO0("ignored.\n");
 		num_ignore++;
 	    }
 	}
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
-    
-    close_ret = close( sendsock );
-    if ( close_ret != 0 ) {
-	WARN(0, "close(sendsock) failed.\n");
-	exit(EXIT_FAILURE);
-    }
-    
-    close_ret = close( recvsock );
-    if ( close_ret != 0 ) {
-	WARN(0, "close(recvsock) failed.\n");
-	exit(EXIT_FAILURE);
+
+    {
+	int close_ret = close( sendsock );
+	if ( close_ret != 0 ) {
+	    WARN(0, "close(sendsock) failed.\n");
+	    exit(EXIT_FAILURE);
+	}
+	
+	close_ret = close( recvsock );
+	if ( close_ret != 0 ) {
+	    WARN(0, "close(recvsock) failed.\n");
+	    exit(EXIT_FAILURE);
+	}
     }
 
-    if ( num_daemon > 0 ) {
-	WARN( 2, "Found %d valid DSCUDA daemon%s. (%d ignored).\n",
+    if (num_daemon > 0) {
+	INFO0("Found %d valid DSCUDA daemon%s. (%d ignored).\n",
 	      num_daemon, (num_daemon>1)? "s":"", num_ignore );
-    } else if ( num_daemon == 0 ) {
+    }
+    else if (num_daemon==0) {
 	//
 	// Even if no daemons found, the servers defined in DSCUDA_SERVER are available.
 	//
 	WARN( 0, "%s(): Not found DS-CUDA daemon in this network.\n", __func__ );
 	WARN( 0, "%s(): And Trying to continue execution.\n", __func__ );
-    } else { 	/* Terminate program and exit. */
+    }
+    else { 	/* Terminate program and exit. */
 	WARN( 0, "%s(): Detected unexpected trouble; num_daemon=%d?\n", __func__, num_daemon );
 	exit(EXIT_FAILURE);
     }
-
     return num_daemon;
-}
+} //---> int dscuda::searchDaemon(void)
+
 
 /*
  *
  */
-void ClientState_t::initVirtualDeviceList(void) {
+void
+ClientState::initVirtualDeviceList(void)
+{
     char *ip, ips[RC_NVDEVMAX][256];
     char buf[1024*RC_NVDEVMAX];
-    RCServer_t *sp;
-    char *env;
+    RCServer *sp;
     char *vdev_token;
     char *pdev_token;
 
     // DSCUDA_SERVER
-    char *sconfname;
-    if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
-        env = readServerConf(sconfname);
-    } else {
-        env = getenv("DSCUDA_SERVER");
+    {
+	char *sconfname;
+	char *env;    
+	if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
+	    env = readServerConf(sconfname);
+	    INFO0("[ Environment variable ] DSCUDA_SERVER_CONF = %s\n", env);
+	} else {
+	    env = getenv("DSCUDA_SERVER");
+	    INFO0("[ Environment variable ] DSCUDA_SERVER    = %s\n", env);
+	}
+	// check DSCUDA_SERVER (1)
+	if (env == NULL) {
+	    Nvdev = 1;
+	    Vdev[0].nredundancy = 1;
+	    sp = Vdev[0].server;
+	    sp->id = 0;
+	    strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
+	    return;
+	}
+	
+	// check DSCUDA_SERVER (2)
+	if (sizeof(buf) < strlen(env)) {
+	    WARN(0, "Too long length of DSCUDA_SERVER.\n");
+	    exit(EXIT_FAILURE);
+	}
+	strncpy( buf, env, sizeof(buf) );
     }
-
-    if (env == NULL) {
-	Nvdev = 1;
-	Vdev[0].nredundancy = 1;
-	sp = Vdev[0].server;
-	sp->id = 0;
-	strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
-	return;
-    }
-    
-    if (sizeof(buf) < strlen(env)) {
-	WARN(0, "Too long length of DSCUDA_SERVER.\n");
-	exit(EXIT_FAILURE);
-    }
-    strncpy(buf, env, sizeof(buf));
-
     //<-- set "Nvdev", # of virtual device count.
     Nvdev = 0;
     vdev_token = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
@@ -1046,12 +1111,15 @@ void ClientState_t::initVirtualDeviceList(void) {
 	    }
 	}
     } // for (int i=0; ...
-}
+} //---> void ClientState::initVirtualDeviceList(void)
+
 //
 //
 //
 #if 0
-void ServerArray::removeArray(ServerArray *sub) {
+void
+ServerArray::removeArray(ServerArray *sub)
+{
 
     for (int i=0; i<num; i++) {
 	for (int k=0; k<sub->num; k++) {
@@ -1059,10 +1127,12 @@ void ServerArray::removeArray(ServerArray *sub) {
     }
 }
 #endif
-static void updateSpareServerList(void) {
+static void
+updateSpareServerList(void)
+{
     int         spare_count = 0;;
-    Vdev_t     *pVdev;
-    RCServer_t *pSvr;
+    VirDev     *pVdev;
+    RCServer *pSvr;
 
     for (int i=0; i<SvrCand.num; i++) {    // Sweep all Vdev.server[] and compare.
 	int found = 0;
@@ -1090,7 +1160,8 @@ static void updateSpareServerList(void) {
     SvrSpare.num = spare_count;
 }
 
-static void getenvWarnLevel(void)
+static void
+getenvWarnLevel(void)
 {
     char *env = getenv("DSCUDA_WARNLEVEL");
     int val;
@@ -1124,26 +1195,26 @@ getenvDSCUDA_PATH(void)
  *
  */
 void
-ClientState_t::setFaultTolerantMode(void)
+ClientState::setFaultTolerantMode(void)
 {
     char *env;
 
     env = getenv( "DSCUDA_USEDAEMON" );
-    if ( env == NULL ) {
+    if (env == NULL) {
 	daemon = 0;
     } else {
 	daemon = atoi(env);
     }
     
     env = getenv( "DSCUDA_AUTOVERB" );
-    if ( env == NULL ) {
+    if (env == NULL) {
 	autoverb = 0;
     } else {
-	autoverb = atoi(env);
+	autoverb = atoi(env); //** {0,1,2,3}
     }
 
     env = getenv( "DSCUDA_MIGRATION" );
-    if ( env == NULL ) {
+    if (env == NULL) {
 	migration = 0;
     } else {
 	migration = atoi(env);
@@ -1156,37 +1227,36 @@ ClientState_t::setFaultTolerantMode(void)
 	cp_period = atoi(env);
     }
 
-    if ( autoverb == 0 ) {
-	if ( migration == 0 ) {
-	    ft_mode = FT_PLAIN;
-	} else if ( migration > 0 ) {
-	    ft_mode = FT_MIGRA;
-	} else {
-	    WARN( 0, "Found invalid setting of DSCUDA_MIGRATION=%d\n", migration );
-	    exit( EXIT_FAILURE );
-	}
-    } else if ( autoverb > 0 ) {
-	if ( migration == 0 ) {
-	    ft_mode = FT_REDUN;
-	} else if ( migration > 0 ) {
-	    ft_mode = FT_BOTH;
-	} else {
-	    WARN( 0, "Found invalid setting of DSCUDA_MIGRATION=%d\n", migration );
-	    exit( EXIT_FAILURE );
-	}
-    } else {
-	WARN( 0, "Found invalid setting of DSCUDA_AUTOVERB=%d\n", autoverb );
-	exit( EXIT_FAILURE );
+    //<--- Define Fault Tolerant behavior from env.var.
+    switch (autoverb) {
+    case 0:
+	ft_mode = FT_NONE;
+	break;
+    case 1:
+	ft_mode = FT_ERRSTAT;
+	break;
+    case 2:
+	ft_mode = FT_BYCPY;
+	break;
+    case 3:
+	ft_mode = FT_BYTIMER;
+	break;
+    default:
+	WARN(0, "Found invalid setting of DSCUDA_AUTOVERB=%d\n", autoverb);
+	exit(EXIT_FAILURE);
     }
+    //---> Define Fault Tolerant behavior from env.var.
 
+    //<--- copy same value to virtual and physical device.
     for (int i=0; i<RC_NVDEVMAX; i++) {
 	Vdev[i].ft_mode = this->ft_mode;
 	for (int k=0; k<Vdev[i].nredundancy; k++) {
 	    Vdev[i].server[k].ft_mode = this->ft_mode;
 	}
     }
+    //---> copy same value to virtual and physical device.
 
-    if (ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH) {
+    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
 	for (int i=0; i<RC_NVDEVMAX; i++) {
 	    Vdev[i].rec_en = 1;
 	    for (int k=0; k<Vdev[i].nredundancy; k++) {
@@ -1194,29 +1264,28 @@ ClientState_t::setFaultTolerantMode(void)
 	    }
 	}
     }
-
-    return;
-}
-
+} //---> void ClientState::setFaultTolerantMode(void)
 /****** CHECK-POINTING THREAD ****************************************
  * Take the data backups of each virtualized GPU to client's host
  * memory after verifying between redundant physical GPUs every
  * specified wall clock
  * time period. The period is defined in second.
  */
-void *periodicCheckpoint(void *arg) {
-    int cp_period = *(int *)arg;
-    int age = 0;
-    int devid;
-    int errcheck = 1;
+void*
+periodicCheckpoint(void *arg)
+{
+    int         cp_period = *(int *)arg;
+    int         age = 0;
+    int         devid;
+    int         errcheck = 1;
     cudaError_t cuerr;
-    int pmem_devid;
-    BkupMem *pmem;
-    int  pmem_count;
-    void *lsrc;
-    void *ldst;
-    int  redun;
-    int  size;
+    int         pmem_devid;
+    BkupMem    *pmem;
+    int         pmem_count;
+    void       *lsrc;
+    void       *ldst;
+    int         redun;
+    int         size;
     
     int  cmp_result[RC_NREDUNDANCYMAX][RC_NREDUNDANCYMAX]; //verify
     int  regional_match;
@@ -1238,6 +1307,10 @@ void *periodicCheckpoint(void *arg) {
 	     cp_period, age++);
 
 	St.collectEntireRegions();
+	//**  calling hierachical as following,
+	//**  +---> Vdev[*].collectEntireRegions();
+	//**           +---> server[*].collectEntireRegions();
+
 	int correct = St.verifyEntireRegions();
 	if ( correct==1 ) {
 	    correct_count++;
@@ -1289,9 +1362,7 @@ void *periodicCheckpoint(void *arg) {
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.
  */
-using dscuda::searchDaemon;
-
-ClientState_t::ClientState_t(void)
+ClientState::ClientState(void)
 {
     // Open dscuda output file.
     {
@@ -1345,7 +1416,7 @@ ClientState_t::ClientState_t(void)
 	INFO0("[ Working Directory    ] %s\n", path);
 	INFO0("[ Process ID (PID)     ] %d\n", getpid());
     }
-    ServerArray_t svr_array;
+    ServerArray svr_array;
 
     use_ibv     = 0;
     autoverb    = 0;
@@ -1363,33 +1434,35 @@ ClientState_t::ClientState_t(void)
     {
 	setFaultTolerantMode();
 	INFO0("[ Environment variable ] DSCUDA_USEDAEMON = %d\n", daemon);
-	INFO0("[ Environment variable ] DSCUDA_AUTOVERB  = %d\n", autoverb);
-	INFO0("[ Environment variable ] DSCUDA_MIGRATION = %d\n", migration);
 	INFO0("[ Fault Tolerant Mode  ] ");
 	switch (ft_mode) {
-	case FT_PLAIN:
-	    INFO0("\"FT_PLAIN\"\n");
+	case FT_NONE:
+	    INFO0("\"FT_NONE\"\n");
 	    break;
-	case FT_REDUN:
-	    INFO0("\"FT_REDUN\"\n");
-	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	case FT_ERRSTAT:
+	    INFO0("\"FT_ERRSTAT\"\n");
 	    break;
-	case FT_MIGRA:
-	    INFO0("\"FT_MIGRA\"\n");
-	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	case FT_BYCPY:
+	    INFO0("\"FT_BYCPY\"\n");
 	    break;
-	case FT_BOTH:
-	    INFO0("\"FT_BOTH\"\n");
-	    INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = every %d sec\n", cp_period);
+	case FT_BYTIMER:
+	    INFO0("\"FT_BYTIMER\"\n");
 	    break;
 	default:
 	    WARN0(0, "(UNKNOWN).\n");
 	    exit(EXIT_FAILURE);
 	}
+	INFO0("[ Environment variable ] DSCUDA_AUTOVERB  = %d\n", autoverb);
+	INFO0("[ Environment variable ] DSCUDA_MIGRATION = %d\n", migration);
+	INFO0("[ Environment variable ] DSCUDA_CP_PERIOD = %d\n", cp_period);
     }
-
-    searchDaemon();
     initVirtualDeviceList();  /* Update the list of virtual devices */
+    WARN0(0, "\n");
+
+    // Search around cluster.
+    WARN(2, "   <---Start Searching DS-CUDA daemon program                            *\n");
+    dscuda::searchDaemon();
+    WARN(2, "   --->Stop  Searching DS-CUDA daemon program                            *\n\n");
 
     // dummy
     svr_array.captureEnv("DSCUDA_SERVER_IGNORE", FT_IGNORE );
@@ -1428,9 +1501,16 @@ ClientState_t::ClientState_t(void)
     }
 
     switch (ft_mode) {
-    case FT_REDUN: // thru
-    case FT_MIGRA: // thru
-    case FT_BOTH:
+    case FT_NONE:
+	WARN(1, "[ERRORSTATICS] ----.\n" );
+	break;
+    case FT_ERRSTAT: // thru
+	WARN(1, "[ERRORSTATICS] start.\n" );
+	break;
+    case FT_BYCPY:   // thru
+	WARN(1, "[ERRORSTATICS] start.\n" );
+	break;
+    case FT_BYTIMER:
 	WARN(1, "[ERRORSTATICS] start.\n" );
 	/********************************************
 	 ***>  Create the CHECKPOINTING thread.  <***
@@ -1438,17 +1518,18 @@ ClientState_t::ClientState_t(void)
 	pthread_create(&tid, NULL, periodicCheckpoint, (void *)&cp_period);
 	break;
     default:
-	WARN(1, "[ERRORSTATICS] disabled.\n" );
+	WARN(1, "[ERRORSTATICS] %s():L%d (undefined status).\n", __func__, __LINE__);
+	exit(1);
     }
     INFO0("\
 ###******************************************************************************\n\
 ###***   Start user application process.                                        *\n\
 ###******************************************************************************\n");
-} //--> ClientState_t::ClientState_t(void)
+} //--> ClientState::ClientState(void)
 //--
 //--
 //--
-ClientState_t::~ClientState_t(void)
+ClientState::~ClientState(void)
 {
     INFO0("\
 ###******************************************************************************\n\
@@ -1460,42 +1541,45 @@ ClientState_t::~ClientState_t(void)
     char       my_tfmt[64];	      
     struct tm *my_local;
 
-    if ( ft_mode==FT_REDUN || ft_mode== FT_MIGRA || ft_mode==FT_BOTH ) {
+    //--- Terminate the checkpointing thread.
+    if (ft_mode == FT_BYTIMER) {
 	pthread_cancel(tid);
     }
     
     stop_time = time( NULL);
     exe_time = stop_time - start_time;
 
+    //--- Report start time.
+    my_local = localtime( &start_time);
+    strftime( my_tfmt, 64, "%c", my_local);
+    WARN0(1, "    Start_time: %s\n", my_tfmt);
+    //--- Report stop time.
+    my_local = localtime( &stop_time);
+    strftime( my_tfmt, 64, "%c", my_local);
+    WARN0(1, "    Stop_time:  %s\n", my_tfmt);
+    //--- Report run time.
+    my_local = localtime( &exe_time);
+    strftime( my_tfmt, 64, "%s", my_local);
+    WARN0(1, "    Run_time:   %s (sec)\n", my_tfmt);
+
     switch (ft_mode) {
-    case FT_REDUN: // thru
-    case FT_MIGRA: // thru
-    case FT_BOTH:  // thru
-	WARN0(1, "[ERRORSTATICS] ************** Summary *******************************\n" );
-	
-	my_local = localtime( &start_time);
-	strftime( my_tfmt, 64, "%c", my_local);
-	WARN0(1, "[ERRORSTATICS]  Start_time: %s\n", my_tfmt);
-	
-	my_local = localtime( &stop_time);
-	strftime( my_tfmt, 64, "%c", my_local);
-	WARN0(1, "[ERRORSTATICS]  Stop_time:  %s\n", my_tfmt);
-	
-	my_local = localtime( &exe_time);
-	strftime( my_tfmt, 64, "%s", my_local);
-	WARN0(1, "[ERRORSTATICS]  Run_time:   %s (sec)\n", my_tfmt);
+    case FT_NONE:
+	WARN0(1, "    [ERRORSTAT] ----.\n");
+	break;
+    case FT_ERRSTAT: // thru
+    case FT_BYCPY:   // thru
+    case FT_BYTIMER: // thru
 	for (int i=0; i<Nvdev; i++) {
-	    WARN0(1, "[ERRORSTATICS]  Virtual[%2d]\n", i);
+	    WARN0(1, "    [ERRORSTAT]  Virtual[%2d]\n", i);
 	    for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    svr = &Vdev[i].server[j];
-	    WARN0(1, "[ERRORSTATICS]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
+	    WARN0(1, "    [ERRORSTAT]  + Physical[%2d]:%s:%s: ErrorCount= %d , MatchCount= %d\n",
 		  j, svr->ip, svr->hostname, svr->stat_error, svr->stat_correct);
 	    }
 	}
-	WARN0(1, "[ERRORSTATICS] ******************************************************\n" );
 	break;
     default:
-	WARN0(1, "[ERRORSTATICS] none.\n");
+	WARN0(1, "    [ERRORSTAT] unknown.\n");
     } // switch
 
     INFO0("\
@@ -1504,9 +1588,10 @@ ClientState_t::~ClientState_t(void)
 ###***   Completed process of DS-CUDA client library.                           *\n\
 ###***                                                                          *\n\
 ###******************************************************************************\n");
-} //--> ClientState_t::~ClientState_t(void)
+} //--> ClientState::~ClientState(void)
 
-void VirDev_t::invalidateAllModuleCache(void)
+void
+VirDev::invalidateAllModuleCache(void)
 {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
         if( modulelist[i].isValid() ){
@@ -1520,12 +1605,16 @@ void VirDev_t::invalidateAllModuleCache(void)
 /*
  * public functions
  */
-int dscudaNredundancy(void) {
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
+int
+dscudaNredundancy(void)
+{
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
     return vdev->nredundancy;
 }
 
-void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg) {
+void
+dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg)
+{
     errorHandler = handler;
     errorHandlerArg = handler_arg;
 }
@@ -1544,7 +1633,8 @@ void dscudaSetErrorHandler(void (*handler)(void *), void *handler_arg) {
  *               } // _Z6vecMulPfS_fS_iPi
  */
 void
-dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata) {
+dscudaGetMangledFunctionName(char *name, const char *funcif, const char *ptxdata)
+{
     WARN(10, "<---Entering %s()\n", __func__);
     static char mangler[256] = {0, };
     char cmd[4096];
@@ -1595,10 +1685,12 @@ static pthread_mutex_t LoadModuleMutex = PTHREAD_MUTEX_INITIALIZER;
  * the module is cached and sent only once for a certain period.
  */
 
-int dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
+int
+dscudaLoadModule(char *name, char *strdata) // 'strdata' must be NULL terminated.
+{
     WARN(5, "dscudaLoadModule( name=%p(%s), strdata=%p ) {\n", name, name, strdata);
     int idx = vdevidIndex();
-    Vdev_t *vdev = St.Vdev + Vdevid[idx];
+    VirDev *vdev = St.Vdev + Vdevid[idx];
     int module_index;
 
     module_index = vdev->loadModule(name, strdata);
@@ -1610,7 +1702,9 @@ int dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL termi
 }
 
 #if 0 // backup
-int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL terminated.
+int*
+dscudaLoadModule(char *name, char *strdata)
+{// 'strdata' must be NULL terminated.
     int i, j, mid;
     ClientModule *mp;
     int idx;
@@ -1669,7 +1763,7 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
     // module not found in the module list.
     // really need to send it to the server.
     idx = vdevidIndex();
-    Vdev_t *vdev = St.Vdev + Vdevid[idx];
+    VirDev *vdev = St.Vdev + Vdevid[idx];
     RCServer *sp = vdev->server;
 
     for (i=0; i < vdev->nredundancy; i++) {
@@ -1708,14 +1802,15 @@ int* dscudaLoadModule(char *name, char *strdata) {// 'strdata' must be NULL term
 #endif
 
 cudaError_t
-dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func) {
+dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, const char *func)
+{
     cudaError_t err = cudaSuccess;
     dscudaFuncGetAttributesResult *rp;
 
     WARN(3, "dscudaFuncGetAttributesWrapper(%d, 0x%08llx, %s)...",
          moduleid, (unsigned long long)attr, func);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     
     for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
@@ -1753,7 +1848,8 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
 
 cudaError_t
 dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
-                           size_t count, size_t offset, enum cudaMemcpyKind kind) {
+                           size_t count, size_t offset, enum cudaMemcpyKind kind)
+{
     cudaError_t err = cudaSuccess;
     int nredundancy;
 
@@ -1782,7 +1878,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
 
     if (St.isAutoVerb() &&
 	(kind==cudaMemcpyHostToDevice || kind==cudaMemcpyDeviceToDevice)) {
-        cudaMemcpyToSymbolArgs args;
+        CudaMemcpyToSymbolArgs args;
         args.moduleid = moduleid;
         args.symbol = (char *)symbol;
         args.src = (void *)src;
@@ -1798,7 +1894,8 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
 cudaError_t
 dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
                              size_t count, size_t offset,
-                             enum cudaMemcpyKind kind) {
+                             enum cudaMemcpyKind kind)
+{
     cudaError_t err = cudaSuccess;
     int nredundancy;
     void *dstbuf;
@@ -1951,7 +2048,8 @@ dscudaMemcpyFromSymbolAsyncWrapper(int *moduleid, void *dst, const char *symbol,
 }
 
 static void
-setTextureParams(RCtexture *texbufp, const struct textureReference *tex, const struct cudaChannelFormatDesc *desc) {
+setTextureParams(RCtexture *texbufp, const struct textureReference *tex, const struct cudaChannelFormatDesc *desc)
+{
     texbufp->normalized = tex->normalized;
     texbufp->filterMode = tex->filterMode;
     texbufp->addressMode[0] = tex->addressMode[0];
@@ -1978,7 +2076,8 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
                         const struct textureReference *tex,
                         const void *devPtr,
                         const struct cudaChannelFormatDesc *desc,
-                        size_t size) {
+                        size_t size)
+{
     cudaError_t err = cudaSuccess;
     dscudaBindTextureResult *rp;
     RCtexture texbuf;
@@ -1989,8 +2088,8 @@ dscudaBindTextureWrapper(int *moduleid, char *texname,
 
     setTextureParams(&texbuf, tex, desc);
 
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
@@ -2022,7 +2121,8 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
                           const struct textureReference *tex,
                           const void *devPtr,
                           const struct cudaChannelFormatDesc *desc,
-                          size_t width, size_t height, size_t pitch) {
+                          size_t width, size_t height, size_t pitch)
+{
     cudaError_t err = cudaSuccess;
     dscudaBindTexture2DResult *rp;
     RCtexture texbuf;
@@ -2033,8 +2133,8 @@ dscudaBindTexture2DWrapper(int *moduleid, char *texname,
 
     setTextureParams(&texbuf, tex, desc);
 
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
@@ -2064,7 +2164,8 @@ cudaError_t
 dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
                                const struct textureReference *tex,
                                const struct cudaArray *array,
-                               const struct cudaChannelFormatDesc *desc) {
+                               const struct cudaChannelFormatDesc *desc)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     RCtexture texbuf;
@@ -2080,8 +2181,8 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
         exit(1);
     }
 
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         if (St.isIbv()) {
 
@@ -2100,7 +2201,9 @@ dscudaBindTextureToArrayWrapper(int *moduleid, char *texname,
     return err;
 }
 
-cudaError_t cudaGetDevice(int *device) {
+cudaError_t
+cudaGetDevice(int *device)
+{
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaGetDevice(%p)...", device);
@@ -2113,47 +2216,50 @@ cudaError_t cudaGetDevice(int *device) {
 /*********************************************************************
  * cudaSetDevice()
  */
-cudaError_t cudaSetDevice_clnt(int device, int errcheck) {
+cudaError_t
+cudaSetDevice_clnt(int device, int errcheck)
+{
     cudaError_t cuerr = cudaSuccess;
-    int vi = vdevidIndex();
+    int         vi    = vdevidIndex();
     
-    WARN(3, "%s(%d)...\n", __func__, device);
-    if ( 0 <= device && device < St.Nvdev ) {
+    if (0 <= device && device < St.Nvdev ) {
         Vdevid[vi] = device;
-    } else {
+    }
+    else {
         cuerr = cudaErrorInvalidDevice;
-	if ( errcheck != 0 ) {
+	if (errcheck != 0) {
 	    fprintf( stderr, "%s(): failed.\n", __func__);
 	    exit(1);
 	}
     }
-    WARN(3, "+--- done.\n");
     return cuerr;
 }
 
-cudaError_t cudaSetDevice(int device) {
-    cudaError_t cuerr = cudaSuccess;
-    int errcheck = 0; 
-
-    WARN(3, "%s(%d)...\n", __func__, device);
+cudaError_t
+cudaSetDevice(int device)
+{
+    cudaError_t cuerr    = cudaSuccess;
+    int         errcheck = 0; 
+    WARN(3, "%s(%d) {\n", __func__, device);
     
 #if 0
     // cudaSetDevice() is not needed on CUDA called record.
     // active target device is recorded on each cuda*() funcitons.
     if (HISTREC.rec_en > 0) {
-        cudaSetDeviceArgs args;
+        CudaSetDeviceArgs args;
         args.device = device;
         //HISTREC.add(dscudaSetDeviceId, (void *)&args);
     }
 #endif
     
     cuerr = cudaSetDevice_clnt( device, errcheck );
-    WARN(3, "+--- done.\n");
+    WARN(3, "}\n");
     return cuerr;
 }
 
 cudaError_t
-cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
+cudaChooseDevice(int *device, const struct cudaDeviceProp *prop)
+{
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaChooseDevice(%p, %p)...", device, prop);
@@ -2164,7 +2270,9 @@ cudaChooseDevice(int *device, const struct cudaDeviceProp *prop) {
     return err;
 }
 
-cudaError_t cudaGetDeviceCount(int *count) {
+cudaError_t
+cudaGetDeviceCount(int *count)
+{
     cudaError_t err = cudaSuccess;
 
     *count = St.Nvdev;
@@ -2174,7 +2282,8 @@ cudaError_t cudaGetDeviceCount(int *count) {
     return err;
 }
 
-cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
+cudaError_t
+cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevice)
 {
     cudaError_t err = cudaSuccess;
 
@@ -2190,7 +2299,9 @@ cudaError_t cudaDeviceCanAccessPeer(int *canAccessPeer, int device, int peerDevi
     return err;
 }
 
-cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags) {
+cudaError_t
+cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags)
+{
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceEnablePeer(%d, %d)...", peerDevice, flags);
@@ -2202,7 +2313,9 @@ cudaError_t cudaDeviceEnablePeerAccess(int peerDevice, unsigned int flags) {
     return err;
 }
 
-cudaError_t cudaDeviceDisablePeerAccess(int peerDevice) {
+cudaError_t
+cudaDeviceDisablePeerAccess(int peerDevice)
+{
     cudaError_t err = cudaSuccess;
 
     WARN(3, "cudaDeviceDisablePeer(%d)...", peerDevice);
@@ -2215,15 +2328,17 @@ cudaError_t cudaDeviceDisablePeerAccess(int peerDevice) {
 }
 
 /*
- * MEMO: BkupMemList_t::reallocDeviceRegion(RCServer_t *svr)
+ * MEMO: BkupMemList_t::reallocDeviceRegion(RCServer *svr)
  */
-void VirDev_t::remallocRegionsGPU(int num_svr) {
+void
+VirDev::remallocRegionsGPU(int num_svr)
+{
     BkupMem *mem = memlist.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;
     
-    WARN(1, "%s(RCServer_t *sp).\n", __func__);
+    WARN(1, "%s(RCServer *sp).\n", __func__);
     //WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
     St.unsetAutoVerb();
     while ( mem != NULL ) {

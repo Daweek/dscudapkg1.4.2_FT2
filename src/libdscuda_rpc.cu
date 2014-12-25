@@ -24,7 +24,9 @@
 
 #define DEBUG 1
 
-int dscudaRemoteCallType(void) {
+int
+dscudaRemoteCallType(void)
+{
     return RC_REMOTECALL_TYPE_RPC;
 }
 
@@ -33,11 +35,12 @@ int dscudaRemoteCallType(void) {
 // RCServer::
 //
 //********************************************************************
-RCServer::RCServer(void) {
+RCServer::RCServer(void)
+{
     id   = -1;
     cid  = -1;
     uniq = RC_UNIQ_INVALID;
-    ft_mode = FT_INIT;
+    ft_mode = FT_UNDEF;
     rec_en = 0;
     strcpy(ip,       "empty");
     strcpy(hostname, "empty");
@@ -47,16 +50,24 @@ RCServer::RCServer(void) {
     Clnt = NULL;
 }
 
-void RCServer::setIP(const char *ip0) {
+void
+RCServer::setIP(const char *ip0)
+{
     strncpy(this->ip, ip0, sizeof(ip));
 }
-void RCServer::setID(int id0) {
+void
+RCServer::setID(int id0)
+{
     this->id = id0;
 }
-void RCServer::setCID(int cid0) {
+void
+RCServer::setCID(int cid0)
+{
     this->cid = cid0;
 }
-void RCServer::setCID(char *cid_sz) {
+void
+RCServer::setCID(char *cid_sz)
+{
     int cid0;
     if ( cid_sz == NULL ) {
 	cid0 = 0;
@@ -65,27 +76,34 @@ void RCServer::setCID(char *cid_sz) {
     }
     this->cid = cid0;
 }
-void RCServer::setUNIQ(int uniq0) {
+void
+RCServer::setUNIQ(int uniq0)
+{
     this->uniq = uniq0;
 }
-void RCServer::setFTMODE(FtMode ft_mode0) {
+void
+RCServer::setFTMODE(enum FTmode ft_mode0) {
     this->ft_mode = ft_mode0;
 }
-int RCServer::isRecordOn(void) {
-    if ((rec_en==1) &&
-	(ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH)) {
-	return 1;
+int
+RCServer::isRecordOn(void) {
+    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
+	return rec_en;
     } else {
 	return 0;
     }
 }
-int RCServer::setRecord(int rec_en0) {
+int
+RCServer::setRecord(int rec_en0)
+{
     int rec_en_stack = this->rec_en;
     this->rec_en = rec_en0; 
     return rec_en_stack;
 }
 
-int RCServer::setupConnection(void) {
+int
+RCServer::setupConnection(void)
+{
     int  pgid = DSCUDA_PROG;
     char msg[256];
 
@@ -136,7 +154,9 @@ int RCServer::setupConnection(void) {
     return 0;
 }
 
-void RCServer::dupServer(RCServer_t *dup) {
+void
+RCServer::dupServer(RCServer *dup)
+{
     dup->id   = this->id;
     dup->cid  = this->cid;
     dup->uniq = this->uniq;
@@ -147,8 +167,10 @@ void RCServer::dupServer(RCServer_t *dup) {
     strcpy( dup->hostname, this->hostname );
 }
 
-void RCServer::migrateServer(RCServer_t *spare) {
-    RCServer_t tmp;
+void
+RCServer::migrateServer(RCServer *spare)
+{
+    RCServer tmp;
 
     dupServer(&tmp);
 
@@ -172,7 +194,9 @@ void RCServer::migrateServer(RCServer_t *spare) {
     return;
 }
 
-void RCServer::migrateReallocAllRegions(void) {
+void
+RCServer::migrateReallocAllRegions(void)
+{
     BkupMem *memp = memlist.head;
     int     verb = St.isAutoVerb();
     int     i=0;
@@ -193,7 +217,9 @@ void RCServer::migrateReallocAllRegions(void) {
     WARN(1, "\n");
 }
 
-void RCServer::migrateDeliverAllRegions(void) {
+void
+RCServer::migrateDeliverAllRegions(void)
+{
     BkupMem *memp = memlist.head;
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
@@ -214,7 +240,9 @@ void RCServer::migrateDeliverAllRegions(void) {
     WARN(1, "\n");
 }
 
-void RCServer::migrateDeliverAllModules(void) {
+void
+RCServer::migrateDeliverAllModules(void)
+{
     WARN(1, "RCServer::%s(void) {\n", __func__);
     WARN(1, "   + # of deliverd modules = %d.\n", -1000);
     
@@ -222,7 +250,9 @@ void RCServer::migrateDeliverAllModules(void) {
     WARN(1, "\n");
 }
 
-void RCServer::migrateRebuildModulelist(void) {
+void
+RCServer::migrateRebuildModulelist(void)
+{
     WARN(5, "RCServer::%s(void) {\n", __func__);
     dscudaLoadModuleResult *rp;
     int module_id;
@@ -261,37 +291,43 @@ void RCServer::migrateRebuildModulelist(void) {
     WARN(5, "} //RCServer::%s(void).\n", __func__);
 }
 
-VirDev_t::VirDev_t(void) {
+VirDev::VirDev(void)
+{
     id          = -1;
     nredundancy = 1;
-    ft_mode     = FT_INIT;
+    ft_mode     = FT_UNDEF;
     conf        = VDEV_INVALID;
     strcpy(info, "INVALID");
     rec_en      = 0;
 }
 
-int VirDev_t::isRecordOn(void) {
-    if ((rec_en==1) &&
-	(ft_mode==FT_REDUN || ft_mode==FT_MIGRA || ft_mode==FT_BOTH)) {
-	return 1;
+int
+VirDev::isRecordOn(void)
+{
+    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
+	return rec_en;
     } else {
 	return 0;
     }
 }
-int VirDev_t::setRecord(int rec_en0) {
+int
+VirDev::setRecord(int rec_en0)
+{
     int rec_en_stack = this->rec_en;
     int rec_en_stack_svr;
     rec_en = rec_en0;
     for (int i=0; i<nredundancy; i++) {
 	rec_en_stack_svr = server[i].setRecord( rec_en0 );
 	if ( rec_en_stack_svr != rec_en_stack ) {
-	    WARN(0, "VirDev_t::%s(): mismatch of rec_en.\n", __func__);
+	    WARN(0, "VirDev::%s(): mismatch of rec_en.\n", __func__);
 	}
     }
     return rec_en_stack;
 }
 
-void VirDev_t::setFaultMode(enum FtMode_e fault_mode) {
+void
+VirDev::setFaultMode(enum FTmode fault_mode)
+{
     this->ft_mode = fault_mode;
     for (int i=0; i<RC_NREDUNDANCYMAX; i++) {
 	server[i].ft_mode = fault_mode;
@@ -299,7 +335,9 @@ void VirDev_t::setFaultMode(enum FtMode_e fault_mode) {
     return;
 }
 
-void checkResult(void *rp, RCServer_t &sp) {
+void
+checkResult(void *rp, RCServer &sp)
+{
     if ( rp != NULL ) {
 	return;
     } else {
@@ -312,11 +350,13 @@ void checkResult(void *rp, RCServer_t &sp) {
 //* Error Handler on RPC communication.
 //*
 //*
-void RCServer::rpcErrorHook(struct rpc_err *err) {
+void
+RCServer::rpcErrorHook(struct rpc_err *err)
+{
     RCServer *sp;
     int retval;
 
-    if ( err->re_status == RPC_SUCCESS ) {
+    if (err->re_status == RPC_SUCCESS) {
 	//Nothing to do.
 	//WARN(3, "\"RCServer::%s():RPC_SUCCESS\".\n", __func__);
 	return;
@@ -351,19 +391,19 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
     WARN(1, "***  FAULT_TOLERANT_MODE= ");
     
     switch(ft_mode) {
-    case FT_PLAIN:
-	WARN0(1, "\"FT_PLAIN\"\n");
+    case FT_NONE: //thru
+    case FT_ERRSTAT:
+	WARN0(1, "\"FT_NONE\"\n");
 	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
 	WARN(1, "********************************************************\n");
 	exit(EXIT_FAILURE);
-    case FT_REDUN:
-	WARN0(1, "\"FT_REDUN\"\n");
+    case FT_BYCPY:
+	WARN0(1, "\"FT_BYCPY\"\n");
 	WARN(1, "***  So, I give up to continue calculation, sorry.\n");
 	WARN(1, "********************************************************\n");
 	exit(EXIT_FAILURE);
-    case FT_MIGRA: //thru
-    case FT_BOTH:
-	WARN0(1, "\"FT_MIGRA\" or \"FT_BOTH\"\n");
+    case FT_BYTIMER:
+	WARN0(1, "\"FT_BYTIMER\"\n");
 	WARN(1, "***  I am going to migrate to another device.\n");
 
 	do {
@@ -385,10 +425,10 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 	this->migrateReallocAllRegions();
 	this->migrateRebuildModulelist();
 	//
-	//this->migrateDeliverAllRegions(); // should be done in Vdev_t level.
+	//this->migrateDeliverAllRegions(); // should be done in VirDevlevel.
 	//
-	//this->reclist.print();   // should be done in Vdev_t level.
-	//this->reclist.recall();  // should be done in Vdev_t level.
+	//this->reclist.print();   // should be done in VirDevlevel.
+	//this->reclist.recall();  // should be done in VirDevlevel.
 	break;
     default:
 	WARN0(1, "FT_(UNKNOWN)\n");
@@ -405,15 +445,16 @@ void RCServer::rpcErrorHook(struct rpc_err *err) {
 /*
  * Thread Management
  */
-
-cudaError_t cudaThreadExit(void) {
+cudaError_t
+cudaThreadExit(void)
+{
     dscudaResult *rp;
     int           vid = vdevidIndex();
     cudaError_t   err = cudaSuccess;
 
     WARN( 3, "cudaThreadExit() {\n");
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];  //Focused Vdev
-    RCServer_t *sp   = vdev->server;           //Focused Server
+    VirDev    *vdev = St.Vdev + Vdevid[vid];  //Focused Vdev
+    RCServer   *sp   = vdev->server;           //Focused Server
 //  for (int i = 0; i < vdev->nredundancy; i++, sp++) {
 //      rp = dscudathreadexitid_1(Clnt[Vdevid[vid]][sp->id]);
     for ( int i = 0; i < vdev->nredundancy; i++ ) {
@@ -451,7 +492,7 @@ RCServer::cudaThreadSynchronize( struct rpc_err *rpc_result)
 }
 
 cudaError_t
-VirDev_t::cudaThreadSynchronize(void)
+VirDev::cudaThreadSynchronize(void)
 {
     cudaError_t cuerr_phy;
     cudaError_t cuerr_vir = cudaSuccess;
@@ -478,7 +519,7 @@ cudaThreadSynchronize(void)
 {
     cudaError_t cuerr = cudaSuccess;
     int         vid = vdevidIndex();
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
     
     WARN( 3, "cudaThreadSynchronize() {\n");
     cuerr = vdev->cudaThreadSynchronize();
@@ -495,8 +536,8 @@ cudaThreadSetLimit( enum cudaLimit limit, size_t value)
     int vid = vdevidIndex();
 
     WARN(3, "cudaThreadSetLimit(%d, %zu)...", limit, value);
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    RCServer   *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudathreadsetlimitid_1(limit, value, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -510,15 +551,16 @@ cudaThreadSetLimit( enum cudaLimit limit, size_t value)
     return err;
 }
 
-cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
+cudaError_t
+cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
 {
     cudaError_t err = cudaSuccess;
     dscudaThreadGetLimitResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaThreadGetLimit(%p, %d)...", pValue, limit);
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    RCServer   *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudathreadgetlimitid_1(limit, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -536,14 +578,15 @@ cudaError_t cudaThreadGetLimit(size_t *pValue, enum cudaLimit limit)
 }
 
 cudaError_t
-cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig) {
+cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaThreadSetCacheConfig(%d)...", cacheConfig);
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    RCServer   *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudathreadsetcacheconfigid_1(cacheConfig, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -558,14 +601,15 @@ cudaThreadSetCacheConfig(enum cudaFuncCache cacheConfig) {
 }
 
 cudaError_t
-cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig) {
+cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig)
+{
     cudaError_t err = cudaSuccess;
     dscudaThreadGetCacheConfigResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaThreadGetCacheConfig(%p)...", pCacheConfig);
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    RCServer   *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudathreadgetcacheconfigid_1( sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -586,15 +630,16 @@ cudaThreadGetCacheConfig(enum cudaFuncCache *pCacheConfig) {
 /*
  * Error Handling
  */
-
-cudaError_t cudaGetLastError(void) {
+cudaError_t
+cudaGetLastError(void)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(5, "cudaGetLastError()...");
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp   = vdev->server;
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    RCServer   *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudagetlasterrorid_1( sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -608,14 +653,16 @@ cudaError_t cudaGetLastError(void) {
     return err;
 }
 
-cudaError_t cudaPeekAtLastError(void) {
+cudaError_t
+cudaPeekAtLastError(void)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(5, "cudaPeekAtLastError()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudapeekatlasterrorid_1( sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -629,14 +676,16 @@ cudaError_t cudaPeekAtLastError(void) {
     return err;
 }
 
-const char *cudaGetErrorString(cudaError_t error) {
+const char
+*cudaGetErrorString(cudaError_t error)
+{
     dscudaGetErrorStringResult *rp;
     static char str[4096];
     int vid = vdevidIndex();
 
     WARN(5, "cudaGetErrorString()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudageterrorstringid_1(error, sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -654,14 +703,16 @@ const char *cudaGetErrorString(cudaError_t error) {
  * Device Management
  */
 
-cudaError_t cudaSetDeviceFlags(unsigned int flags) {
+cudaError_t
+cudaSetDeviceFlags(unsigned int flags)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaSetDeviceFlags()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer  *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudasetdeviceflagsid_1(flags, sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -680,14 +731,16 @@ cudaError_t cudaSetDeviceFlags(unsigned int flags) {
     return err;
 }
 
-cudaError_t cudaDriverGetVersion (int *driverVersion) {
+cudaError_t
+cudaDriverGetVersion (int *driverVersion)
+{
     cudaError_t err = cudaSuccess;
     dscudaDriverGetVersionResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaDriverGetVersionCount(%p)...", driverVersion);
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudadrivergetversionid_1( sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -702,14 +755,16 @@ cudaError_t cudaDriverGetVersion (int *driverVersion) {
     return err;
 }
 
-cudaError_t cudaRuntimeGetVersion(int *runtimeVersion) {
+cudaError_t
+cudaRuntimeGetVersion(int *runtimeVersion)
+{
     cudaError_t err = cudaSuccess;
     dscudaRuntimeGetVersionResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaRuntimeGetVersion(%p)...", runtimeVersion);
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaruntimegetversionid_1( sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -727,14 +782,16 @@ cudaError_t cudaRuntimeGetVersion(int *runtimeVersion) {
     return err;
 }
 
-cudaError_t cudaDeviceSynchronize(void) {
+cudaError_t
+cudaDeviceSynchronize(void)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaDeviceSynchronize()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudadevicesynchronize_1( sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -748,14 +805,16 @@ cudaError_t cudaDeviceSynchronize(void) {
     return err;
 }
 
-cudaError_t cudaDeviceReset(void) {
+cudaError_t
+cudaDeviceReset(void)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     int vid = vdevidIndex();
 
     WARN(3, "cudaDeviceReset()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudadevicereset_1(sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -773,7 +832,8 @@ cudaError_t cudaDeviceReset(void) {
  * Execution Control
  */
 
-cudaError_t cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
+cudaError_t
+cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig)
 {
     cudaError_t err = cudaSuccess;
     WARN(1, "Current implementation of cudaFuncSetCacheConfig() does nothing "
@@ -785,13 +845,14 @@ cudaError_t cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheCo
 /*
  * Memory Management
  * - "cudaMalloc()" was composed hierarchical with same name of methods;
- *   cudaMalloc() +--> VirDev_t::cudaMalloc() +--> RCServer::cudaMalloc().
+ *   cudaMalloc() +--> VirDev::cudaMalloc() +--> RCServer::cudaMalloc().
  */
-cudaError_t cudaMalloc(void **d_ptr, size_t size)
+cudaError_t
+cudaMalloc(void **d_ptr, size_t size)
 {
     cudaError_t cuerr;
     int         vid  = vdevidIndex();
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    VirDev     *vdev = St.Vdev + Vdevid[vid];
     void       *adrs;
 
     WARN(3, "cudaMalloc(%p, %zu) on Vdev[%d] {\n", d_ptr, size, Vdevid[vid]);
@@ -801,7 +862,8 @@ cudaError_t cudaMalloc(void **d_ptr, size_t size)
     return cuerr;
 }
 
-cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size)
+cudaError_t
+VirDev::cudaMalloc(void **d_ptr, size_t size)
 {
     cudaError_t cuerr_phy;
     cudaError_t cuerr_vir = cudaSuccess;
@@ -810,6 +872,20 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size)
 
     WARN(3, "   Vdev[%d].cudaMalloc(%p, %zu) nredundancy=%d {\n",
 	 id, d_ptr, size, nredundancy);
+
+    /*
+     * Record called history of CUDA APIs.
+     */
+    CudaMallocArgs args;
+    if ( isRecordOn() ) {
+	WARN(3, "      ===> Recorded to the rollback history.\n");
+	args.devPtr = uva_ptr;
+	args.size   = size;
+	this->reclist.add(dscudaMallocId, &args);
+	for (int i=0; i<nredundancy; i++) {
+	    server[i].reclist.add(dscudaMallocId, &args);	    
+	}
+    }
     
     struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
@@ -824,9 +900,9 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size)
 	    this->reclist.recall();
 	}
 	
-	WARN(3, "      Physical[%d]: d_ptr=%p\n", i, adrs[i]);
+	WARN(3, "      Phy[%d]: d_ptr=%p\n", i, adrs[i]);
 	if (cuerr_phy != cudaSuccess) {
-	    WARN(0, "      server[%d].cudaMalloc() Faild\n", i);
+	    WARN(0, "      svr[%d].cudaMalloc() Faild\n", i);
 	    cuerr_vir = cuerr_phy;
 	    break;
 	}
@@ -842,24 +918,13 @@ cudaError_t VirDev_t::cudaMalloc(void **d_ptr, size_t size)
 
     *d_ptr = uva_ptr; // Return UVA address of physical[0].
 
-    /*
-     * Record called history of CUDA APIs.
-     */
-    struct CudaMallocArgs_t args;
-    if ( isRecordOn() ) {
-	args.devPtr = uva_ptr;
-	args.size   = size;
-	this->reclist.add(dscudaMallocId, &args);
-	for (int i=0; i<nredundancy; i++) {
-	    server[i].reclist.add(dscudaMallocId, &args);	    
-	}
-    }
     
     WARN(3, "   }\n");
     return cuerr_vir;
 }
 
-cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result)
+cudaError_t
+RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result)
 {
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
@@ -883,12 +948,14 @@ cudaError_t RCServer::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_
 /*
  * cudaFree() series.
  */
-cudaError_t RCServer::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
+cudaError_t
+RCServer::cudaFree(void *v_ptr, struct rpc_err *rpc_result)
+{
     cudaError_t  err = cudaSuccess;
     dscudaResult *rp;
     void *d_ptr = memlist.queryDevicePtr(v_ptr);
     
-    WARN(3, "      + Physical[%d].cudaFree(%p) { }\n", id, d_ptr);
+    WARN(3, "      + Phy[%d].cudaFree(%p) { }\n", id, d_ptr);
 
     rp = dscudafreeid_1((RCadr)d_ptr, Clnt);
     clnt_geterr( Clnt, rpc_result );
@@ -906,10 +973,12 @@ cudaError_t RCServer::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
     return err;
 }
 
-cudaError_t VirDev_t::cudaFree(void *v_ptr) {
+cudaError_t
+VirDev::cudaFree(void *v_ptr)
+{
     cudaError_t  err = cudaSuccess;
 
-    WARN(3, "   + Virtual[%d].cudaFree(%p) {\n", id, v_ptr);
+    WARN(3, "   + Vir[%d].cudaFree(%p) {\n", id, v_ptr);
     struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
 	err = server[i].cudaFree(v_ptr, &rpc_result);
@@ -926,7 +995,7 @@ cudaError_t VirDev_t::cudaFree(void *v_ptr) {
     /*
      * Record called history of CUDA APIs.
      */
-    struct CudaFreeArgs_t args;
+    CudaFreeArgs args;
     if (isRecordOn()) {
 	args.devPtr = v_ptr;
 	this->reclist.add(dscudaFreeId, &args);
@@ -940,13 +1009,14 @@ cudaError_t VirDev_t::cudaFree(void *v_ptr) {
     return err;
 }
 
-cudaError_t cudaFree(void *d_ptr)
+cudaError_t
+cudaFree(void *d_ptr)
 {
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;
 
     WARN(3, "cudaFree(%p) {\n", d_ptr);
-    Vdev_t     *vdev = St.Vdev + Vdevid[vid];
+    VirDev     *vdev = St.Vdev + Vdevid[vid];
 
     err = vdev->cudaFree(d_ptr);
 
@@ -959,12 +1029,23 @@ cudaError_t cudaFree(void *d_ptr)
  * cudaMemcpy( HostToDevice )
  */
 cudaError_t
-VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count)
+VirDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count)
 {
-    WARN( 4, "   Vdev[%d].%s() {\n", id, __func__);
+    WARN(4, "   Vdev[%d].H2D() {\n", id);
     cudaError_t    cuda_error = cudaSuccess;
     struct rpc_err rpc_result;
-	
+
+    //--- Record called history of CUDA APIs.
+    CudaMemcpyArgs args;
+    if (isRecordOn()) {
+	WARN(4, "      ===> Recorded to the rollback history.\n", id);
+	args.dst   = v_ptr;
+	args.src   = (void *)h_ptr;
+	args.count = count;
+	args.kind  = cudaMemcpyHostToDevice;
+	reclist.add(dscudaMemcpyH2DId, &args);
+    }
+    //--- Exec each physical devices.
     for (int i=0; i<nredundancy; i++) {
 	server[i].cudaMemcpyH2D(v_ptr, h_ptr, count, &rpc_result);
         server[i].rpcErrorHook( &rpc_result );
@@ -973,23 +1054,12 @@ VirDev_t::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count)
 	    this->reclist.recall();
 	}
     }
-
-    /*
-     * Record called history of CUDA APIs.
-     */
-    struct CudaMemcpyArgs_t args;
+    WARN(4, "   }\n");
     if (isRecordOn()) {
-	args.dst   = v_ptr;
-	args.src   = (void *)h_ptr;
-	args.count = count;
-	args.kind  = cudaMemcpyHostToDevice;
-	reclist.add(dscudaMemcpyH2DId, &args);
 #if 1
 	reclist.print();
 #endif
     }
-
-    WARN( 4, "   } libdscuda:%s().\n", __func__);
     return cuda_error;
 }
 
@@ -1007,8 +1077,8 @@ RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc
     //<-- Translate virtual v_ptr to real d_ptr.
     d_ptr = memlist.queryDevicePtr(v_ptr);
     //--> Translate virtual v_ptr to real d_ptr.
-    WARN(5, "      + Physical[%d]:%s(v_ptr=%p ==> d_ptr=%p, size=%zu)\n",
-	 id, __func__, v_ptr, d_ptr, count);
+    WARN(5, "      + Phy[%d]:H2D(v_ptr=%p ==> d_ptr=%p, size=%zu)\n",
+	 id, v_ptr, d_ptr, count);
 
     //<-- RPC communication.
     rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, Clnt);
@@ -1030,7 +1100,7 @@ RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc
     //--> RPC communication.
 
     //****>>> Record called history of CUDA APIs. <<<***********
-    struct CudaMemcpyArgs_t args;
+    CudaMemcpyArgs args;
     if (isRecordOn()) {
 	args.dst   = v_ptr;
 	args.src   = (void *)h_ptr;
@@ -1042,12 +1112,16 @@ RCServer::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc
     return cuda_error;
 }
 
-
 /*
  * cudaMemcpy( DeviceToHost )
  */
-cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count, struct rpc_err *rpc_result) {
-    struct CudaMemcpyArgs_t args;
+cudaError_t
+RCServer::cudaMemcpyD2H( void    *h_ptr,
+	           const void    *v_ptr,
+			 size_t   count,
+		  struct rpc_err *rpc_result)
+{
+    CudaMemcpyArgs args;
     if (isRecordOn()) {
 	args.dst   = (void *)h_ptr;
 	args.src   = (void *)v_ptr;
@@ -1061,7 +1135,7 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
     //<-- Translate virtual d_ptr to real d_ptr.
     void *h_lptr = memlist.queryHostPtr(v_ptr);
     void *d_ptr  = memlist.queryDevicePtr(v_ptr);
-    WARN(4, "      + Physical[%d]:cudaMemcpy( dst=%p, src=%p, count=%zu )\n",
+    WARN(4, "      + Phy[%d]:D2H( dst=%p, src=%p, count=%zu )\n",
 	 id, h_lptr, d_ptr, count);
 
     if (d_ptr == NULL) {
@@ -1097,67 +1171,63 @@ cudaError_t RCServer::cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t count
     return cuda_error;
 }
 
-cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
-    WARN( 4, "   Virtual[%d]:%s() {\n", id, __func__);
+cudaError_t
+VirDev::cudaMemcpyD2H(  void  *dst,
+	            const void  *src,
+		          size_t count )
+{
+    WARN(4, "   Vir[%d]:D2H() {\n", id);
 
-    int matched_count   = 0;
-    int unmatched_count = 0;
-    int recall_result;
-
-    RCServer_t *failed_1st;
-    //    int fail_flag[RC_NVDEVMAX]={0};
     cudaError_t err = cudaSuccess;
-    /*
-     * Record called history of CUDA APIs.
-     */
-    struct CudaMemcpyArgs_t args;
+
+    //--- Record called history of CUDA APIs.
+    CudaMemcpyArgs args;
     if (isRecordOn()) {
+	WARN(4, "      ===> Recorded to the rollback history.\n", id);
 	args.dst   = (void *)dst;
 	args.src   = (void *)src;
 	args.count = count;
 	args.kind  = cudaMemcpyDeviceToHost;
 	this->reclist.add(dscudaMemcpyD2HId, &args);
-    }
+    } 
     
-    /* Get the data from remote GPU(s), then verify */
     struct rpc_err rpc_result;
-    for (int i=0; i<nredundancy; i++) {
-	server[i].cudaMemcpyD2H(dst, src, count, &rpc_result);
-	server[i].rpcErrorHook( &rpc_result );
-	if ( rpc_result.re_status != RPC_SUCCESS ) {
-	    this->restoreMemlist();
-	    this->reclist.recall();
-	}
-    }
-    
-#if 0
-    if ( i==0 ) {
-	memcpy( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
-    } else {
-	if ( bcmp( dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len ) != 0 ) { // unmatched case
-	    server[i].stat_error++; //count up error.
-	    WARN( 0, "[ERRORSTATICS] Total Error Count: %d\n", server[i].stat_error);
-	    unmatched_count++;
-	    //fail_flag[i]=1;
-	    failed_1st = &server[i]; // temporary
-	    WARN(2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
-	} else { /* Matched case */
-	    matched_count++;
-	    //fail_flag[i]=0;
-	    WARN(3, "   Matched   reduncant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
-	    memcpy(dst, rp->buf.RCbuf_val, rp->buf.RCbuf_len); // overwrite matched data
-	}
-    }
-#endif
+    int matched_count   = 0;
+    int unmatched_count = 0;
     int memcmp_ret;
     int all_matched = 1;
-    
-    switch (conf) {
-    case VDEV_MONO:
-	memcpy( dst, server[0].memlist.queryHostPtr(src), count );
-	break;
-    case VDEV_POLY:
-	for (int i=0; i<nredundancy-1; i++) {
+    int recall_result;
+
+    // "Table"
+    //   ft_mode   | VDEV_MONO  VDEV_POLY 
+    //-------------+-----------------------
+    //  FT_NONE    |   svr[0]    svr[0] 
+    //  FT_ERRSTAT |   svr[0]    svr[N]
+    //  FT_BYCPY   |   svr[0]    svr[N]
+    //  FT_BYTIMER |   svr[0]    svr[0]
+    //
+
+    /* Copy from dominant server[0] */
+    server[0].cudaMemcpyD2H(dst, src, count, &rpc_result);
+    server[0].rpcErrorHook( &rpc_result );
+    if ( rpc_result.re_status != RPC_SUCCESS ) {
+	this->restoreMemlist();
+	this->reclist.recall();
+    }
+    memcpy( dst, server[0].memlist.queryHostPtr(src), count );
+
+    if (conf==VDEV_POLY && (ft_mode!=FT_NONE && ft_mode!=FT_BYTIMER)) {
+	/* Copy from redundant server[1...n] */
+	for (int i=1; i < nredundancy; i++) {
+	    server[i].cudaMemcpyD2H(dst, src, count, &rpc_result);
+	    server[i].rpcErrorHook( &rpc_result );
+	    if ( rpc_result.re_status != RPC_SUCCESS ) {
+		this->restoreMemlist();
+		this->reclist.recall();
+	    }
+	}
+	/* compare recv data each other. */
+	for (int i=0; i < nredundancy-1; i++) {
 	    for (int k=i+1; k<nredundancy; k++) {
 		memcmp_ret = memcmp(server[i].memlist.queryHostPtr(src), server[k].memlist.queryHostPtr(src), count);
 		if (memcmp_ret == 0) {
@@ -1170,8 +1240,7 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 		WARN( 2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n", i, nredundancy - 1, __func__);
 	    }
 	}
-	
-	if ( all_matched==1 ) {
+	if (all_matched==1) {
 	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
 	    memcpy( dst, server[0].memlist.queryHostPtr(src), count );
@@ -1186,9 +1255,7 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 		WARN(1, "   #(;_;)   All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
 		     nredundancy-1, matched_count, unmatched_count);
 	    }
-
-	    if (( St.ft_mode==FT_REDUN || St.ft_mode==FT_MIGRA ||
-		  St.ft_mode==FT_BOTH ) && (St.isHistoCalling()==0 )) {
+	    if (St.isHistoCalling()==0) {
 		St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
 	    
 		//TODO: rewrite BKUPMEM.restructDeviceRegion();
@@ -1202,21 +1269,15 @@ cudaError_t VirDev_t::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 		St.setAutoVerb();    // ===> restore autoVerb enabled.
 	    }
 	}
-	break;
-    default: //irregular condition.
-	WARN(1, "ERROR: # of redundancy is zero or minus value????. %s\n", __func__);
-	exit( EXIT_FAILURE );
-    }//switch
-
-    WARN(4, "   } libdscuda:%s().\n", __func__);
+    }
+    WARN(4, "   }\n");
     return err;
-}
+} // ---> VirDev::cudaMemcpyD2H(...)
 
 void
 RCServer::collectEntireRegions(void)
 {
     WARN_CP(9, "      + RCServer[%d]::%s() {\n", id, __func__);
-    BkupMem *bkupmem;
     dscudaMemcpyD2HResult *rp;
     struct rpc_err rpc_error;
     cudaError_t    cuda_error;
@@ -1225,13 +1286,13 @@ RCServer::collectEntireRegions(void)
     int   size;
     int   i = 0;
 
-    bkupmem = memlist.head;
+    BkupMem *bkupmem = memlist.head;
     while (bkupmem != NULL) {
 	d_ptr = bkupmem->d_region;
 	h_ptr = bkupmem->h_region;
 	size  = bkupmem->size;
 	WARN_CP(9, "         + correct region[%d], %d[Byte]...", i, size);
-	rp = dscudamemcpyd2hid_1((RCadr)d_ptr, size, Clnt);
+	rp = dscudamemcpyd2hid_1( (RCadr)d_ptr, size, Clnt );
 	WARN0(9, "done.\n");
 	
 	//<--- RPC fault check.
@@ -1260,44 +1321,41 @@ RCServer::collectEntireRegions(void)
 	i++;
     } // while (...);
     WARN_CP(9, "      + } RCServer[%d]::%s()\n", id, __func__);
-}
+} // ---> void RCServer::collectEntireRegions(void)
 
-void VirDev_t::collectEntireRegions(void) {
-    WARN_CP(9, "   + VirDev_t[%d]::%s()\n", id, __func__);
-    BkupMem *bkupmem;
-    dscudaMemcpyD2HResult *rp;
-    void *d_ptr;
-    int   size;
-
+void
+VirDev::collectEntireRegions(void)
+{
+    WARN_CP(9, "   + VirDev[%d]::%s()\n", id, __func__);
     for (int n=0; n<nredundancy; n++) {
 	server[n].collectEntireRegions();
     }
-    WARN_CP(9, "   + } VirDev_t[%d]::%s()\n", id, __func__);
+    WARN_CP(9, "   + } VirDev[%d]::%s()\n", id, __func__);
 }
 
-void ClientState_t::collectEntireRegions(void) {
-    WARN_CP(9, "ClientState_t::%s() {\n", __func__);
+void
+ClientState::collectEntireRegions(void)
+{
+    WARN_CP(9, "ClientState::%s() {\n", __func__);
     
     for (int n=0; n<Nvdev; n++) {
 	Vdev[n].collectEntireRegions();
     }
     
-    WARN_CP(9, "} ClientState_t::%s()\n", __func__);
+    WARN_CP(9, "} ClientState::%s()\n", __func__);
 }
 
-
 int
-VirDev_t::verifyEntireRegions(void)
+VirDev::verifyEntireRegions(void)
 {
-    WARN_CP(9, "   + VirDev_t::%s() {\n", __func__);
-    BkupMem *bkupmem;
+    WARN_CP(9, "   + VirDev::%s() {\n", __func__);
     void *v_region;
     void *h_ptr_i;
     void *h_ptr_j;
     int   size;
     int   all_matched = 1;
 
-    bkupmem = memlist.head;
+    BkupMem *bkupmem = memlist.head;
     while (bkupmem != NULL) {
 	v_region = bkupmem->v_region;
 	size     = bkupmem->size;
@@ -1327,14 +1385,14 @@ VirDev_t::verifyEntireRegions(void)
     } else {
 	WARN_CP(9, "   + NOT MATCHED *************************\n");
     }
-    WARN_CP(9, "   + } VirDev_t::%s()\n", __func__);
+    WARN_CP(9, "   + } VirDev::%s()\n", __func__);
     return all_matched;
 }
 
 int
-ClientState_t::verifyEntireRegions(void)
+ClientState::verifyEntireRegions(void)
 {
-    WARN_CP(9, "ClientState_t::%s() {\n", __func__);
+    WARN_CP(9, "ClientState::%s() {\n", __func__);
     int virdev_matched;
     int all_devices_matched = 1;
     
@@ -1345,7 +1403,7 @@ ClientState_t::verifyEntireRegions(void)
 	}
     }
     
-    WARN_CP(9, "} ClientState_t::%s()\n", __func__);
+    WARN_CP(9, "} ClientState::%s()\n", __func__);
     return all_devices_matched;
 }
 
@@ -1354,15 +1412,17 @@ ClientState_t::verifyEntireRegions(void)
 // Update the host memory region of reliable data.
 // *only called in periodic-checkpointing thread.
 //
-void VirDev_t::updateMemlist(int svr_id) {
-    WARN(9, "VirDev_t::updateMemlist(%d) {\n", svr_id);
-    RCServer_t *svr_ptr;
-    BkupMem_t  *mem_ptr;
+void
+VirDev::updateMemlist(int svr_id)
+{
+    WARN(9, "VirDev::updateMemlist(%d) {\n", svr_id);
+    RCServer *svr_ptr;
+    BkupMem    *mem_ptr;
     void       *v_ptr, *h_src, *h_dst;
     int         size;
 
     if (svr_id >= RC_NREDUNDANCYMAX) {
-	WARN(0, "VirDev_t::updateMemlist(): Too large server index(%d). exit.", svr_id);
+	WARN(0, "VirDev::updateMemlist(): Too large server index(%d). exit.", svr_id);
 	exit(1);
     }
     
@@ -1379,13 +1439,13 @@ void VirDev_t::updateMemlist(int svr_id) {
 	mem_ptr = mem_ptr->next;
 	i++;
     }
-    WARN(9, "VirDev_t::updateMemlist(%d) {\n", svr_id);
+    WARN(9, "VirDev::updateMemlist(%d) {\n", svr_id);
 }
 //
 // Clear all the CUDA API called history in vdevs and pdevs.
 // ***> only called in periodic-checkpointing thread <***
 //
-void VirDev_t::clearReclist(void) {
+void VirDev::clearReclist(void) {
     for (int i=0; i<nredundancy; i++) {
 	server[i].reclist.clear();
     }
@@ -1396,9 +1456,11 @@ void VirDev_t::clearReclist(void) {
 // This function is inverse of "unpdateMemlist()".
 // ***> only called in periodic-checkpointing thread <***
 //
-void VirDev_t::restoreMemlist(void) {
-    WARN(9, "VirDev_t[%d]::%s() {\n", this->id, __func__);
-    BkupMem_t *mem_ptr;
+void
+VirDev::restoreMemlist(void)
+{
+    WARN(9, "VirDev[%d]::%s() {\n", this->id, __func__);
+    BkupMem   *mem_ptr;
     void      *v_ptr;
     void      *h_src;
     int        size;
@@ -1418,7 +1480,7 @@ void VirDev_t::restoreMemlist(void) {
 	}
 	mem_ptr = mem_ptr->next;
     }
-    WARN(9, "} VirDev_t[%d]::%s().\n", this->id, __func__);
+    WARN(9, "} VirDev[%d]::%s().\n", this->id, __func__);
     return;
 }
 //
@@ -1428,11 +1490,11 @@ void VirDev_t::restoreMemlist(void) {
 
 
 static cudaError_t
-cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {
+cudaMemcpyD2D(void *dst, const void *src, size_t count, VirDev *vdev ) {
     dscudaResult *rp;
     cudaError_t err = cudaSuccess;
 
-    RCServer_t *sp = vdev->server;
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamemcpyd2did_1((RCadr)dst, (RCadr)src, count, sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -1443,7 +1505,7 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {
     }
     //<--- oikawa moved to here from cudaMemcpy();
     if (St.isAutoVerb() > 0) {
-	cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToDevice );
+	CudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToDevice );
 	//HISTREC.add(dscudaMemcpyD2DId, (void *)&args);
     }
     //--->
@@ -1451,7 +1513,8 @@ cudaMemcpyD2D(void *dst, const void *src, size_t count, Vdev_t *vdev ) {
 }
 
 static cudaError_t
-cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count) {
+cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count)
+{
     cudaError_t err = cudaSuccess;
     int dev0;
     int pgsz = 4096;
@@ -1493,7 +1556,8 @@ cudaMemcpyP2P(void *dst, int ddev, const void *src, int sdev, size_t count) {
  * Replaced "cudaMemcpy()"
  */
 cudaError_t
-cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
+cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind )
+{
     RCuva      *suva, *duva;
     int         dev0;
     cudaError_t err  = cudaSuccess;
@@ -1502,7 +1566,7 @@ cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) 
     void *ldst = dscudaAdrOfUva(dst);
 
     int         vdevid = Vdevid[ vdevidIndex() ];
-    Vdev_t     *vdev   = St.Vdev + vdevid;
+    VirDev     *vdev   = St.Vdev + vdevid;
     
     switch ( kind ) {
     case cudaMemcpyDeviceToHost:
@@ -1538,7 +1602,8 @@ cudaMemcpy( void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) 
 }
 
 cudaError_t
-cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count) {
+cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count)
+{
     WARN(3, "cudaMemcpyPeer(0x%08lx, %d, 0x%08lx, %d, %zu)...",
          (unsigned long)dst, ddev, (unsigned long)src, sdev, count);
     cudaError_t cuerr;
@@ -1550,13 +1615,14 @@ cudaMemcpyPeer(void *dst, int ddev, const void *src, int sdev, size_t count) {
 }
 
 cudaError_t
-cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
+cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device)
+{
     cudaError_t err = cudaSuccess;
     dscudaGetDevicePropertiesResult *rp;
 
     WARN(3, "cudaGetDeviceProperties(0x%08lx, %d)...", (unsigned long)prop, device);
-    Vdev_t     *vdev = St.Vdev + device;
-    RCServer_t *sp   = vdev->server;
+    VirDev     *vdev = St.Vdev + device;
+    RCServer *sp   = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudagetdevicepropertiesid_1(device, sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -1576,7 +1642,9 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
 /*
  * LoadModule Management. 
  */
-int RCServer::findModuleOpen(void) {
+int
+RCServer::findModuleOpen(void)
+{
     int i;
     for (i=0; i<RC_NKMODULEMAX; i++) {
 	if ( modulelist[i].valid != 1 ) {
@@ -1587,7 +1655,9 @@ int RCServer::findModuleOpen(void) {
     exit(EXIT_FAILURE);
 }
 
-int RCServer::queryModuleID(int module_index) {
+int
+RCServer::queryModuleID(int module_index)
+{
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	if ( modulelist[i].index == module_index ) {
 	    return modulelist[i].id;
@@ -1597,7 +1667,9 @@ int RCServer::queryModuleID(int module_index) {
     exit(EXIT_FAILURE);
 }
 
-int VirDev_t::findModuleOpen(void) { //TODO: almost same as above func.
+int
+VirDev::findModuleOpen(void)
+{ //TODO: almost same as above func.
     int i;
     for (i=0; i<RC_NKMODULEMAX; i++) {
 	if ( modulelist[i].valid != 1 ) {
@@ -1608,8 +1680,10 @@ int VirDev_t::findModuleOpen(void) { //TODO: almost same as above func.
     exit(EXIT_FAILURE);
 }
 
-int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
-			 char *modulebuf, int module_index) {
+int
+RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
+			 char *modulebuf, int module_index)
+{
     WARN(5, "      + RCServer::%s(modulename=%s, module_index=%d) { \n",
 	 __func__, modulename, module_index);
     
@@ -1641,7 +1715,7 @@ int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
     modulelist[n].index     = module_index;
     modulelist[n].id        = module_id;
     modulelist[n].sent_time = time(NULL);
-    modulelist[n].ptx_data  = PtxStore.query(modulename);
+    modulelist[n].ptx_data  = Ptx.query(modulename);
     WARN(5, "RCServer[%d]: New client module item was registered. id:%d\n", id, module_id);
     
     if (St.isAutoVerb() ) {
@@ -1652,8 +1726,10 @@ int RCServer::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
     return module_id;
 }
 
-int VirDev_t::loadModule(char *name, char *strdata) {
-    WARN(5, "   + VirDev_t::loadModule( name=%p(%s), strdata=%p ) {\n", name, name, strdata);
+int
+VirDev::loadModule(char *name, char *strdata)
+{
+    WARN(5, "   + VirDev::loadModule( name=%p(%s), strdata=%p ) {\n", name, name, strdata);
 
     if (name != NULL) {
 #if RC_CACHE_MODULE
@@ -1676,7 +1752,7 @@ int VirDev_t::loadModule(char *name, char *strdata) {
 	}
 #endif // RC_CACHE_MODULE
     } else {
-	WARN(5, "VirDev_t::loadModule(%p) modulename:-\n", name);
+	WARN(5, "VirDev::loadModule(%p) modulename:-\n", name);
     }
 
     //<---
@@ -1702,9 +1778,9 @@ int VirDev_t::loadModule(char *name, char *strdata) {
     // really need to send it to the server.
 
     // <-- If target .ptx is not registered to PtxStore, then register first.
-    PtxRecord_t *ptxrecord_ptr = PtxStore.query(name_found);
+    PtxRecord *ptxrecord_ptr = Ptx.query(name_found);
     if (ptxrecord_ptr == NULL) {
-	PtxStore.add( name_found, strdata_found );
+	Ptx.add( name_found, strdata_found );
     }
     // --> If target .ptx is not registered to PtxStore, then register first.
     
@@ -1713,8 +1789,8 @@ int VirDev_t::loadModule(char *name, char *strdata) {
     this->modulelist[j].id        = j; //dummy; not used.
     this->modulelist[j].valid     = 1;
     this->modulelist[j].sent_time = time(NULL);
-    this->modulelist[j].ptx_data  = PtxStore.query(name_found);
-    PtxStore.print(4);
+    this->modulelist[j].ptx_data  = Ptx.query(name_found);
+    Ptx.print(4);
     WARN(5, "      + New client-module item was registered. index=%d\n", j);
 
     int mid;
@@ -1723,18 +1799,20 @@ int VirDev_t::loadModule(char *name, char *strdata) {
         WARN(3, "(info) server[%d].loadModule() returns mid=%d.\n", i, mid);
     }
 
-    WARN(5, "   + } // VirDev_t::loadModule().\n");
+    WARN(5, "   + } // VirDev::loadModule().\n");
     return modulelist[j].index;
-}//VirDev_t::loadModule(
+}//VirDev::loadModule(
 
 /*
  * launch a kernel function of id 'kid', defined in a module of id 'moduleid'.
  * 'kid' must be unique inside a single module.
  */
-void RCServer::launchKernel(int module_index, int kid, char *kname,
-			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-			    RCstream stream, RCargs args,
-			    struct rpc_err *rpc_result) {
+void
+RCServer::launchKernel(int module_index, int kid, char *kname,
+		       RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+		       RCstream stream, RCargs args,
+		       struct rpc_err *rpc_result)
+{
     WARN(5, "      + RCServer[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
@@ -1785,7 +1863,7 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     //--->
     free(lo_args.RCargs_val);
 
-    cudaRpcLaunchKernelArgs args2;
+    CudaRpcLaunchKernelArgs args2;
     if (isRecordOn()) {
         args2.moduleid = module_index;
         args2.kid      = kid;
@@ -1801,14 +1879,16 @@ void RCServer::launchKernel(int module_index, int kid, char *kname,
     WARN(5, "      + } RCServer[%d]::%s()\n", id, __func__);
 }
 
-void VirDev_t::launchKernel(int module_index, int kid, char *kname,
+void
+VirDev::launchKernel(int module_index, int kid, char *kname,
 			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-			    RCstream stream, RCargs args) {
-    WARN(5, "   + VirDev_t::%s() {\n", __func__);
+			    RCstream stream, RCargs args)
+{
+    WARN(5, "   + VirDev::%s() {\n", __func__);
     /*     
      * Automatic Recovery, Register to the called history.
      */
-    cudaRpcLaunchKernelArgs args2;
+    CudaRpcLaunchKernelArgs args2;
     if (isRecordOn()) {
         args2.moduleid = module_index;
         args2.kid      = kid;
@@ -1831,17 +1911,18 @@ void VirDev_t::launchKernel(int module_index, int kid, char *kname,
 	    this->reclist.recall();
 	}
     }
-    WARN(5, "   + } // VirDev_t::%s()\n", __func__);
+    WARN(5, "   + } // VirDev::%s()\n", __func__);
 }
 
 void
 rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
                              RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
-                             RCargs args) {
+                             RCargs args)
+{
     WARN(5, "%s() {\n", __func__);
     pthread_mutex_lock( &cudaKernelRun_mutex );
 
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
     vdev->launchKernel(module_index, kid, kname, gdim, bdim, smemsize, stream, args);
     
     pthread_mutex_unlock( &cudaKernelRun_mutex );
@@ -1851,7 +1932,8 @@ rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* modulei
 
 cudaError_t
 cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,
-                size_t width, size_t height, unsigned int flags) {
+                size_t width, size_t height, unsigned int flags)
+{
     cudaError_t err = cudaSuccess;
     dscudaMallocArrayResult *rp;
     RCchanneldesc descbuf;
@@ -1866,8 +1948,8 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     descbuf.w = desc->w;
     descbuf.f = desc->f;
 
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++ ) {
         rp = dscudamallocarrayid_1(descbuf, width, height, flags, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -1885,7 +1967,9 @@ cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *de
     return err;
 }
 
-cudaError_t cudaFreeArray(struct cudaArray *array) {
+cudaError_t
+cudaFreeArray(struct cudaArray *array)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
     RCcuarrayArray *ca;
@@ -1896,8 +1980,8 @@ cudaError_t cudaFreeArray(struct cudaArray *array) {
         WARN(0, "invalid cudaArray : %p\n", array);
         exit( EXIT_FAILURE );
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++ ) {
         rp = dscudafreearrayid_1((RCadr)ca->ap[i], sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -1913,13 +1997,14 @@ cudaError_t cudaFreeArray(struct cudaArray *array) {
 
 cudaError_t
 cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const void *src,
-                  size_t count, enum cudaMemcpyKind kind) {
+                  size_t count, enum cudaMemcpyKind kind)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *h2drp, *d2drp;
     RCbuf srcbuf;
     RCcuarrayArray *ca;
-    Vdev_t *vdev;
-    RCServer_t *sp;
+    VirDev *vdev;
+    RCServer *sp;
 
     WARN(3, "cudaMemcpyToArray(%p, %zu, %zu, %p, %zu, %s)...",
          dst, wOffset, hOffset, src, count, dscudaMemcpyKindName(kind));
@@ -1965,13 +2050,15 @@ cudaMemcpyToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset, const v
     return err;
 }
 
-cudaError_t cudaMemset(void *devPtr, int value, size_t count) {
+cudaError_t
+cudaMemset(void *devPtr, int value, size_t count)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
     WARN(3, "cudaMemset()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamemsetid_1((RCadr)devPtr, value, count, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -1985,13 +2072,15 @@ cudaError_t cudaMemset(void *devPtr, int value, size_t count) {
     return err;
 }
 
-cudaError_t cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height) {
+cudaError_t
+cudaMallocPitch(void **devPtr, size_t *pitch, size_t width, size_t height)
+{
     cudaError_t err = cudaSuccess;
     dscudaMallocPitchResult *rp;
 
     WARN(3, "cudaMallocPitch(%p, %p, %zu, %zu)...", devPtr, pitch, width, height);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamallocpitchid_1(width, height, sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2019,8 +2108,8 @@ cudaMemcpy2DToArray(struct cudaArray *dst, size_t wOffset, size_t hOffset,
     dscudaResult *h2drp, *d2drp;
     RCbuf srcbuf;
     RCcuarrayArray *ca;
-    Vdev_t *vdev;
-    RCServer_t *sp;
+    VirDev *vdev;
+    RCServer *sp;
 
     WARN(3, "cudaMemcpy2DToArray(%p, %zu, %zu, %p, %zu, %zu, %zu, %s)...",
          dst, wOffset, hOffset,
@@ -2098,8 +2187,8 @@ cudaMemcpy2D(void *dst, size_t dpitch,
     dscudaMemcpy2DD2HResult *d2hrp;
     dscudaResult *h2drp, *d2drp;
     RCbuf srcbuf;
-    Vdev_t *vdev;
-    RCServer_t *sp;
+    VirDev *vdev;
+    RCServer *sp;
 
     WARN(3, "cudaMemcpy2D(%p, %zu, %p, %zu, %zu, %zu, %s)...",
          dst, dpitch,
@@ -2166,14 +2255,15 @@ cudaMemcpy2D(void *dst, size_t dpitch,
 }
 
 cudaError_t
-cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height) {
+cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height)
+{
     cudaError_t err = cudaSuccess;
     dscudaResult *rp;
 
     WARN(3, "cudaMemset2D(%p, %zu, %d, %zu, %zu)...",
          devPtr, pitch, value, width, height);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamemset2did_1((RCadr)devPtr, pitch, value, width, height, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2187,14 +2277,16 @@ cudaMemset2D(void *devPtr, size_t pitch, int value, size_t width, size_t height)
     return err;
 }
 
-cudaError_t cudaMallocHost(void **ptr, size_t size) {
+cudaError_t
+cudaMallocHost(void **ptr, size_t size)
+{
 #if RC_SUPPORT_PAGELOCK
     cudaError_t err = cudaSuccess;
     dscudaMallocHostResult *rp;
 
     WARN(3, "cudaMallocHost(%p, %d)...", ptr, size);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudamallochostid_1(size, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2227,8 +2319,8 @@ cudaError_t cudaHostAlloc(void **pHost, size_t size, unsigned int flags) {
     dscudaHostAllocResult *rp;
 
     WARN(3, "cudaHostAlloc(0x%08llx, %d, 0x%08x)...", (unsigned long)pHost, size, flags);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudahostallocid_1(size, flags, sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -2277,8 +2369,8 @@ cudaError_t cudaFreeHost(void *ptr) {
     dscudaResult *rp;
 
     WARN(3, "cudaFreeHost(0x%08llx)...", (unsigned long)ptr);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++ ) {
         rp = dscudafreehostid_1((RCadr)ptr, sp[i].Clnt );
         checkResult(rp, sp[i] );
@@ -2312,8 +2404,8 @@ cudaHostGetDevicePointer(void **pDevice, void*pHost, unsigned int flags) {
 
     WARN(3, "cudaHostGetDevicePointer(0x%08llx, 0x%08llx, 0x%08x)...",
          (unsigned long)pDevice, (unsigned long)pHost, flags);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudahostgetdevicepointerid_1((RCadr)pHost, flags, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2341,8 +2433,8 @@ cudaError_t cudaHostGetFlags(unsigned int *pFlags, void *pHost) {
     dscudaHostGetFlagsResult *rp;
 
     WARN(3, "cudaHostGetFlags(%p %p)...", pFlags, pHost);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudahostgetflagsid_1((RCadr)pHost, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2366,8 +2458,8 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
     dscudaResult *h2drp, *d2drp;
     RCbuf srcbuf;
     RCstreamArray *st;
-    Vdev_t *vdev;
-    RCServer_t *sp;
+    VirDev *vdev;
+    RCServer *sp;
 
     WARN(3, "cudaMemcpyAsync(0x%08llx, 0x%08llx, %d, %s, 0x%08llx)...",
          (unsigned long)dst, (unsigned long)src, count, dscudaMemcpyKindName(kind), st->s[0]);
@@ -2378,8 +2470,8 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
     }
     switch (kind) {
       case cudaMemcpyDeviceToHost:
-        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-        RCServer_t *sp = vdev->server;
+        VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+        RCServer *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++) {
             d2hrp = dscudamemcpyasyncd2hid_1((RCadr)src, count, (RCstream)st->s[i], sp[i].Clnt);
             checkResult(d2hrp, sp[i]);
@@ -2395,8 +2487,8 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
       case cudaMemcpyHostToDevice:
         srcbuf.RCbuf_len = count;
         srcbuf.RCbuf_val = (char *)src;
-        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-        RCServer_t *sp = vdev->server;
+        VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+        RCServer *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++) {
             h2drp = dscudamemcpyasynch2did_1((RCadr)dst, srcbuf, count, (RCstream)st->s[i], sp[i].Clnt);
             checkResult(h2drp, sp[i]);
@@ -2407,8 +2499,8 @@ cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind ki
         }
         break;
       case cudaMemcpyDeviceToDevice:
-        Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-        RCServer_t *sp = vdev->server;
+        VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+        RCServer *sp = vdev->server;
         for (int i = 0; i < vdev->nredundancy; i++) {
             d2drp = dscudamemcpyasyncd2did_1((RCadr)dst, (RCadr)src, count, (RCstream)st->s[i], sp[i].Clnt);
             checkResult(d2drp, sp[i]);
@@ -2437,7 +2529,7 @@ cudaError_t
 dscudaMemcpyToSymbolH2D(int moduleid, char *symbol, const void *src,
                         size_t count, size_t offset, int vdevid, int raidid) {
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     RCbuf srcbuf;
     cudaError_t err;
 
@@ -2453,9 +2545,10 @@ dscudaMemcpyToSymbolH2D(int moduleid, char *symbol, const void *src,
 
 cudaError_t
 dscudaMemcpyToSymbolD2D(int moduleid, char *symbol, const void *src,
-                        size_t count, size_t offset, int vdevid, int raidid) {
+                        size_t count, size_t offset, int vdevid, int raidid)
+{
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpytosymbold2did_1(moduleid, symbol, (RCadr)src, count, offset, sp[raidid].Clnt );
@@ -2468,9 +2561,10 @@ dscudaMemcpyToSymbolD2D(int moduleid, char *symbol, const void *src,
 
 cudaError_t
 dscudaMemcpyFromSymbolD2H(int moduleid, void **dstbuf, char *symbol,
-                          size_t count, size_t offset, int vdevid, int raidid) {
+                          size_t count, size_t offset, int vdevid, int raidid)
+{
     dscudaMemcpyFromSymbolD2HResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbold2hid_1(moduleid, (char *)symbol, count, offset, sp[raidid].Clnt);
@@ -2486,7 +2580,7 @@ cudaError_t
 dscudaMemcpyFromSymbolD2D(int moduleid, void *dstadr, char *symbol,
                           size_t count, size_t offset, int vdevid, int raidid) {
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbold2did_1(moduleid, (RCadr)dstadr, (char *)symbol, count, offset, sp[raidid].Clnt );
@@ -2502,7 +2596,7 @@ dscudaMemcpyToSymbolAsyncH2D(int moduleid, char *symbol, const void *src,
                              size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
 {
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     RCbuf srcbuf;
     cudaError_t err;
 
@@ -2520,7 +2614,7 @@ cudaError_t
 dscudaMemcpyToSymbolAsyncD2D(int moduleid, char *symbol, const void *src,
                              size_t count, size_t offset, RCstream stream, int vdevid, int raidid) {
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpytosymbolasyncd2did_1( moduleid, symbol, (RCadr)src, count, offset, stream, sp[raidid].Clnt);
@@ -2533,9 +2627,10 @@ dscudaMemcpyToSymbolAsyncD2D(int moduleid, char *symbol, const void *src,
 
 cudaError_t
 dscudaMemcpyFromSymbolAsyncD2H(int moduleid, void **dstbuf, char *symbol,
-                               size_t count, size_t offset, RCstream stream, int vdevid, int raidid) {
+                               size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
+{
     dscudaMemcpyFromSymbolAsyncD2HResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbolasyncd2hid_1(moduleid, (char *)symbol, count, offset,
@@ -2550,9 +2645,10 @@ dscudaMemcpyFromSymbolAsyncD2H(int moduleid, void **dstbuf, char *symbol,
 
 cudaError_t
 dscudaMemcpyFromSymbolAsyncD2D(int moduleid, void *dstadr, char *symbol,
-                               size_t count, size_t offset, RCstream stream, int vdevid, int raidid) {
+                               size_t count, size_t offset, RCstream stream, int vdevid, int raidid)
+{
     dscudaResult *rp;
-    RCServer_t *sp = (St.Vdev + vdevid)->server;
+    RCServer *sp = (St.Vdev + vdevid)->server;
     cudaError_t err;
 
     rp = dscudamemcpyfromsymbolasyncd2did_1(moduleid, (RCadr)dstadr, (char *)symbol, count, offset, stream, sp[raidid].Clnt);
@@ -2574,8 +2670,8 @@ cudaError_t cudaStreamCreate(cudaStream_t *pStream) {
     cudaStream_t st[RC_NREDUNDANCYMAX];
 
     WARN(3, "cudaStreamCreate(0x%08llx)...", (unsigned long)pStream);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudastreamcreateid_1(sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2609,8 +2705,8 @@ cudaError_t cudaStreamDestroy(cudaStream_t stream) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudastreamdestroyid_1((RCadr)st->s[i], sp[i].Clnt );
         checkResult(rp, sp[i] );
@@ -2639,8 +2735,8 @@ cudaError_t cudaStreamSynchronize(cudaStream_t stream) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudastreamsynchronizeid_1((RCadr)st->s[i], sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2668,8 +2764,8 @@ cudaError_t cudaStreamQuery(cudaStream_t stream) {
         WARN(0, "invalid stream : 0x%08llx\n", stream);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudastreamqueryid_1((RCadr)st->s[i], sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2695,8 +2791,8 @@ cudaError_t cudaEventCreate(cudaEvent_t *event) {
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
     WARN(3, "cudaEventCreate(%p)...", event);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventcreateid_1(sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2720,8 +2816,8 @@ cudaEventCreateWithFlags(cudaEvent_t *event, unsigned int flags) {
     cudaEvent_t ev[RC_NREDUNDANCYMAX];
 
     WARN(3, "cudaEventCreateWithFlags(%p, 0x%08x)...", event, flags);
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventcreatewithflagsid_1(flags, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2749,8 +2845,8 @@ cudaError_t cudaEventDestroy( cudaEvent_t event ) {
         WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++ ) {
         rp = dscudaeventdestroyid_1((RCadr)ev->e[i], sp[i].Clnt );
         checkResult(rp, sp[i] );
@@ -2781,8 +2877,8 @@ cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end) {
         WARN(0, "invalid end event : %p\n", end);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventelapsedtimeid_1((RCadr)es->e[i], (RCadr)ee->e[i], sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2814,8 +2910,8 @@ cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream) {
         WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventrecordid_1((RCadr)ev->e[i], (RCadr)st->s[i], sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2840,8 +2936,8 @@ cudaError_t cudaEventSynchronize(cudaEvent_t event) {
         WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventsynchronizeid_1((RCadr)ev->e[i], sp[i].Clnt );
         checkResult(rp, sp[i] );
@@ -2865,8 +2961,8 @@ cudaError_t cudaEventQuery(cudaEvent_t event) {
         WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudaeventqueryid_1((RCadr)ev->e[i], sp[i].Clnt );
         checkResult(rp, sp[i] );
@@ -2898,8 +2994,8 @@ cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags) 
         WARN(0, "invalid event : %p\n", event);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudastreamwaiteventid_1((RCadr)st->s[i], (RCadr)ev->e[i], flags, sp[i].Clnt);
         checkResult(rp, sp[i]);
@@ -2924,8 +3020,8 @@ cudaCreateChannelDesc(int x, int y, int z, int w, enum cudaChannelFormatKind f)
     cudaChannelFormatDesc desc;
 
     WARN(3, "cudaCreateChannelDesc()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudacreatechanneldescid_1(x, y, z, w, f, sp[i].Clnt );
         checkResult(rp, sp[i]);
@@ -2956,8 +3052,8 @@ cudaGetChannelDesc(struct cudaChannelFormatDesc *desc, const struct cudaArray *a
         WARN(0, "invalid cudaArray : %p\n", array);
         exit(1);
     }
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscudagetchanneldescid_1( (RCadr)ca->ap[i], sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -3002,8 +3098,8 @@ cufftPlan3d(cufftHandle *plan, int nx, int ny, int nz, cufftType type)
     dscufftPlanResult *rp;
 
     WARN(3, "cufftPlan3d()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscufftplan3did_1(nx, ny, nz, (unsigned int)type, sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -3027,8 +3123,8 @@ cufftDestroy(cufftHandle plan) {
     dscufftResult *rp;
 
     WARN(3, "cufftDestroy()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++ ) {
         rp = dscufftdestroyid_1((unsigned int)plan, sp[i].Clnt );
         checkResult( rp, sp[i] );
@@ -3049,8 +3145,8 @@ cufftExecC2C(cufftHandle plan, cufftComplex *idata, cufftComplex *odata, int dir
     dscufftResult *rp;
 
     WARN(3, "cufftExecC2C()...");
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++) {
         rp = dscufftexecc2cid_1((unsigned int)plan, (RCadr)idata, (RCadr)odata, direction, sp[i].Clnt );
         checkResult(rp, sp[i]);

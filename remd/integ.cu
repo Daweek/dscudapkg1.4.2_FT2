@@ -460,7 +460,7 @@ simRemd( Remd_t &remd, Simu_t &simu )
 	calcHistogram( histo_ar, remd, simu); // struct histogram 
 	exchTemp( t0, remd, simu);            //
 
-	usleep(500000); // for longer sim time.
+	//usleep(500000); // for longer sim time.
     } //for (t = 0; ...
     
     saveHistogram( histo_ar, remd, simu );

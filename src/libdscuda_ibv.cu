@@ -49,7 +49,7 @@ dscudaRemoteCallType(void)
 }
 
 void
-setupConnection(int idev, RCServer_t *sp)
+setupConnection(int idev, RCServer *sp)
 {
     struct addrinfo *addr;
     struct rdma_cm_id *cmid= NULL;
@@ -155,7 +155,7 @@ perform_remote_call(IbvConnection *conn, RCMethod *methodp, int sendsize, RCMeth
 }
 
 void
-checkResult(void *rp, RCServer_t *sp)
+checkResult(void *rp, RCServer *sp)
 {
     // a dummy func.
 }
@@ -176,7 +176,7 @@ cudaThreadSynchronize(void)
 
     initClient();
     WARN(3, "cudaThreadSynchronize()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(ThreadSynchronize, Vdevid[vid], i);
         WARN(3, "spktsize:%d\n", spktsize);
@@ -201,7 +201,7 @@ cudaThreadExit(void)
 
     initClient();
     WARN(3, "cudaThreadExit()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(ThreadExit, Vdevid[vid], i);
         WARN(3, "spktsize:%d\n", spktsize);
@@ -244,7 +244,7 @@ cudaGetErrorString(cudaError_t error)
 
     initClient();
     WARN(3, "cudaGetErrorString()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(GetErrorString, Vdevid[vid], i);
 
@@ -276,7 +276,7 @@ cudaRuntimeGetVersion(int *runtimeVersion)
 
     initClient();
     WARN(3, "cudaRuntimeGetVersion(0x%08llx)...", (unsigned long)runtimeVersion);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(RuntimeGetVersion, Vdevid[vid], i);
         WARN(3, "spktsize:%d\n", spktsize);
@@ -302,7 +302,7 @@ cudaDeviceSynchronize(void)
 
     initClient();
     WARN(3, "cudaDeviceSynchronize()...");
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(DeviceSynchronize, Vdevid[vid], i);
         WARN(3, "spktsize:%d\n", spktsize);
@@ -353,7 +353,7 @@ cudaMalloc(void **devAdrPtr, size_t size)
 
     initClient();
     WARN(3, "cudaMalloc(0x%08llx, %d)...", (unsigned long)devAdrPtr, size);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         SETUP_IBV_PACKET_BUF(Malloc, Vdevid[vid], i);
         spkt->size = size;
@@ -383,8 +383,8 @@ cudaFree(void *mem)
 
     initClient();
     WARN(3, "cudaFree(0x%08llx)...", (unsigned long)mem);
-    Vdev_t *vdev = Vdev + Vdevid[vid];
-    RCServer_t *sp = vdev->server;
+    VirDev *vdev = Vdev + Vdevid[vid];
+    RCServer *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         SETUP_IBV_PACKET_BUF(Free, Vdevid[vid], i);
         spkt->devAdr = (RCadr)mem;
@@ -409,7 +409,7 @@ cudaError_t
 cudaMemcpyH2D(void *dst, const void *src, size_t count, int vdevid)
 {
     cudaError_t err = cudaSuccess;
-    Vdev_t *vdev;
+    VirDev *vdev;
 
     vdev = Vdev + vdevid;
     for (int i = 0; i < vdev->nredundancy; i++) {
@@ -444,7 +444,7 @@ cudaError_t
 cudaMemcpyD2H(void *dst, const void *src, size_t count, int vdevid)
 {
     cudaError_t err = cudaSuccess;
-    Vdev_t *vdev;
+    VirDev *vdev;
 
     vdev = Vdev + vdevid;
     for (int i = 0; i < vdev->nredundancy; i++) {
@@ -465,7 +465,7 @@ cudaMemcpyD2H(void *dst, const void *src, size_t count, int vdevid)
         else if (bcmp(dst, &rpkt->dstbuf, count) != 0) {
             WARN(1, "\n\ncudaMemcpy() data copied from device%d & device0 UNMATCHED.\n\n\n", i);
             if (St.isAutoVerb()) {
-                cudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
+                CudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
                 HISTREC.add(dscudaMemcpyD2HId, (void *)&args);
                 HISTREC.recall();
                 break;
@@ -486,7 +486,7 @@ cudaError_t
 cudaMemcpyD2D(void *dst, const void *src, size_t count, int vdevid)
 {
     cudaError_t err = cudaSuccess;
-    Vdev_t *vdev;
+    VirDev *vdev;
 
     vdev = Vdev + vdevid;
     for (int i = 0; i < vdev->nredundancy; i++) {
@@ -553,7 +553,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
 {
     cudaError_t err = cudaSuccess;
     int vdevid;
-    Vdev_t *vdev;
+    VirDev *vdev;
     int vi = vdevidIndex();
     RCuva *suva, *duva;
     int dev0;
@@ -619,7 +619,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
     }
 
     if (St.isAutoVerb()) {
-        cudaMemcpyArgs args;
+        CudaMemcpyArgs args;
         switch (kind) {
           case cudaMemcpyHostToDevice:
             args.dst = dst;
@@ -665,7 +665,7 @@ cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device)
     initClient();
     WARN(3, "cudaGetDeviceProperties(0x%08lx, %d)...", (unsigned long)prop, device);
 
-    // Vdev_t *vdev = Vdev + device;
+    // VirDev *vdev = Vdev + device;
     //    for (int i = 0; i < vdev->nredundancy; i++) {
     for (int i = 0; i < 1; i++) { // performs no redundant call for now.
         SETUP_IBV_PACKET_BUF(GetDeviceProperties, device, i);
@@ -778,7 +778,7 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
         mem = mem->next;
     }
 
-    Vdev_t *vdev = Vdev + Vdevid[vid];
+    VirDev *vdev = Vdev + Vdevid[vid];
     for (int i = 0; i < vdev->nredundancy; i++) {
         ibvDscudaLaunchKernel(moduleid[i], kid, kname,
                               gdim, bdim, smemsize, (RCstream)st->s[i],

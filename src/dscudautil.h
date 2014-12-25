@@ -26,7 +26,7 @@ namespace dscuda {
     void    xfree(void *p);
 }
 
-extern struct ClientState_t St;
+extern struct ClientState St;
 
 #define MACRO_TSTAMP_FORMAT						\
 	time_t now = time(NULL);					\

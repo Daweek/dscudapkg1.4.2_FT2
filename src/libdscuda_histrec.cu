@@ -17,7 +17,9 @@
 
 #define DEBUG
 
-static int checkSum(void *targ, int size) {
+static int
+checkSum(void *targ, int size)
+{
     int sum=0, *ptr = (int *)targ;
     
     for (int s=0; s<size; s+=sizeof(int)) {
@@ -34,11 +36,11 @@ static int checkSum(void *targ, int size) {
   recallStub[DSCVMethod ## mthd] = recall ## mthd;
 
 #define DSCUDAVERB_STORE_ARGS(mthd) \
-  cuda ## mthd ## Args *argsrc;		\
-  argsrc = (cuda ## mthd ## Args *)argp; \
-  cuda ## mthd ## Args *argdst; \
-  argdst = (cuda ## mthd ## Args *)malloc(sizeof(cuda ## mthd ## Args)); \
-  *argdst = *(cuda ## mthd ## Args *)argp;
+  Cuda ## mthd ## Args *argsrc;		\
+  argsrc = (Cuda ## mthd ## Args *)argp; \
+  Cuda ## mthd ## Args *argdst; \
+  argdst = (Cuda ## mthd ## Args *)malloc(sizeof(Cuda ## mthd ## Args)); \
+  *argdst = *(Cuda ## mthd ## Args *)argp;
 
 //mapping RPCfunctionID to DSCUDAVerbMethodID
 static DSCVMethod funcID2DSCVMethod(int funcID) {
@@ -74,7 +76,6 @@ static DSCVMethod funcID2DSCVMethod(int funcID) {
 static void*
 storeSetDevice(void *argp)
 {
-    WARN(3, "add hist cudaSetDevice\n");
     DSCUDAVERB_STORE_ARGS(SetDevice); 
     return argdst;
 }
@@ -89,26 +90,29 @@ storeMalloc(void *argp)
 static void *
 storeMemcpyH2D(void *argp)
 {
-    WARN(3, "add hist cudaMemcpyH2D\n");
     DSCUDAVERB_STORE_ARGS(Memcpy);
     argdst->src = malloc(argsrc->count + 1);
     memcpy(argdst->src, (const void *)argsrc->src, argsrc->count);
     return argdst;
 }
 
-static void *storeMemcpyD2D(void *argp) {
-    WARN(3, "add hist cudaMemcpyD2D\n");
+static void*
+storeMemcpyD2D(void *argp)
+{
     DSCUDAVERB_STORE_ARGS(Memcpy);
     return argdst;
 }
 
-static void *storeMemcpyD2H(void *argp) {
-    WARN(3, "add hist cudaMemcpyD2H\n");
+static void*
+storeMemcpyD2H(void *argp)
+{
     DSCUDAVERB_STORE_ARGS(Memcpy);
     return argdst;
 }
 
-static void *storeMemcpyToSymbolH2D(void *argp) {
+static void*
+storeMemcpyToSymbolH2D(void *argp)
+{
     WARN(3, "add hist cudaMemcpyToSymbolH2D\n");
     DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
     
@@ -125,7 +129,9 @@ static void *storeMemcpyToSymbolH2D(void *argp) {
     return argdst;
 }
 
-static void *storeMemcpyToSymbolD2D(void *argp) {
+static void*
+storeMemcpyToSymbolD2D(void *argp)
+{
     WARN(3, "add hist cudaMemcpyToSymbolD2D\n");
     DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
 
@@ -141,12 +147,16 @@ static void *storeMemcpyToSymbolD2D(void *argp) {
     return argdst;
 }
 
-static void *storeFree(void *argp) {
+static void*
+storeFree(void *argp)
+{
     //nothing to do
     return NULL;
 }
 
-static void *storeLoadModule(void *argp) {
+static void*
+storeLoadModule(void *argp)
+{
     DSCUDAVERB_STORE_ARGS(LoadModule);
     argdst->name = (char *)malloc(sizeof(char) * (strlen(argsrc->name) + 1));
     argdst->strdata = (char *)malloc(sizeof(char) * (strlen(argsrc->strdata) + 1));
@@ -155,7 +165,9 @@ static void *storeLoadModule(void *argp) {
     return argdst;
 }
 
-static void *storeRpcLaunchKernel(void *argp) {
+static void*
+storeRpcLaunchKernel(void *argp)
+{
     WARN(3, "add hist RpcLaunchKernel\n");
     DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
 
@@ -176,38 +188,50 @@ static void *storeRpcLaunchKernel(void *argp) {
 }
 
 //stubs for release args
-static void releaseSetDevice(void *argp) {
-    cudaSetDeviceArgs *argsrc;
-    argsrc = (cudaSetDeviceArgs *)argp;
+static void
+releaseSetDevice(void *argp)
+{
+    CudaSetDeviceArgs *argsrc;
+    argsrc = (CudaSetDeviceArgs *)argp;
     free(argsrc);
 }
 
-static void releaseMalloc(void *argp) {
+static void
+releaseMalloc(void *argp)
+{
     //nothing to do
 }
 
-static void releaseMemcpyH2D(void *argp) {
-    cudaMemcpyArgs *argsrc;
-    argsrc = (cudaMemcpyArgs *)argp;
+static void
+releaseMemcpyH2D(void *argp)
+{
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
     free(argsrc->src);
     free(argsrc);
 }
 
-static void releaseMemcpyD2D(void *argp) {
-    cudaMemcpyArgs *argsrc;
-    argsrc = (cudaMemcpyArgs *)argp;
+static void
+releaseMemcpyD2D(void *argp)
+{
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
     free(argsrc);
 }
 
-static void releaseMemcpyD2H(void *argp) {
-    cudaMemcpyArgs *argsrc;
-    argsrc = (cudaMemcpyArgs *)argp;
+static void
+releaseMemcpyD2H(void *argp)
+{
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
     free(argsrc);
 }
 
-static void releaseMemcpyToSymbolH2D(void *argp) {
-    cudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (cudaMemcpyToSymbolArgs *)argp;
+static void
+releaseMemcpyToSymbolH2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
     
     free(argsrc->moduleid);
     free(argsrc->symbol);
@@ -215,31 +239,39 @@ static void releaseMemcpyToSymbolH2D(void *argp) {
     free(argsrc);
 }
 
-static void releaseMemcpyToSymbolD2D(void *argp) {
-    cudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (cudaMemcpyToSymbolArgs *)argp;
+static void
+releaseMemcpyToSymbolD2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
 
     free(argsrc->moduleid);
     free(argsrc->symbol);
     free(argsrc);
 }
 
-static void releaseFree(void *argp) {
+static void
+releaseFree(void *argp)
+{
     //nothing to do
 }
 
-static void releaseLoadModule(void *argp) {
-    cudaLoadModuleArgs *argsrc;
-    argsrc = (cudaLoadModuleArgs *)argp;
+static void
+releaseLoadModule(void *argp)
+{
+    CudaLoadModuleArgs *argsrc;
+    argsrc = (CudaLoadModuleArgs *)argp;
     
     free(argsrc->name);
     free(argsrc->strdata);
     free(argsrc);
 }
 
-static void releaseRpcLaunchKernel(void *argp) {
-    cudaRpcLaunchKernelArgs *argsrc;
-    argsrc = (cudaRpcLaunchKernelArgs *)argp;
+static void
+releaseRpcLaunchKernel(void *argp)
+{
+    CudaRpcLaunchKernelArgs *argsrc;
+    argsrc = (CudaRpcLaunchKernelArgs *)argp;
     
     //free(argsrc->moduleid);
     free(argsrc->kname);
@@ -248,26 +280,32 @@ static void releaseRpcLaunchKernel(void *argp) {
 }
 
 //stubs for recall
-static void recallSetDevice(void *argp) {
-    cudaSetDeviceArgs *argsrc;
-    argsrc = (cudaSetDeviceArgs *)argp;
+static void
+recallSetDevice(void *argp)
+{
+    CudaSetDeviceArgs *argsrc;
+    argsrc = (CudaSetDeviceArgs *)argp;
 
     WARN(3, "Recall cudaSetDevice()...\n");
     cudaSetDevice(argsrc->device);
 }
 
-static void recallMalloc(void *argp) {
+static void
+recallMalloc(void *argp)
+{
     //nothing to do
 }
 
-static void recallMemcpyH2D(void *argp) {
+static void
+recallMemcpyH2D(void *argp)
+{
     // note: dont insert pthread_mutex_lock or unlock.
-    cudaMemcpyArgs *argsrc;
+    CudaMemcpyArgs *argsrc;
     int         vdevid = Vdevid[ vdevidIndex() ];
-    Vdev_t     *vdev   = St.Vdev + vdevid;
+    VirDev     *vdev   = St.Vdev + vdevid;
     int         rec_en_stack;
     
-    argsrc = (cudaMemcpyArgs *)argp;
+    argsrc = (CudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyH2D() \n");
 
     rec_en_stack = vdev->setRecord(0);
@@ -276,23 +314,27 @@ static void recallMemcpyH2D(void *argp) {
     WARN(3, "\n");
 }
 
-static void recallMemcpyD2D(void *argp) {
+static void
+recallMemcpyD2D(void *argp)
+{
     // note: dont insert pthread_mutex_lock or unlock.
-    cudaMemcpyArgs *argsrc;
-    argsrc = (cudaMemcpyArgs *)argp;
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
     
     WARN(3, "Recall cudaMemcpyD2D()...\n");
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToDevice);
 }
 
-static void recallMemcpyD2H(void *argp) {
+static void
+recallMemcpyD2H(void *argp)
+{
     // note: dont insert pthread_mutex_lock or unlock.
-    cudaMemcpyArgs *argsrc;
+    CudaMemcpyArgs *argsrc;
     int         vdevid = Vdevid[ vdevidIndex() ];
-    Vdev_t     *vdev   = St.Vdev + vdevid;
+    VirDev     *vdev   = St.Vdev + vdevid;
     int         rec_en_stack;
 
-    argsrc = (cudaMemcpyArgs *)argp;
+    argsrc = (CudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyD2H()...\n");
 
     rec_en_stack = vdev->setRecord(0);
@@ -301,40 +343,50 @@ static void recallMemcpyD2H(void *argp) {
     WARN(3, "\n");
 }
 
-static void recallMemcpyToSymbolH2D(void *argp) {
-    cudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (cudaMemcpyToSymbolArgs *)argp;
+static void
+recallMemcpyToSymbolH2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
     WARN(3, "recall cudaMemcpyToSymbolH2D\n");
     dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyHostToDevice);
 }
 
-static void recallMemcpyToSymbolD2D(void *argp) {
-    cudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (cudaMemcpyToSymbolArgs *)argp;
+static void
+recallMemcpyToSymbolD2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
     WARN(3, "recall cudaMemcpyToSymbolD2D\n");
     dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyDeviceToDevice);
 }
 
-static void recallFree(void *argp) {
+static void
+recallFree(void *argp)
+{
     //nothing to do
 }
 
-static void recallLoadModule(void *argp) {
-    cudaLoadModuleArgs *argsrc;
-    argsrc = (cudaLoadModuleArgs *)argp;
+static void
+recallLoadModule(void *argp)
+{
+    CudaLoadModuleArgs *argsrc;
+    argsrc = (CudaLoadModuleArgs *)argp;
 }
 
-static void recallRpcLaunchKernel(void *argp) {
+static void
+recallRpcLaunchKernel(void *argp)
+{
     // note: dont insert pthread_mutex_lock or unlock.
-    cudaRpcLaunchKernelArgs *argsrc;
-    argsrc = (cudaRpcLaunchKernelArgs *)argp;
+    CudaRpcLaunchKernelArgs *argsrc;
+    argsrc = (CudaRpcLaunchKernelArgs *)argp;
     WARN(3, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
 	 argsrc->moduleid, argsrc->kid, argsrc->kname);
 #if 0
     rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
 #else
     int         rec_en_stack;
-    Vdev_t *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
     rec_en_stack = vdev->setRecord(0);
     vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
     vdev->setRecord(rec_en_stack);
@@ -344,13 +396,14 @@ static void recallRpcLaunchKernel(void *argp) {
 /*
  *  CONSTRUCTOR
  */
-HistRecList_t::HistRecList_t(void) {
+HistList::HistList(void)
+{
     add_count = 0;
     length    = 0;
     byte_size = 0;
     max_len   = 32;
     
-    histrec = (HistRec_t *)dscuda::xmalloc( sizeof(HistRec) * max_len );
+    histrec = (HistCell*)dscuda::xmalloc( sizeof(HistCell) * max_len );
 
     //<-- import from dscudaVerbInit()
     memset(storeArgsStub,   0, sizeof(DSCVMethod) * DSCVMethodEnd);
@@ -371,26 +424,28 @@ HistRecList_t::HistRecList_t(void) {
 
     for (int i=1; i<DSCVMethodEnd; i++) {
 	if (!storeArgsStub[i]) {
-	    fprintf(stderr, "HistRecList_t(constructor): storeArgsStub[%d] is not initialized.\nexit.\n\n", i);
+	    fprintf(stderr, "HistList(constructor): storeArgsStub[%d] is not initialized.\nexit.\n\n", i);
 	    exit(1);
 	}
 	if (!releaseArgsStub[i]) {
-	    fprintf(stderr, "HistRecList_t(constructor): releaseArgsStub[%d] is not initialized.\nexit.\n\n", i);
+	    fprintf(stderr, "HistList(constructor): releaseArgsStub[%d] is not initialized.\nexit.\n\n", i);
 	    exit(1);
 	}
 	if (!recallStub[i]) {
-	    fprintf(stderr, "HistRecList_t(constructor): recallStub[%d] is not initialized.\nexit.\n\n", i);
+	    fprintf(stderr, "HistList(constructor): recallStub[%d] is not initialized.\nexit.\n\n", i);
 	    exit(1);
 	}
     }
     //HISTREC.on();
     //--> import from dscudaVerbInit()
     //WARN( 5, "The constructor %s() called.\n", __func__ );
-} // HistRecList_t::HistRecList_t()
+} // HistList::HistList()
 
-void HistRecList_t::extendLen(void) {
+void
+HistList::extendLen(void)
+{
     max_len += EXTEND_LEN;
-    histrec = (HistRec *)realloc( histrec, sizeof(HistRec) * max_len );
+    histrec = (HistCell*)realloc( histrec, sizeof(HistCell) * max_len );
     if (histrec == NULL) {
 	WARN( 0, "%s():realloc() failed.\n", __func__ );
 	exit(EXIT_FAILURE);
@@ -402,7 +457,7 @@ void HistRecList_t::extendLen(void) {
  * Add one item to called histry of CUDA API. 
  */
 void
-HistRecList_t::add(int funcID, void *argp)
+HistList::add(int funcID, void *argp)
 {
     int DSCVMethodId;
 
@@ -422,42 +477,47 @@ HistRecList_t::add(int funcID, void *argp)
     
     switch (funcID) {
     case dscudaSetDeviceId:
-	byte_size += sizeof(struct CudaSetDeviceArgs_t);
+	byte_size += sizeof( CudaSetDeviceArgs );
 	break;
     case dscudaMallocId:
-	byte_size += sizeof(struct CudaMallocArgs_t);
+	byte_size += sizeof( CudaMallocArgs );
 	break;
     case dscudaMemcpyH2DId: //thru
+	byte_size += sizeof( CudaMemcpyArgs );
+	break;
     case dscudaMemcpyD2HId: //thru
+	byte_size += sizeof( CudaMemcpyArgs );
+	break;
     case dscudaMemcpyD2DId:
-	byte_size += sizeof(struct CudaMemcpyArgs_t);
+	byte_size += sizeof( CudaMemcpyArgs );
+	WARN(3, "add hist cudaMemcpyD2D\n");
 	break;
     case dscudaMemcpyToSymbolH2DId: //thru
     case dscudaMemcpyToSymbolD2DId:
-	byte_size += sizeof(struct CudaMemcpyToSymbolArgs_t);
+	byte_size += sizeof( CudaMemcpyToSymbolArgs );
 	break;
     case dscudaFreeId:
-	byte_size += sizeof(struct CudaFreeArgs_t);
+	byte_size += sizeof( CudaFreeArgs );
 	break;
 	/*    
 	      case dscudaLoadModuleId:
 	      return DSCVMethodLoadModule;
 	*/
     case dscudaLaunchKernelId:
-	byte_size += sizeof(struct CudaRpcLaunchKernelArgs_t) + 32;
+	byte_size += sizeof( CudaRpcLaunchKernelArgs ) + 32;
 	// 32 is pseudo length of *kname.
 	break;
     default:
 	WARN(0, "%s():unknown kind of cuda api.\n", __func__);
 	exit(1);
     }
-    
-
 }
 /*
  * Clear all hisotry of calling cuda functions.
  */
-void HistRecList_t::clear(void) {
+void
+HistList::clear(void)
+{
    if (histrec != NULL) {
       for (int i=0; i < length; i++) {
          (releaseArgsStub[funcID2DSCVMethod( histrec[i].funcID)])(histrec[i].args);
@@ -467,23 +527,28 @@ void HistRecList_t::clear(void) {
    byte_size = 0;
 }
 
-void HistRecList_t::setRecallFlag(void) {
+void
+HistList::setRecallFlag(void)
+{
     recall_flag = 1;
 }
 
-void HistRecList_t::clrRecallFlag(void) {
+void
+HistList::clrRecallFlag(void)
+{
     recall_flag = 0;
 }
 
-void HistRecList_t::print(void)
+void
+HistList::print(void)
 {
-    WARN0(1, "<--- Record of CUDA API history Stack*************************************\n");
+    WARN0(1, "<--- Record of CUDA API history Stack  *******\n");
     if (this->length == 0) {
 	WARN0(1, "%s(): RecList[]> (Empty).\n", __func__);
 	return;
     }
     for (int i=0; i<length; i++) { /* Print recall history. */
-	WARN0(1, "    [%d] = #%lld:", i, histrec[i].seq_num);
+	WARN0(1, "        [%d] = #%lld:", i, histrec[i].seq_num);
 	switch (histrec[i].funcID) { /* see "dscudarpc.h" */
 	case 305: WARN0(1, "cudaSetDevice()\n");        break;
 	case 504: WARN0(1, "cudaEventRecord()\n");      break;
@@ -497,13 +562,15 @@ void HistRecList_t::print(void)
 	}
     }
     WARN0(1, "Occupied memory size is %d Byte.\n",  byte_size);
-    WARN0(1, "---> Record of CUDA API history  ******************************************\n");
+    WARN0(1, "---> Record of CUDA API history  *************\n");
 }
 /*
  * Rerun the recorded history of cuda function series.
  */
-int HistRecList_t::recall(void) {
-    WARN(9, "HistRecList_t::%s() {\n", __func__);
+int
+HistList::recall(void)
+{
+    WARN(9, "HistList::%s() {\n", __func__);
     static int called_depth = 0;
     int result;
     int verb_curr = St.autoverb;
@@ -534,10 +601,10 @@ int HistRecList_t::recall(void) {
 	result = 1;
    }
 
-    WARN(9, "} HistRecList_t::%s()\n", __func__);
+    WARN(9, "} HistList::%s()\n", __func__);
     St.autoverb = verb_curr;
     clrRecallFlag();
     
    return result;
-} // HistRecList_t::recall(void)
+} // HistList::recall(void)
 

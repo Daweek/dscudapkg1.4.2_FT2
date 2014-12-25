@@ -19,47 +19,48 @@
 //*** CUDA API arguments packing list.
 //***
 //**************************************************************************
-typedef struct CudaSetDeviceArgs_t {
-    int device;
-} cudaSetDeviceArgs;
-
-struct CudaMallocArgs_t {
-    void *devPtr;
-    size_t size;
-    CudaMallocArgs_t( void ) { devPtr = NULL, size = 0; }
-    CudaMallocArgs_t( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
+struct CudaSetDeviceArgs
+{
+    int      device;
 };
-
-typedef struct CudaMemcpyArgs_t {
-    void *dst;
-    void *src;
-    size_t count;
+struct CudaMallocArgs
+{
+    void    *devPtr;
+    size_t   size;
+    CudaMallocArgs(void) { devPtr = NULL, size = 0; }
+    CudaMallocArgs( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
+};
+struct CudaMemcpyArgs
+{
+    void    *dst;
+    void    *src;
+    size_t   count;
     enum cudaMemcpyKind kind;
-    CudaMemcpyArgs_t( void ) { dst = src = NULL; count = 0; }
-    CudaMemcpyArgs_t( void *d, void *s, size_t c, enum cudaMemcpyKind k ) {
+    CudaMemcpyArgs( void ) { dst = src = NULL; count = 0; }
+    CudaMemcpyArgs( void *d, void *s, size_t c, enum cudaMemcpyKind k ) {
 	dst = d; src = s; count = c; kind = k;
     }
-} cudaMemcpyArgs;
-
-typedef struct CudaMemcpyToSymbolArgs_t {
-    int *moduleid;
-    char *symbol;
-    void *src;
-    size_t count;
-    size_t offset;
-    enum cudaMemcpyKind kind;
-} cudaMemcpyToSymbolArgs;
-
-struct CudaFreeArgs_t {
-    void *devPtr;
 };
-
-typedef struct CudaLoadModuleArgs_t {
-    char *name;
-    char *strdata;
-} cudaLoadModuleArgs;
-
-typedef struct CudaRpcLaunchKernelArgs_t {
+struct CudaMemcpyToSymbolArgs
+{
+    int     *moduleid;
+    char    *symbol;
+    void    *src;
+    size_t   count;
+    size_t   offset;
+    enum cudaMemcpyKind kind;
+};
+struct CudaFreeArgs
+{
+    void    *devPtr;
+};
+struct CudaLoadModuleArgs
+{
+    char    *name;
+    char    *strdata;
+};
+struct CudaRpcLaunchKernelArgs
+{
     int      moduleid;
     int      kid;
     char    *kname;
@@ -68,8 +69,7 @@ typedef struct CudaRpcLaunchKernelArgs_t {
     RCsize   smemsize;
     RCstream stream;
     RCargs   args;
-} cudaRpcLaunchKernelArgs;
-
+};
 //************************************************************************
 //***  Class Name: "BkupMem_t"
 //***  Description:
@@ -80,16 +80,17 @@ typedef struct CudaRpcLaunchKernelArgs_t {
 //***    - In case when using device don't response from client request,
 //***    - migrate to another device and restore with clean data.
 //************************************************************************
-typedef struct BkupMem_t {
+struct BkupMem
+{
     void  *v_region;        // UVA, Search index, and also Virtual device address.
     void  *d_region;        //!UVA, server device memory space.
     void  *h_region;        //
     int    size;            // in Byte.
     int    update_rdy;      // 1:"*dst" has valid data, 0:invalid.
-    struct BkupMem_t *next; // For double-linked-list prev.
-    struct BkupMem_t *prev; // For double-linked-list next.
+    BkupMem *next; // For double-linked-list prev.
+    BkupMem *prev; // For double-linked-list next.
     /*constructor/destructor.*/
-    BkupMem_t( void );
+    BkupMem(void);
     //--- methods
     void   init(void *uva_ptr, void *d_ptr, int isize);
     int    isHead(void);
@@ -97,22 +98,23 @@ typedef struct BkupMem_t {
     int    calcSum(void);
     void  *translateAddrVtoD(const void *v_ptr);
     void  *translateAddrVtoH(const void *v_ptr);
-} BkupMem;
+};
 
 //********************************************************************
-//***  Class Name: "BkupMemList_t"
+//***  Class Name: "BkupMemList"
 //***  Description:
 //***      - 
 //********************************************************************
-typedef struct BkupMemList_t {
+struct BkupMemList
+{
 public:
     BkupMem *head;        /* pointer to 1st  BkupMem */
     BkupMem *tail;        /* pointer to last BkupMem */
     int      length;       /* Counts of allocated memory region */
     long     total_size;   /* Total size of backuped memory in Byte */
     //--- construct/destruct
-    BkupMemList_t(void);
-    ~BkupMemList_t(void);
+    BkupMemList(void);
+    ~BkupMemList(void);
     //--- methods ---------------
     void     print(void);
     BkupMem* query(void *uva_ptr);
@@ -126,7 +128,7 @@ public:
     void*    queryHostPtr(const void *v_ptr);
     void*    queryDevicePtr(const void *v_ptr);
     void     restructDeviceRegion(void);              /* ReLoad backups */
-} BkupMemList;
+};
 
 //********************************************************************
 //***
@@ -150,24 +152,25 @@ typedef enum {
     DSCVMethodEnd
 } DSCVMethod;
 //********************************************************************
-//***  Class Name: "HistRec_t"
+//***  Class Name: "HistCell"
 //***  Description:
 //***      - Recording the sequential CUDA-call.
 //********************************************************************
-typedef struct HistRec_t {
-    int64_t seq_num;  // unique id.
+struct HistCell
+{
+    int64_t seq_num;  // unique serial ID.
     int     funcID;   // Recorded cuda*() function.
     void   *args;     // And its arguments.
     int     dev_id;   // The Device ID, set by last cudaSetDevice().
-} HistRec;
-
+};
 //********************************************************************
-//***  Class Name: "HistRecList_t"
+//***  Class Name: "HistList"
 //***  Description:
 //***      - 
 //********************************************************************
-typedef struct HistRecList_t {
-    HistRec *histrec;
+struct HistList
+{
+    HistCell *histrec;
     int      length;    /* # of recorded function calls to be recalled */
     int      byte_size; // Total size of this history
     int      max_len;   /* Upper bound of "verbHistNum", extensible */
@@ -180,7 +183,7 @@ typedef struct HistRecList_t {
     void (*recallStub[DSCVMethodEnd])(void *);
     
     /*CONSTRUCTOR*/
-    HistRecList_t(void);
+    HistList(void);
     //
     void add(int funcID, void *argp);
     void clear(void);           /* Clear */
@@ -192,48 +195,48 @@ private:
     void     setRecallFlag(void);
     void     clrRecallFlag(void);
     void     extendLen(void);
-} HistRecList;
-
+};
 //********************************************************************
-//***  Class Name: "ClientModule_t"
+//***  Class Name: "PtxRecord"
 //***  Description:
 //***      - CUDA Kernel function module management for Client.
 //********************************************************************
-typedef struct PtxRecord_t {
+struct PtxRecord
+{
     int  valid;   //1:valid, 0:invalid.
     char name[RC_KMODULENAMELEN];
     char ptx_image[RC_KMODULEIMAGELEN]; //!Caution; may be Large size.
     /*CONSTRUCTOR*/
-    PtxRecord_t(void);
+    PtxRecord(void);
     /*METHODS*/
     void invalidate(void);
     void set(char *name0, char *ptx_image0);
-} PtxRecord_t;
-
-typedef struct PtxStore_t {
-    struct PtxRecord_t ptx_record[RC_NKMODULEMAX];
+};
+struct PtxStore
+{
+    PtxRecord ptx_record[RC_NKMODULEMAX];
     int used_count;
     /*CONSTRUCTOR*/
-    PtxStore_t(void);
+    PtxStore(void);
     /*METHODS*/
-    PtxRecord_t *add(char *name0, char *ptx_image0);
-    PtxRecord_t *query(char *name0);
+    PtxRecord *add(char *name0, char *ptx_image0);
+    PtxRecord *query(char *name0);
     void         print(int n);
     // Never remove items.
-} PtxStore_t;
-
+};
 //********************************************************************
-//***  Class Name: "ClientModule_t"
+//***  Class Name: "ClientModule"
 //***  Description:
 //********************************************************************
-typedef struct ClientModule_t {
+struct ClientModule
+{
     int    index;  
     int    id;     /*  that consists of the virtual one, returned from server. */
     int    valid;  /* 1=>alive, 0=>cache out, -1=>init val. */
-    PtxRecord_t *ptx_data;
+    PtxRecord *ptx_data;
     time_t sent_time;
     /*CONSTRUCTOR*/
-    ClientModule_t(void);
+    ClientModule(void);
     /*METHODS*/
     void validate() { valid = 1; }
     void invalidate() { valid = 0; }
@@ -247,81 +250,84 @@ typedef struct ClientModule_t {
 	    return 0;
 	}
     }
-
-} ClientModule;
+};
 
 //********************************************************************
-//***  Class Name: "RCmappedMem_t"
+//***  Class Name: "RCmappedMem"
 //***  Description:
 //********************************************************************
-typedef struct RCmappedMem_t {
-    void *pHost;
-    void *pDevice;
-    int   size;
-    RCmappedMem_t *prev;
-    RCmappedMem_t *next;
-} RCmappedMem;
+struct RCmappedMem
+{
+    void        *pHost;
+    void        *pDevice;
+    int          size;
+    RCmappedMem *prev;
+    RCmappedMem *next;
+};
 
 //********************************************************************
-//***  Class Name: "RCstreamArray_t"
+//***  Class Name: "RCstreamArray"
 //***  Description:
 //********************************************************************
-typedef struct RCstreamArray_t {
+struct RCstreamArray
+{
     cudaStream_t s[RC_NREDUNDANCYMAX];
-    RCstreamArray_t *prev;
-    RCstreamArray_t *next;
-} RCstreamArray;
-
+    RCstreamArray *prev;
+    RCstreamArray *next;
+};
 //********************************************************************
-//***  Class Name: "RCeventArray_t"
+//***  Class Name: "RCeventArray"
 //***  Description:
 //********************************************************************
-typedef struct RCeventArray_t {
+struct RCeventArray
+{
     cudaEvent_t e[RC_NREDUNDANCYMAX];
-    RCeventArray_t *prev;
-    RCeventArray_t *next;
-} RCeventArray;
-
+    RCeventArray *prev;
+    RCeventArray *next;
+};
 //********************************************************************
-//***  Class Name: "RCcuarrayArray_t"
+//***  Class Name: "RCcuarrayArray"
 //***  Description:
 //********************************************************************
-typedef struct RCcuarrayArray_t {
+struct RCcuarrayArray
+{
     cudaArray *ap[RC_NREDUNDANCYMAX];
-    RCcuarrayArray_t *prev;
-    RCcuarrayArray_t *next;
-} RCcuarrayArray;
-
+    RCcuarrayArray *prev;
+    RCcuarrayArray *next;
+};
 //********************************************************************
 //***  Class Name: "RCuva_t"
 //***  Description:
 //********************************************************************
-typedef struct RCuva_t {
-    void    *adr[RC_NREDUNDANCYMAX];
-    int      devid;
-    int      size;
-    RCuva_t *prev;
-    RCuva_t *next;
-} RCuva;
+struct RCuva
+{
+    void  *adr[RC_NREDUNDANCYMAX];
+    int    devid;
+    int    size;
+    RCuva *prev;
+    RCuva *next;
+};
 
-typedef enum FtMode_e {
-    //* Define basic behavior of Fault tolerant functions.
-    FT_PLAIN  = 0,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=0.
-    FT_REDUN  = 1,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=0.
-    FT_MIGRA  = 2,  // DSCUDA_AUTOVERB=0, DSCUDA_MIGRATION=1.
-    FT_BOTH   = 3,  // DSCUDA_AUTOVERB=1, DSCUDA_MIGRATION=1.
-    //
-    FT_INIT   = 4,  // 
-    FT_SPARE  = 5,  // Flag of alternate GPU
-    FT_BROKEN = 6,  // Flag of No more use.
-    FT_IGNORE = 7
-} FtMode;
+//**
+//** define FT mode for ClientState, VirtualDevice, and Physical one.
+//**
+enum FTmode { FT_NONE    = 0,   //-> No any Redundant or fault toleant behavior.
+	      FT_ERRSTAT = 1,   //-> count errors only, not corrected.
+	      FT_BYCPY   = 2,   //-> redundant data is verified every cudaMemcpyD2H.
+	      FT_BYTIMER = 3,   //-> redundant data is verified specified period.
+	      //;
+	      FT_SPARE   = 4,   //-> spare device
+	      FT_BROKEN  = 5,   //-> broken and replaced device
+	      FT_IGNORE  = 6,
+	      //;
+	      FT_UNDEF   = 999 };  //-> (Initial value, actually unused.)
 //********************************************************************
 //***  Class Name: "RCServer"
 //***  Description:
 //***      - Physical GPU Device Class.
 //********************************************************************
-typedef struct RCServer {
+struct RCServer
+{
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
                       // clients specify the server using this num preceded
@@ -329,15 +335,15 @@ typedef struct RCServer {
                       // export DSCUDA_SERVER="192.168.1.123:2"
     char        ip[512];      // IP address. ex. "192.168.0.92"
     char        hostname[64]; // Hostname.   ex. "titan01"
-    int         uniq;         // unique in all RCServer_t including svrCand[].
+    int         uniq;         // unique in all RCServer including svrCand[].
     
     BkupMemList memlist;      // GPU global memory mirroring region.
-    HistRecList reclist;      // GPU CUDA function called history.
+    HistList    reclist;      // GPU CUDA function called history.
     int         rec_en;
     
     int        *d_faultconf;  //
 
-    FtMode      ft_mode;      // Fault Tolerant mode.
+    enum FTmode ft_mode;      // Fault Tolerant mode.
     int         stat_error;   // Error  statics in redundant calculation.
     int         stat_correct; // Corrct statics in redundant calculation.
     
@@ -363,10 +369,10 @@ typedef struct RCServer {
     void setCID(int cid0);
     void setCID(char *cir_sz);
     void setUNIQ(int uniq0);
-    void setFTMODE(FtMode ft_mode0);
+    void setFTMODE(enum FTmode ft_mode0);
     /*METHODS*/
     int  setupConnection(void); // 0:success, -1:fail.
-    void dupServer(struct RCServer *dup);
+    void dupServer(RCServer *dup);
 
     cudaError_t cudaMalloc(void **d_ptr, size_t, struct rpc_err *);
     cudaError_t cudaFree(void *d_ptr, struct rpc_err *);
@@ -380,23 +386,24 @@ typedef struct RCServer {
 
     //<--- Migration series
     void rpcErrorHook(struct rpc_err *err);
-    void migrateServer(struct RCServer *spare);
+    void migrateServer(RCServer *spare);
     void migrateReallocAllRegions(void);
     void migrateDeliverAllRegions(void);
     void migrateDeliverAllModules(void);
     void migrateRebuildModulelist(void);
 
     void collectEntireRegions(void);
-} RCServer_t;  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
+};  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
 //***  Class Name: "ServerArray"
 //***  Description:
 //***      - The Group of Physical GPU Device Class.
 //*************************************************
-typedef struct ServerArray {
+struct ServerArray
+{
     int num;                      /* # of server candidates.         */
-    RCServer_t svr[RC_NVDEVMAX];  /* a list of candidates of server. */
+    RCServer svr[RC_NVDEVMAX];  /* a list of candidates of server. */
     /*CONSTRUCTOR*/
     ServerArray(void);
     //~ServerArray(void);
@@ -406,38 +413,39 @@ typedef struct ServerArray {
 //    void      removeArray(ServerArray *sub);
     RCServer *findSpareOne(void);
     RCServer *findBrokenOne(void);
-    void      captureEnv(char *env, FtMode ft_mode0);
+    void      captureEnv(char *env, enum FTmode ft_mode0);
     void      print(void);
-} ServerArray_t;
+};
 
 
-typedef enum VdevConf_e{
-    VDEV_MONO = 0, //Vdev_t.nredundancy == 1
+typedef enum VdevConf_e {
+    VDEV_MONO = 0, //VirDev.nredundancy == 1
     VDEV_POLY = 1, //                   >= 2
     VDEV_INVALID = 8,
     VDEV_UNKNOWN = 9
 } VdevConf;
 
 //*************************************************
-//***  Class Name: "VirDev_t"
+//***  Class Name: "VirDev"
 //***  Description:
 //***      - Virtualized GPU Device class.
 //*************************************************
-typedef struct VirDev_t {
+struct VirDev
+{
     int         id;
-    RCServer_t  server[RC_NREDUNDANCYMAX]; //Physical Device array.
+    RCServer    server[RC_NREDUNDANCYMAX]; //Physical Device array.
     int         nredundancy;               //Redundant count
 
-    FtMode      ft_mode;
+    enum FTmode ft_mode;
     VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
     BkupMemList memlist;              //part of Checkpoint data.
-    HistRecList reclist;
+    HistList    reclist;
     int         rec_en;
 
     /*CONSTRUCTOR*/
-    VirDev_t(void);
+    VirDev(void);
     /*CUDA kernel modules management*/
     ClientModule modulelist[RC_NKMODULEMAX];
     int         loadModule(char *name, char *strdata);
@@ -448,7 +456,7 @@ typedef struct VirDev_t {
     int         isRecordOn(void);
     int         setRecord(int rec_en0); // return current rec_en.
     
-    void        setFaultMode(enum FtMode_e fault_mode);
+    void        setFaultMode(enum FTmode fault_mode);
     void        setConfInfo(int redun);
     cudaError_t cudaMalloc(void **h_ptr, size_t size);
     cudaError_t cudaFree(void *d_ptr);
@@ -465,8 +473,7 @@ typedef struct VirDev_t {
     void  updateMemlist(int svr_id);
     void  restoreMemlist(void);
     void  clearReclist(void);
-
-} Vdev_t;
+}; // struct VirDev
 
 //*******************************************************************************
 //***  Class Name: "ClientState_t"                                              *
@@ -475,18 +482,19 @@ typedef struct VirDev_t {
 //*******************************************************************************
 void *periodicCheckpoint(void *arg);
 
-struct ClientState_t {
+struct ClientState
+{
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
     //static void *periodicCheckpoint(void *arg);
     void setFaultTolerantMode(void);
 public:
     //static int    Nvdev;             // # of virtual devices available.
-    //static Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
+    //static VirDev Vdev[RC_NVDEVMAX]; // list of virtual devices.
     int    Nvdev;             // # of virtual devices available.
-    Vdev_t Vdev[RC_NVDEVMAX]; // list of virtual devices.
+    VirDev Vdev[RC_NVDEVMAX]; // list of virtual devices.
 
-    FtMode       ft_mode;
+    enum FTmode  ft_mode;
                               /*** Static Information ***/
     unsigned int ip_addr;     // Client IP address.
     time_t       start_time;  // Clinet start time.
@@ -494,7 +502,7 @@ public:
 
     /* Mode */
     int use_ibv;             /* 1:IBV, 0:RPC   */
-    int autoverb;           /* 1:Redundant calculation */
+    int autoverb;           /* {0, 1, 2, 3} Redundant calculation level */
     int migration;
     int cp_period;          // Period of checkpoint [sec] defined by DSCUDA_CP_PERIOD
     int daemon;
@@ -508,8 +516,8 @@ public:
     //** --> DS-CUDA client log/err output files.
     
     /*CONSRUCTOR, DESTRUCTOR*/
-    ClientState_t(void);
-    ~ClientState_t(void);
+    ClientState(void);
+    ~ClientState(void);
     
     /*METHODS*/
     void setIpAddress(unsigned int val) { ip_addr = val; }
@@ -536,18 +544,15 @@ public:
     void  collectEntireRegions(void);
     int   verifyEntireRegions(void);
     void  udpateMemlist(void);
-}; // ClientState_t
+}; // ClientState
 
-extern struct ClientState_t St;
-extern struct PtxStore_t PtxStore;
-//extern int    ClientState_t::Nvdev;
-//extern Vdev_t ClientState_t::Vdev[RC_NVDEVMAX];   // list of virtual devices.
-
+extern ClientState St;
+extern PtxStore    Ptx;
 
 extern const char *DEFAULT_SVRIP;
 
-extern ServerArray_t SvrSpare;   // Alternative GPU Device Servers.
-extern ServerArray_t SvrIgnore;  // Forbidden GPU Device Servers.
+extern ServerArray SvrSpare;   // Alternative GPU Device Servers.
+extern ServerArray SvrIgnore;  // Forbidden GPU Device Servers.
 
 extern int    Vdevid[RC_NPTHREADMAX];
 //extern struct rdma_cm_id *Cmid[RC_NVDEVMAX][RC_NREDUNDANCYMAX];
@@ -565,7 +570,7 @@ int  vdevidIndex(void);
 
 int  dscudaLoadModule(char *srcname, char *strdata);
 void
-checkResult(void *rp, RCServer_t &sp);
+checkResult(void *rp, RCServer &sp);
 cudaError_t cudaSetDevice_clnt( int device, int errcheck );
 
 cudaError_t
@@ -608,7 +613,7 @@ void *dscudaUvaOfAdr(void *adr, int devid);
 void *dscudaAdrOfUva(void *adr);
 int   dscudaDevidOfUva(void *adr);
 void
-replaceBrokenServer(RCServer_t *broken, RCServer_t *spare);
+replaceBrokenServer(RCServer *broken, RCServer *spare);
 
 cudaError_t
 dscudaBindTextureWrapper(int *moduleid, char *texname,
