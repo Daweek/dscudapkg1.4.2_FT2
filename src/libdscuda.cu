@@ -1194,38 +1194,32 @@ getenvDSCUDA_PATH(void)
 /*
  *
  */
+static void
+getenvBool(const char *envname, bool var) {
+    char *env = getenv(envname);
+    int   val = atoi(env);
+    if (env==NULL || val==0) ft_opt.D2H_statics = false;
+    else                     ft_opt.D2H_statics = true;
+}
 void
-ClientState::setFaultTolerantMode(void)
-{
+ClientState::setFaultTolerantMode(void) {
     char *env;
-
+    int  val;
     env = getenv( "DSCUDA_USEDAEMON" );
-    if (env == NULL) {
-	daemon = 0;
-    } else {
-	daemon = atoi(env);
-    }
+    if (env==NULL) daemon = 0;
+    else           daemon = atoi(env);
     
-    env = getenv( "DSCUDA_AUTOVERB" );
-    if (env == NULL) {
-	autoverb = 0;
-    } else {
-	autoverb = atoi(env); //** {0,1,2,3}
-    }
-
     env = getenv( "DSCUDA_MIGRATION" );
-    if (env == NULL) {
-	migration = 0;
-    } else {
-	migration = atoi(env);
-    }
+    if (env==NULL) migration = 0;
+    else           migration = atoi(env);
 
     env = getenv( "DSCUDA_CP_PERIOD" );
-    if (env == NULL) {
-	cp_period = 60;
-    } else {
-	cp_period = atoi(env);
-    }
+    if (env==NULL) cp_period = 60;
+    else           cp_period = atoi(env);
+    
+    env = getenv( "DSCUDA_AUTOVERB" );
+    if (env==NULL) autoverb = 0;
+    else           autoverb = atoi(env); //** {0,1,2,3}
 
     //<--- Define Fault Tolerant behavior from env.var.
     switch (autoverb) {
@@ -1247,6 +1241,20 @@ ClientState::setFaultTolerantMode(void)
     }
     //---> Define Fault Tolerant behavior from env.var.
 
+    getenvBool( "DSCUDA_FT_1",  ft_opt.d2h_reduncpy  );
+    getenvBool( "DSCUDA_FT_2",  ft_opt.d2h_compare   );
+    getenvBool( "DSCUDA_FT_3",  ft_opt.d2h_statics   );
+    getenvBool( "DSCUDA_FT_4",  ft_opt.d2h_rollback  );
+    //
+    getenvBool( "DSCUDA_FT_8",  ft_opt.cp_priodic    );
+    getenvBool( "DSCUDA_FT_9",  ft_opt.cp_reduncpy   );
+    getenvBool( "DSCUDA_FT_10", ft_opt.cp_compare    );
+    getenvBool( "DSCUDA_FT_11", ft_opt.cp_statics    );
+    getenvBool( "DSCUDA_FT_12", ft_opt.cp_rollback   );
+    //
+    getenvBool( "DSCUDA_FT_16", ft_opt.rec_en        );
+    getenvBool( "DSCUDA_FT_16", ft_opt.gpu_migrate   );
+
     //<--- copy same value to virtual and physical device.
     for (int i=0; i<RC_NVDEVMAX; i++) {
 	Vdev[i].ft_mode = this->ft_mode;
@@ -1258,10 +1266,7 @@ ClientState::setFaultTolerantMode(void)
 
     if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
 	for (int i=0; i<RC_NVDEVMAX; i++) {
-	    Vdev[i].rec_en = 1;
-	    for (int k=0; k<Vdev[i].nredundancy; k++) {
-		Vdev[i].server[k].rec_en = 1;
-	    }
+	    Vdev[i].recordON();
 	}
     }
 } //---> void ClientState::setFaultTolerantMode(void)
@@ -1272,8 +1277,7 @@ ClientState::setFaultTolerantMode(void)
  * time period. The period is defined in second.
  */
 void*
-periodicCheckpoint(void *arg)
-{
+periodicCheckpoint(void *arg) {
     int         cp_period = *(int *)arg;
     int         age = 0;
     int         devid;
@@ -1362,8 +1366,7 @@ periodicCheckpoint(void *arg)
  * Client initializer.
  * This function may be executed in parallel threads, so need mutex lock.
  */
-ClientState::ClientState(void)
-{
+ClientState::ClientState(void) {
     // Open dscuda output file.
     {
 	char curr_time[80];
@@ -2236,8 +2239,7 @@ cudaSetDevice_clnt(int device, int errcheck)
 }
 
 cudaError_t
-cudaSetDevice(int device)
-{
+cudaSetDevice(int device) {
     cudaError_t cuerr    = cudaSuccess;
     int         errcheck = 0; 
     WARN(3, "%s(%d) {\n", __func__, device);
@@ -2333,7 +2335,7 @@ cudaDeviceDisablePeerAccess(int peerDevice)
 void
 VirDev::remallocRegionsGPU(int num_svr)
 {
-    BkupMem *mem = memlist.head;
+    BkupMem *mem = memlist.headPtr();
     int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;

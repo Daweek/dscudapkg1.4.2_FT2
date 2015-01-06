@@ -305,14 +305,14 @@ recallMemcpyH2D(void *argp)
     CudaMemcpyArgs *argsrc;
     int         vdevid = Vdevid[ vdevidIndex() ];
     VirDev     *vdev   = St.Vdev + vdevid;
-    int         rec_en_stack;
+    bool rec_en_stack = vdev->isRecording();
     
     argsrc = (CudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyH2D() \n");
 
-    rec_en_stack = vdev->setRecord(0);
+    vdev->recordOFF();
     vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
-    vdev->setRecord(rec_en_stack);
+    if (rec_en_stack) vdev->recordON();
     WARN(3, "\n");
 }
 
@@ -334,14 +334,14 @@ recallMemcpyD2H(void *argp)
     CudaMemcpyArgs *argsrc;
     int         vdevid = Vdevid[ vdevidIndex() ];
     VirDev     *vdev   = St.Vdev + vdevid;
-    int         rec_en_stack;
+    bool rec_en_stack = vdev->isRecording();
 
     argsrc = (CudaMemcpyArgs *)argp;
     WARN(3, "Recall cudaMemcpyD2H()...\n");
 
-    rec_en_stack = vdev->setRecord(0);
+    vdev->recordOFF();
     vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
-    vdev->setRecord(rec_en_stack);
+    if (rec_en_stack) vdev->recordON();
     WARN(3, "\n");
 }
 
@@ -387,11 +387,11 @@ recallRpcLaunchKernel(void *argp)
 #if 0
     rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
 #else
-    int         rec_en_stack;
     VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    rec_en_stack = vdev->setRecord(0);
+    bool rec_en_stack = vdev->isRecording();
+    vdev->recordOFF();
     vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
-    vdev->setRecord(rec_en_stack);
+    if (rec_en_stack) vdev->recordON();
 #endif
 }
 
@@ -459,14 +459,12 @@ HistList::extendLen(void)
  * Add one item to called histry of CUDA API. 
  */
 void
-HistList::add(int funcID, void *argp)
+HistList::append(int funcID, void *argp)
 {
     int DSCVMethodId;
-
     if (length == max_len) { /* Extend the existing memory region. */
 	extendLen();
     }
-
     DSCVMethodId = funcID2DSCVMethod(funcID);
     histrec[length].seq_num = add_count;
     histrec[length].args    = (storeArgsStub[funcID2DSCVMethod(funcID)])(argp);
@@ -515,7 +513,7 @@ HistList::add(int funcID, void *argp)
 	WARN(0, "%s():unknown kind of cuda api.\n", __func__);
 	exit(1);
     }
-}
+}//append
 /*
  * Clear all hisotry of calling cuda functions.
  */

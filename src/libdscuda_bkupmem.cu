@@ -30,20 +30,20 @@ BkupMem::BkupMem(void)
 /*
  * Is this BkupMem is the "head" of list?
  */
-int
+bool
 BkupMem::isHead(void)
 {
-    if (prev == NULL) { return 1; }
-    else              { return 0; }
+    if (prev == NULL) return true;
+    else              return false;
 }
 /*
  * Is this BkupMem is the "tail" of list?
  */
-int
-BkupMem::isTail( void )
+bool
+BkupMem::isTail(void)
 {
-    if (next == NULL) { return 1; }
-    else              { return 0; }
+    if (next == NULL) return true;
+    else              return false;
 }
 void*
 BkupMem::translateAddrVtoD(const void *v_ptr)
@@ -156,14 +156,14 @@ BkupMemList::getTotalSize(void)
     return total_size;
 }
 
-int
-BkupMemList::isEmpty( void )
+bool
+BkupMemList::isEmpty(void)
 {
-    if      ( head==NULL && tail==NULL ) return 1;
-    else if ( head!=NULL && tail!=NULL ) return 0;
+    if      ( head==NULL && tail==NULL ) return true;
+    else if ( head!=NULL && tail!=NULL ) return false;
     else {
 	fprintf( stderr, "Unexpected error in %s().\n", __func__ );
-	exit( EXIT_FAILURE );
+	exit(EXIT_FAILURE);
     }
 }
 
@@ -215,7 +215,7 @@ BkupMemList::query(void *uva_ptr)
  * Add the BkupMem cell at the tail of List.
  */
 void
-BkupMemList::add(void *uva_ptr, void *d_ptr, int size)
+BkupMemList::append(void *uva_ptr, void *d_ptr, int size)
 {
     BkupMem *mem;
     
@@ -252,17 +252,19 @@ BkupMemList::remove(void *uva_ptr)
 	WARN(0, "mem. list length= %d \n", countRegion());
 	this->print();
 	return;
-    } else if (mem->isHead()) { // remove head cell.
+    }
+    else if (mem->isHead()) { // remove head cell.
 	head = mem->next;
 	if (head != NULL) {
 	    head->prev = NULL;
 	}
-    } else if (mem->isTail()) { // remove tail cell.
+    }
+    else if (mem->isTail()) { // remove tail cell.
 	tail = mem->prev;
-    } else { // remove a intermediate cell.
+    }
+    else { // remove a intermediate cell.
 	mem->prev->next = mem->next;
     }
-
     // delete removed cell.
     total_size -= mem->size;    
     free(mem->h_region);

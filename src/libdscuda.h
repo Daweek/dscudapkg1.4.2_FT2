@@ -82,22 +82,24 @@ struct CudaRpcLaunchKernelArgs
 //************************************************************************
 struct BkupMem
 {
+public:
+    BkupMem* prev;            // For double-linked-list next.
+    BkupMem* next;            // For double-linked-list prev.
     void*    v_region;        // UVA, Search index, and also Virtual device address.
     void*    d_region;        //!UVA, server device memory space.
     void*    h_region;        //
     int      size;            // in Byte.
     int      update_rdy;      // 1:"*dst" has valid data, 0:invalid.
-    BkupMem* next;            // For double-linked-list prev.
-    BkupMem* prev;            // For double-linked-list next.
     /*constructor/destructor.*/
              BkupMem(void);
     //--- methods
+    bool     isHead(void);
+    bool     isTail(void);
     void     init(void *uva_ptr, void *d_ptr, int isize);
-    int      isHead(void);
-    int      isTail(void);
     int      calcSum(void);
     void*    translateAddrVtoD(const void *v_ptr);
     void*    translateAddrVtoH(const void *v_ptr);
+private:
 };
 //********************************************************************
 //***  Class Name: "BkupMemList"
@@ -107,19 +109,15 @@ struct BkupMem
 struct BkupMemList
 {
 public:
-    BkupMem *head;        /* pointer to 1st  BkupMem */
-    BkupMem *tail;        /* pointer to last BkupMem */
-    int      length;       /* Counts of allocated memory region */
-    long     total_size;   /* Total size of backuped memory in Byte */
     //--- construct/destruct
-    BkupMemList(void);
-    ~BkupMemList(void);
+             BkupMemList(void);
+             ~BkupMemList(void);
     //--- methods ---------------
     void     print(void);
+    BkupMem* headPtr(void);
     BkupMem* query(void *uva_ptr);
-    void     add(void *uva_ptr, void *dst, int size);
+    void     append(void *uva_ptr, void *dst, int size);
     void     remove(void *uva_ptr);        // verbAllocatedMemUnregister()
-    int      isEmpty(void);
     int      getLen(void);
     long     getTotalSize(void); // get total size of allocated memory.
     int      countRegion(void);
@@ -127,6 +125,12 @@ public:
     void*    queryHostPtr(const void *v_ptr);
     void*    queryDevicePtr(const void *v_ptr);
     void     restructDeviceRegion(void);              /* ReLoad backups */
+private:
+    BkupMem* head;        /* pointer to 1st  BkupMem */
+    BkupMem* tail;        /* pointer to last BkupMem */
+    int      length;       /* Counts of allocated memory region */    
+    long     total_size;   /* Total size of backuped memory in Byte */
+    bool     isEmpty(void);
 };
 //********************************************************************
 //***
@@ -181,7 +185,8 @@ struct HistList
     /*CONSTRUCTOR*/
     HistList(void);
     //
-    void add(int funcID, void *argp);
+    //void add(int funcID, void *argp);
+    void append(int funcID, void *argp);
     void clear(void);           /* Clear */
     void print(void);           /* Print to stdout */
     int  recall(void);          /* Recall */
@@ -317,6 +322,29 @@ enum FTmode { FT_NONE    =0,   //-> No any Redundant or fault toleant behavior.
 	      FT_IGNORE  =6,
 	      //;
 	      FT_UNDEF   =999 };  //-> (Initial value, actually unused.)
+struct FToption {   //-*- Static configuration -*-
+    //[0]
+    bool d2h_reduncpy; //[1] 
+    bool d2h_compare;  //[2] "true": compare data between redundant recieved.
+    bool d2h_statics;  //[3] "true": count unmatched or matched.
+    bool d2h_rollback; //[4] "true": enable rollback.
+    //[5]
+    //[6]
+    //[7]
+    bool cp_periodic;  //[8]
+    bool cp_reduncpy;  //[9]
+    bool cp_compare;   //[10] "true": compare data between redundant recieved.
+    bool cp_statics;   //[11]
+    bool cp_rollback;  //[12]
+    //[13]
+    //[14]
+    //[15]
+    bool rec_en;       //[16]
+    //
+    bool gpu_migrate;  //[24]
+    //[17...]
+};
+
 //********************************************************************
 //***  Class Name: "RCServer"
 //***  Description:
@@ -324,6 +352,7 @@ enum FTmode { FT_NONE    =0,   //-> No any Redundant or fault toleant behavior.
 //********************************************************************
 struct RCServer
 {
+public:
     int         id;   // index for each redundant server.
     int         cid;  // id of a server given by -c option to dscudasvr.
                       // clients specify the server using this num preceded
@@ -335,11 +364,21 @@ struct RCServer
     
     BkupMemList memlist;      // GPU global memory mirroring region.
     HistList    reclist;      // GPU CUDA function called history.
-    int         rec_en;
-    
+    //<--- record history of CUDA API ON/OFF dynamically.
+    void        recordON(void);    // switch to enable.
+    void        recordOFF(void);   // switch to disable.
+    bool        isRecording(void); // get current stat.
+    void        appendRecord(int funcID, void *argp);
+private:
+    bool        history_recording; //
+    //--->
+public:
     int        *d_faultconf;  //
 
+    //<-- Fault tolerant static configurations.
     FTmode      ft_mode;      // Fault Tolerant mode.
+    FToption    ft_opt;
+    //--> 
     int         stat_error;   // Error  statics in redundant calculation.
     int         stat_correct; // Corrct statics in redundant calculation.
     
@@ -356,8 +395,6 @@ struct RCServer
     int         queryModuleID(int module_index);
     void        invalidateModuleCache(void);
     /*RECORDING HISTORY*/
-    int         isRecordOn(void);
-    int         setRecord(int rec_en0); // return current rec_en.
 
     /*SETTER*/
     void setIP(const char *ip0);
@@ -379,7 +416,6 @@ struct RCServer
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
 			     RCdim3 bdim, RCsize smemsize, RCstream stream,
 			     RCargs args, struct rpc_err *);
-
     //<--- Migration series
     void rpcErrorHook(struct rpc_err *err);
     void migrateServer(RCServer *spare);
@@ -387,7 +423,7 @@ struct RCServer
     void migrateDeliverAllRegions(void);
     void migrateDeliverAllModules(void);
     void migrateRebuildModulelist(void);
-
+    //--->
     void collectEntireRegions(void);
 };  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
@@ -424,18 +460,31 @@ enum VdevConf {  VDEV_MONO    = 0, //VirDev.nredundancy == 1
 //*************************************************
 struct VirDev
 {
+public:
     int         id;
     RCServer    server[RC_NREDUNDANCYMAX]; //Physical Device array.
     int         nredundancy;               //Redundant count
-
+    
+    //<-- Fault tolerant function control 
     FTmode      ft_mode;
+    FToption    ft_opt;
+    //--> Fault tolerant function control
+    
     VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
     BkupMemList memlist;              //part of Checkpoint data.
     HistList    reclist;
-    int         rec_en;
-
+    //<--- CUDA API recording ON/OFF dynamically.
+public:
+    void        recordON(void); 
+    void        recordOFF(void);
+    bool        isRecording(void);
+    void        appendRecord(int funcID, void *argp);
+private:
+    bool        history_recording;
+    //---> CUDA API recording ON/OFF dynamically.
+public:
     /*CONSTRUCTOR*/
     VirDev(void);
     /*CUDA kernel modules management*/
@@ -445,8 +494,7 @@ struct VirDev
     void        invalidateAllModuleCache(void);
     void        printModuleList(void);
     /*HISTORY RECORDING*/
-    int         isRecordOn(void);
-    int         setRecord(int rec_en0); // return current rec_en.
+
     
     void        setFaultMode(FTmode fault_mode);
     void        setConfInfo(int redun);
@@ -476,26 +524,17 @@ void *periodicCheckpoint(void *arg);
 
 struct ClientState
 {
-private:
-    pthread_t tid;        /* thread ID of Checkpointing */
-    //static void *periodicCheckpoint(void *arg);
-    void setFaultTolerantMode(void);
 public:
     //static int    Nvdev;             // # of virtual devices available.
     //static VirDev Vdev[RC_NVDEVMAX]; // list of virtual devices.
     int    Nvdev;             // # of virtual devices available.
     VirDev Vdev[RC_NVDEVMAX]; // list of virtual devices.
-
-    FTmode  ft_mode;
-                              /*** Static Information ***/
-    unsigned int ip_addr;     // Client IP address.
-    time_t       start_time;  // Clinet start time.
-    time_t       stop_time;   // Client stop time.
+    FTmode   ft_mode;
+    FToption ft_opt;
 
     /* Mode */
     int use_ibv;             /* 1:IBV, 0:RPC   */
     int autoverb;           /* {0, 1, 2, 3} Redundant calculation level */
-    int migration;
     int cp_period;          // Period of checkpoint [sec] defined by DSCUDA_CP_PERIOD
     int daemon;
     int historical_calling;
@@ -503,8 +542,6 @@ public:
     //** <-- DS-CUDA client log/err output files.
     FILE *dscuda_stdout;     // log-file descriptor.
     FILE *dscuda_stderr;     // err-file descriptor.
-    char dslog_filename[80]; // ex.) "c20141224_235901.dslog", 'c' means clnt.
-    char dserr_filename[80]; // ex.) "c20141224_235901.dserr", 'c' means clnt.
     //** --> DS-CUDA client log/err output files.
     
     /*CONSRUCTOR, DESTRUCTOR*/
@@ -512,8 +549,7 @@ public:
     ~ClientState(void);
     
     /*METHODS*/
-    void setIpAddress(unsigned int val) { ip_addr = val; }
-    unsigned int getIpAddress() { return ip_addr; }
+    unsigned getIpAddress() { return ip_addr; }
     void initVirtualDeviceList(void); // Update the list of virtual devices
     
     void useIbv() { use_ibv = 1; }
@@ -525,17 +561,25 @@ public:
     void unsetAutoVerb() { autoverb = 0; }
     int  isAutoVerb(void)    { return autoverb; }
 
-     void   setHistoCalling() { historical_calling = 1; }
+    void   setHistoCalling() { historical_calling = 1; }
     void unsetHistoCalling() { historical_calling = 0; }
     int  isHistoCalling()   { return historical_calling; }
 
-    void setMigrateDevice(int val=1) { migration = val; }
-    void unsetMigrateDevice() { migration = 0; }
-    int  getMigrateDevice() { return migration; }
     /*CHECKPOINT*/
     void  collectEntireRegions(void);
     int   verifyEntireRegions(void);
     void  udpateMemlist(void);
+private:
+    pthread_t tid;        /* thread ID of Checkpointing */
+    unsigned  ip_addr;     // Client IP address.
+    //<-- Error/Fault Static Information
+    time_t    start_time;  // Clinet start time.
+    time_t    stop_time;   // Client stop time.
+    //<-- DSCUDA log filename.
+    char      dslog_filename[80]; // ex.) "c20141224_235901.dslog", 'c' means clnt.
+    char      dserr_filename[80]; // ex.) "c20141224_235901.dserr", 'c' means clnt.
+    void setIpAddress(unsigned int val) { ip_addr = val; }
+    void setFaultTolerantMode(void);
 }; // ClientState
 
 extern ClientState St;
