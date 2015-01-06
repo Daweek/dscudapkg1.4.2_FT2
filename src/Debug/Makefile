@@ -50,7 +50,7 @@ libdscuda_rpc.so: $(LIBDSCUDA_OBJ)
 	@echo "//************************"
 	@echo "//**  libdscuda_rpc.so  ***"
 	@echo "//************************"
-	$(CXX) -shared -Wl,-soname,libdscuda.so -o $@ $^
+	$(CXX) -O0 -g -shared -Wl,-soname,libdscuda.so -o $@ $^
 #----
 libdscuda_rpc.a: $(LIBDSCUDA_OBJ)
 	ar rvu $@ $^
@@ -58,29 +58,29 @@ libdscuda_rpc.a: $(LIBDSCUDA_OBJ)
 #
 #---- "libdscuda_rpc.o"
 libdscuda_rpc.o  : libdscuda_rpc.cu
-	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+	$(NVCC) -DRPC_ONLY=1 $(CUDAINCLUDES) -O0 -g -c -Xcompiler -fPIC -o $@ $<
 #
 #---- "libdscuda.o"
 $(CLIENTBASE) : libdscuda.cu
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+	$(NVCC) $(CUDAINCLUDES) -O0 -g -c -Xcompiler -fPIC -o $@ $<
 
 #---- A dummy library to override CUDA runtime library functions.
 libcudart.so.3:	cudart_dummy.cu
-	$(NVCC) $(CUDAINCLUDES) -shared -Xcompiler -fPIC -o $@ $<
+	$(NVCC) $(CUDAINCLUDES) -O0 -g -shared -Xcompiler -fPIC -o $@ $<
 #
 #---- "fault torelant" routine.
 libdscuda_bkupmem.o: libdscuda_bkupmem.cu libdscuda.h
 	@echo "//***************************"
 	@echo "//**  libdscuda_bkupmem.o  **"
 	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+	$(NVCC) $(CUDAINCLUDES) -c -O0 -g -Xcompiler -fPIC -o $@ $<
 #
 #---- "checkpoint" routine.
 libdscuda_histrec.o:  libdscuda_histrec.cu libdscuda.h
 	@echo "//***************************"
 	@echo "//**  libdscuda_histrec.o  **"
 	@echo "//***************************"		
-	$(NVCC) $(CUDAINCLUDES) -c -Xcompiler -fPIC -o $@ $<
+	$(NVCC) $(CUDAINCLUDES) -c -O0 -g -Xcompiler -fPIC -o $@ $<
 #---- "dscudad"
 dscudad: dscudad.o sockutil.o dscudautil.o 
 	@echo "//****************"

@@ -3,8 +3,8 @@
 
 #define RC_NSERVERMAX     4 // max # of servers per node.
 #define RC_NDEVICEMAX     4 // max # of GPU devices per node.
-#define RC_NREDUNDANCYMAX 16 // max redundancy per server.
-#define RC_NVDEVMAX       16 // max # of virtual devices per client.
+#define RC_NREDUNDANCYMAX 4 // max redundancy per server.
+#define RC_NVDEVMAX       4 // max # of virtual devices per client.
 #define RC_NPTHREADMAX    32 // max # of pthreads which use virtual devices.
 #define RC_UNIQ_CANDBASE  65536
 #define RC_UNIQ_INVALID   -1

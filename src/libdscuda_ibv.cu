@@ -49,7 +49,7 @@ dscudaRemoteCallType(void)
 }
 
 void
-setupConnection(int idev, RCServer *sp)
+setupConnection(int idev, PhyDev *sp)
 {
     struct addrinfo *addr;
     struct rdma_cm_id *cmid= NULL;
@@ -155,7 +155,7 @@ perform_remote_call(IbvConnection *conn, RCMethod *methodp, int sendsize, RCMeth
 }
 
 void
-checkResult(void *rp, RCServer *sp)
+checkResult(void *rp, PhyDev *sp)
 {
     // a dummy func.
 }
@@ -384,7 +384,7 @@ cudaFree(void *mem)
     initClient();
     WARN(3, "cudaFree(0x%08llx)...", (unsigned long)mem);
     VirDev *vdev = Vdev + Vdevid[vid];
-    RCServer *sp = vdev->server;
+    PhyDev *sp = vdev->server;
     for (int i = 0; i < vdev->nredundancy; i++, sp++) {
         SETUP_IBV_PACKET_BUF(Free, Vdevid[vid], i);
         spkt->devAdr = (RCadr)mem;

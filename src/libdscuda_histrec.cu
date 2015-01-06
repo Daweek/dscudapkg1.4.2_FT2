@@ -17,19 +17,6 @@
 
 #define DEBUG
 
-static int
-checkSum(void *targ, int size)
-{
-    int sum=0, *ptr = (int *)targ;
-    
-    for (int s=0; s<size; s+=sizeof(int)) {
-	//printf("ptr[%d]= %d\n", s, *ptr);
-	sum += *ptr;
-	ptr++;
-    }
-    return sum;
-}
-
 #define DSCUDAVERB_SET_STUBS(mthd) \
   storeArgsStub[DSCVMethod ## mthd] = store ## mthd; \
   releaseArgsStub[DSCVMethod ## mthd] = release ## mthd; \
@@ -42,364 +29,47 @@ checkSum(void *targ, int size)
   argdst = (Cuda ## mthd ## Args *)malloc(sizeof(Cuda ## mthd ## Args)); \
   *argdst = *(Cuda ## mthd ## Args *)argp;
 
-//mapping RPCfunctionID to DSCUDAVerbMethodID
-static DSCVMethod
-funcID2DSCVMethod(int funcID)
-{
-    switch (funcID) {
-    case dscudaSetDeviceId:
-	return DSCVMethodSetDevice;
-    case dscudaMallocId:
-	return DSCVMethodMalloc;
-    case dscudaMemcpyH2DId:
-	return DSCVMethodMemcpyH2D;
-    case dscudaMemcpyD2DId:
-	return DSCVMethodMemcpyD2D;
-    case dscudaMemcpyD2HId:
-	return DSCVMethodMemcpyD2H;
-    case dscudaMemcpyToSymbolH2DId:
-	return DSCVMethodMemcpyToSymbolH2D;
-    case dscudaMemcpyToSymbolD2DId:
-	return DSCVMethodMemcpyToSymbolD2D;
-    case dscudaFreeId:
-	return DSCVMethodFree;
-	/*    
-	      case dscudaLoadModuleId:
-	      return DSCVMethodLoadModule;
-	*/
-    case dscudaLaunchKernelId:
-	return DSCVMethodRpcLaunchKernel;
-    default:
-	return DSCVMethodNone;
-    }
-}
+static DSCVMethod funcID2DSCVMethod(int funcID);
+//--- "store" function series
+static void* storeSetDevice         (void*);
+static void* storeMalloc            (void*);
+static void* storeFree              (void*);
+static void* storeMemcpyH2D         (void*);
+static void* storeMemcpyD2H         (void*);
+static void* storeMemcpyD2D         (void*);
+static void* storeMemcpyToSymbolH2D (void*);
+static void* storeMemcpyToSymbolD2D (void*);
+static void* storeLoadModule        (void*);
+static void* storeRpcLaunchKernel   (void*);
+//--- "release" function series
+static void releaseSetDevice        (void*);
+static void releaseMalloc           (void*);
+static void releaseFree             (void*);
+static void releaseMemcpyH2D        (void*);
+static void releaseMemcpyD2H        (void*);
+static void releaseMemcpyD2D        (void*);
+static void releaseMemcpyToSymbolH2D(void*);
+static void releaseMemcpyToSymbolD2D(void*);
+static void releaseLoadModule       (void*);
+static void releaseRpcLaunchKernel  (void*);
+//--- "recall" function series
+static void recallSetDevice         (void*);
+static void recallMalloc            (void*);
+static void recallFree              (void*);
+static void recallMemcpyH2D         (void*);
+static void recallMemcpyD2H         (void*);
+static void recallMemcpyD2D         (void*);
+static void recallMemcpyToSymbolH2D (void*);
+static void recallMemcpyToSymbolD2D (void*);
+static void recallLoadModule        (void*);
+static void recallRpcLaunchKernel   (void*);
 
-//stubs for store args
-static void*
-storeSetDevice(void *argp)
-{
-    DSCUDAVERB_STORE_ARGS(SetDevice); 
-    return argdst;
-}
 
-static void *
-storeMalloc(void *argp)
-{
-    //nothing to do
-    return NULL;
-}
-
-static void *
-storeMemcpyH2D(void *argp)
-{
-    DSCUDAVERB_STORE_ARGS(Memcpy);
-    argdst->src = malloc(argsrc->count + 1);
-    memcpy(argdst->src, (const void *)argsrc->src, argsrc->count);
-    return argdst;
-}
-
-static void*
-storeMemcpyD2D(void *argp)
-{
-    DSCUDAVERB_STORE_ARGS(Memcpy);
-    return argdst;
-}
-
-static void*
-storeMemcpyD2H(void *argp)
-{
-    DSCUDAVERB_STORE_ARGS(Memcpy);
-    return argdst;
-}
-
-static void*
-storeMemcpyToSymbolH2D(void *argp)
-{
-    WARN(3, "add hist cudaMemcpyToSymbolH2D\n");
-    DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
-    
-    int nredundancy = dscudaNredundancy();
-    argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
-    memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
-  
-    argdst->symbol = (char *)malloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
-    argdst->src = malloc(argsrc->count);
-    
-    strcpy(argdst->symbol, argsrc->symbol);
-    memcpy(argdst->src, argsrc->src, argsrc->count);
-
-    return argdst;
-}
-
-static void*
-storeMemcpyToSymbolD2D(void *argp)
-{
-    WARN(3, "add hist cudaMemcpyToSymbolD2D\n");
-    DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
-
-    int nredundancy = dscudaNredundancy();
-    argdst->moduleid = (int *)dscuda::xmalloc(sizeof(int) * nredundancy);
-    
-    memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
-
-    argdst->symbol = (char *)dscuda::xmalloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
-
-    strcpy(argdst->symbol, argsrc->symbol);
-    
-    return argdst;
-}
-
-static void*
-storeFree(void *argp)
-{
-    //nothing to do
-    return NULL;
-}
-
-static void*
-storeLoadModule(void *argp)
-{
-    DSCUDAVERB_STORE_ARGS(LoadModule);
-    argdst->name = (char *)malloc(sizeof(char) * (strlen(argsrc->name) + 1));
-    argdst->strdata = (char *)malloc(sizeof(char) * (strlen(argsrc->strdata) + 1));
-    strcpy(argdst->name, argsrc->name);
-    strcpy(argdst->strdata, argsrc->strdata);
-    return argdst;
-}
-
-static void*
-storeRpcLaunchKernel(void *argp)
-{
-    WARN(3, "add hist RpcLaunchKernel\n");
-    DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
-
-    int nredundancy = dscudaNredundancy();
-    //argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
-    //memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
-    argdst->moduleid = argsrc->moduleid;
-    
-    argdst->kname = (char *)malloc(sizeof(char) * strlen(argsrc->kname) + 1);
-    strcpy(argdst->kname, argsrc->kname);
-    
-    int narg = argsrc->args.RCargs_len;
-    RCarg *rpcargbuf = (RCarg *)malloc(sizeof(RCarg) * narg);
-    memcpy(rpcargbuf, argsrc->args.RCargs_val, sizeof(RCarg) * narg);
-    argdst->args.RCargs_val = rpcargbuf;
-
-    return argdst;
-}
-
-//stubs for release args
-static void
-releaseSetDevice(void *argp)
-{
-    CudaSetDeviceArgs *argsrc;
-    argsrc = (CudaSetDeviceArgs *)argp;
-    free(argsrc);
-}
-
-static void
-releaseMalloc(void *argp)
-{
-    //nothing to do
-}
-
-static void
-releaseMemcpyH2D(void *argp)
-{
-    CudaMemcpyArgs *argsrc;
-    argsrc = (CudaMemcpyArgs *)argp;
-    free(argsrc->src);
-    free(argsrc);
-}
-
-static void
-releaseMemcpyD2D(void *argp)
-{
-    CudaMemcpyArgs *argsrc;
-    argsrc = (CudaMemcpyArgs *)argp;
-    free(argsrc);
-}
-
-static void
-releaseMemcpyD2H(void *argp)
-{
-    CudaMemcpyArgs *argsrc;
-    argsrc = (CudaMemcpyArgs *)argp;
-    free(argsrc);
-}
-
-static void
-releaseMemcpyToSymbolH2D(void *argp)
-{
-    CudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (CudaMemcpyToSymbolArgs *)argp;
-    
-    free(argsrc->moduleid);
-    free(argsrc->symbol);
-    free(argsrc->src);
-    free(argsrc);
-}
-
-static void
-releaseMemcpyToSymbolD2D(void *argp)
-{
-    CudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (CudaMemcpyToSymbolArgs *)argp;
-
-    free(argsrc->moduleid);
-    free(argsrc->symbol);
-    free(argsrc);
-}
-
-static void
-releaseFree(void *argp)
-{
-    //nothing to do
-}
-
-static void
-releaseLoadModule(void *argp)
-{
-    CudaLoadModuleArgs *argsrc;
-    argsrc = (CudaLoadModuleArgs *)argp;
-    
-    free(argsrc->name);
-    free(argsrc->strdata);
-    free(argsrc);
-}
-
-static void
-releaseRpcLaunchKernel(void *argp)
-{
-    CudaRpcLaunchKernelArgs *argsrc;
-    argsrc = (CudaRpcLaunchKernelArgs *)argp;
-    
-    //free(argsrc->moduleid);
-    free(argsrc->kname);
-    free(argsrc->args.RCargs_val);
-    free(argsrc);
-}
-
-//stubs for recall
-static void
-recallSetDevice(void *argp)
-{
-    CudaSetDeviceArgs *argsrc;
-    argsrc = (CudaSetDeviceArgs *)argp;
-
-    WARN(3, "Recall cudaSetDevice()...\n");
-    cudaSetDevice(argsrc->device);
-}
-
-static void
-recallMalloc(void *argp)
-{
-    //nothing to do
-}
-
-static void
-recallMemcpyH2D(void *argp)
-{
-    // note: dont insert pthread_mutex_lock or unlock.
-    CudaMemcpyArgs *argsrc;
-    int         vdevid = Vdevid[ vdevidIndex() ];
-    VirDev     *vdev   = St.Vdev + vdevid;
-    bool rec_en_stack = vdev->isRecording();
-    
-    argsrc = (CudaMemcpyArgs *)argp;
-    WARN(3, "Recall cudaMemcpyH2D() \n");
-
-    vdev->recordOFF();
-    vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
-    if (rec_en_stack) vdev->recordON();
-    WARN(3, "\n");
-}
-
-static void
-recallMemcpyD2D(void *argp)
-{
-    // note: dont insert pthread_mutex_lock or unlock.
-    CudaMemcpyArgs *argsrc;
-    argsrc = (CudaMemcpyArgs *)argp;
-    
-    WARN(3, "Recall cudaMemcpyD2D()...\n");
-    cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToDevice);
-}
-
-static void
-recallMemcpyD2H(void *argp)
-{
-    // note: dont insert pthread_mutex_lock or unlock.
-    CudaMemcpyArgs *argsrc;
-    int         vdevid = Vdevid[ vdevidIndex() ];
-    VirDev     *vdev   = St.Vdev + vdevid;
-    bool rec_en_stack = vdev->isRecording();
-
-    argsrc = (CudaMemcpyArgs *)argp;
-    WARN(3, "Recall cudaMemcpyD2H()...\n");
-
-    vdev->recordOFF();
-    vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
-    if (rec_en_stack) vdev->recordON();
-    WARN(3, "\n");
-}
-
-static void
-recallMemcpyToSymbolH2D(void *argp)
-{
-    CudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (CudaMemcpyToSymbolArgs *)argp;
-    WARN(3, "recall cudaMemcpyToSymbolH2D\n");
-    dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyHostToDevice);
-}
-
-static void
-recallMemcpyToSymbolD2D(void *argp)
-{
-    CudaMemcpyToSymbolArgs *argsrc;
-    argsrc = (CudaMemcpyToSymbolArgs *)argp;
-    WARN(3, "recall cudaMemcpyToSymbolD2D\n");
-    dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyDeviceToDevice);
-}
-
-static void
-recallFree(void *argp)
-{
-    //nothing to do
-}
-
-static void
-recallLoadModule(void *argp)
-{
-    CudaLoadModuleArgs *argsrc;
-    argsrc = (CudaLoadModuleArgs *)argp;
-}
-
-static void
-recallRpcLaunchKernel(void *argp)
-{
-    // note: dont insert pthread_mutex_lock or unlock.
-    CudaRpcLaunchKernelArgs *argsrc;
-    argsrc = (CudaRpcLaunchKernelArgs *)argp;
-    WARN(3, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
-	 argsrc->moduleid, argsrc->kid, argsrc->kname);
-#if 0
-    rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
-#else
-    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    bool rec_en_stack = vdev->isRecording();
-    vdev->recordOFF();
-    vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
-    if (rec_en_stack) vdev->recordON();
-#endif
-}
 
 /*
  *  CONSTRUCTOR
  */
-HistList::HistList(void)
-{
+HistList::HistList(void) {
     add_count = 0;
     length    = 0;
     byte_size = 0;
@@ -518,8 +188,7 @@ HistList::append(int funcID, void *argp)
  * Clear all hisotry of calling cuda functions.
  */
 void
-HistList::clear(void)
-{
+HistList::clear(void) {
    if (histrec != NULL) {
       for (int i=0; i < length; i++) {
          (releaseArgsStub[funcID2DSCVMethod( histrec[i].funcID)])(histrec[i].args);
@@ -528,22 +197,16 @@ HistList::clear(void)
    length = 0;
    byte_size = 0;
 }
-
 void
-HistList::setRecallFlag(void)
-{
+HistList::setRecallFlag(void) {
     recall_flag = 1;
 }
-
 void
-HistList::clrRecallFlag(void)
-{
+HistList::clrRecallFlag(void) {
     recall_flag = 0;
 }
-
 void
-HistList::print(void)
-{
+HistList::print(void) {
     WARN0(1, "<--- Record of CUDA API history Stack  *******\n");
     if (this->length == 0) {
 	WARN0(1, "%s(): RecList[]> (Empty).\n", __func__);
@@ -570,8 +233,7 @@ HistList::print(void)
  * Rerun the recorded history of cuda function series.
  */
 int
-HistList::recall(void)
-{
+HistList::recall(void) {
     WARN(9, "HistList::%s() {\n", __func__);
     static int called_depth = 0;
     int result;
@@ -609,4 +271,322 @@ HistList::recall(void)
     
    return result;
 } // HistList::recall(void)
+
+//mapping RPCfunctionID to DSCUDAVerbMethodID
+static DSCVMethod
+funcID2DSCVMethod(int funcID) {
+    switch (funcID) {
+    case dscudaSetDeviceId:
+	return DSCVMethodSetDevice;
+    case dscudaMallocId:
+	return DSCVMethodMalloc;
+    case dscudaMemcpyH2DId:
+	return DSCVMethodMemcpyH2D;
+    case dscudaMemcpyD2DId:
+	return DSCVMethodMemcpyD2D;
+    case dscudaMemcpyD2HId:
+	return DSCVMethodMemcpyD2H;
+    case dscudaMemcpyToSymbolH2DId:
+	return DSCVMethodMemcpyToSymbolH2D;
+    case dscudaMemcpyToSymbolD2DId:
+	return DSCVMethodMemcpyToSymbolD2D;
+    case dscudaFreeId:
+	return DSCVMethodFree;
+	/*    
+	      case dscudaLoadModuleId:
+	      return DSCVMethodLoadModule;
+	*/
+    case dscudaLaunchKernelId:
+	return DSCVMethodRpcLaunchKernel;
+    default:
+	return DSCVMethodNone;
+    }
+}
+//stubs for store args
+static void*
+storeSetDevice(void *argp) {
+    DSCUDAVERB_STORE_ARGS(SetDevice); 
+    return argdst;
+}
+static void*
+storeMalloc(void *argp) {
+    //nothing to do
+    return NULL;
+}
+static void*
+storeMemcpyH2D(void *argp) {
+    DSCUDAVERB_STORE_ARGS(Memcpy);
+    argdst->src = malloc(argsrc->count + 1);
+    memcpy(argdst->src, (const void *)argsrc->src, argsrc->count);
+    return argdst;
+}
+static void*
+storeMemcpyD2D(void *argp) {
+    DSCUDAVERB_STORE_ARGS(Memcpy);
+    return argdst;
+}
+static void*
+storeMemcpyD2H(void *argp) {
+    DSCUDAVERB_STORE_ARGS(Memcpy);
+    return argdst;
+}
+static void*
+storeMemcpyToSymbolH2D(void *argp) {
+    WARN(3, "add hist cudaMemcpyToSymbolH2D\n");
+    DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
+    
+    int nredundancy = dscudaNredundancy();
+    argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
+    memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
+  
+    argdst->symbol = (char *)malloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
+    argdst->src = malloc(argsrc->count);
+    
+    strcpy(argdst->symbol, argsrc->symbol);
+    memcpy(argdst->src, argsrc->src, argsrc->count);
+
+    return argdst;
+}
+static void*
+storeMemcpyToSymbolD2D(void *argp)
+{
+    WARN(3, "add hist cudaMemcpyToSymbolD2D\n");
+    DSCUDAVERB_STORE_ARGS(MemcpyToSymbol);
+
+    int nredundancy = dscudaNredundancy();
+    argdst->moduleid = (int *)dscuda::xmalloc(sizeof(int) * nredundancy);
+    
+    memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
+
+    argdst->symbol = (char *)dscuda::xmalloc(sizeof(char) * (strlen(argsrc->symbol) + 1));
+
+    strcpy(argdst->symbol, argsrc->symbol);
+    
+    return argdst;
+}
+
+static void*
+storeFree(void *argp) {
+    //nothing to do
+    return NULL;
+}
+
+static void*
+storeLoadModule(void *argp) {
+    DSCUDAVERB_STORE_ARGS(LoadModule);
+    argdst->name = (char *)malloc(sizeof(char) * (strlen(argsrc->name) + 1));
+    argdst->strdata = (char *)malloc(sizeof(char) * (strlen(argsrc->strdata) + 1));
+    strcpy(argdst->name, argsrc->name);
+    strcpy(argdst->strdata, argsrc->strdata);
+    return argdst;
+}
+
+static void*
+storeRpcLaunchKernel(void *argp) {
+    WARN(3, "add hist RpcLaunchKernel\n");
+    DSCUDAVERB_STORE_ARGS(RpcLaunchKernel);
+
+    int nredundancy = dscudaNredundancy();
+    //argdst->moduleid = (int *)malloc(sizeof(int) * nredundancy);
+    //memcpy(argdst->moduleid, argsrc->moduleid, sizeof(int) * nredundancy);
+    argdst->moduleid = argsrc->moduleid;
+    
+    argdst->kname = (char *)malloc(sizeof(char) * strlen(argsrc->kname) + 1);
+    strcpy(argdst->kname, argsrc->kname);
+    
+    int narg = argsrc->args.RCargs_len;
+    RCarg *rpcargbuf = (RCarg *)malloc(sizeof(RCarg) * narg);
+    memcpy(rpcargbuf, argsrc->args.RCargs_val, sizeof(RCarg) * narg);
+    argdst->args.RCargs_val = rpcargbuf;
+
+    return argdst;
+}
+
+//stubs for release args
+static void
+releaseSetDevice(void *argp) {
+    CudaSetDeviceArgs *argsrc;
+    argsrc = (CudaSetDeviceArgs *)argp;
+    free(argsrc);
+}
+
+static void
+releaseMalloc(void *argp) {
+    //nothing to do
+}
+
+static void
+releaseMemcpyH2D(void *argp) {
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
+    free(argsrc->src);
+    free(argsrc);
+}
+
+static void
+releaseMemcpyD2D(void *argp) {
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
+    free(argsrc);
+}
+static void
+releaseMemcpyD2H(void *argp) {
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
+    free(argsrc);
+}
+static void
+releaseMemcpyToSymbolH2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
+    
+    free(argsrc->moduleid);
+    free(argsrc->symbol);
+    free(argsrc->src);
+    free(argsrc);
+}
+static void
+releaseMemcpyToSymbolD2D(void *argp) {
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
+
+    free(argsrc->moduleid);
+    free(argsrc->symbol);
+    free(argsrc);
+}
+static void
+releaseFree(void *argp) {
+    //nothing to do
+}
+static void
+releaseLoadModule(void *argp) {
+    CudaLoadModuleArgs *argsrc;
+    argsrc = (CudaLoadModuleArgs *)argp;
+    
+    free(argsrc->name);
+    free(argsrc->strdata);
+    free(argsrc);
+}
+
+static void
+releaseRpcLaunchKernel(void *argp) {
+    CudaRpcLaunchKernelArgs *argsrc;
+    argsrc = (CudaRpcLaunchKernelArgs *)argp;
+    
+    //free(argsrc->moduleid);
+    free(argsrc->kname);
+    free(argsrc->args.RCargs_val);
+    free(argsrc);
+}
+
+//stubs for recall
+static void
+recallSetDevice(void *argp) {
+    CudaSetDeviceArgs *argsrc;
+    argsrc = (CudaSetDeviceArgs *)argp;
+
+    WARN(3, "Recall cudaSetDevice()...\n");
+    cudaSetDevice(argsrc->device);
+}
+
+static void
+recallMalloc(void *argp) {
+    //nothing to do
+}
+
+static void
+recallMemcpyH2D(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
+    CudaMemcpyArgs *argsrc;
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    VirDev     *vdev   = St.Vdev + vdevid;
+    bool rec_en_stack = vdev->isRecording();
+    
+    argsrc = (CudaMemcpyArgs *)argp;
+    WARN(3, "Recall cudaMemcpyH2D() \n");
+
+    vdev->recordOFF();
+    vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
+    if (rec_en_stack) vdev->recordON();
+    WARN(3, "\n");
+}
+
+static void
+recallMemcpyD2D(void *argp) {
+    // note: dont insert pthread_mutex_lock or unlock.
+    CudaMemcpyArgs *argsrc;
+    argsrc = (CudaMemcpyArgs *)argp;
+    
+    WARN(3, "Recall cudaMemcpyD2D()...\n");
+    cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToDevice);
+}
+
+static void
+recallMemcpyD2H(void *argp)
+{
+    // note: dont insert pthread_mutex_lock or unlock.
+    CudaMemcpyArgs *argsrc;
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    VirDev     *vdev   = St.Vdev + vdevid;
+    bool rec_en_stack = vdev->isRecording();
+
+    argsrc = (CudaMemcpyArgs *)argp;
+    WARN(3, "Recall cudaMemcpyD2H()...\n");
+
+    vdev->recordOFF();
+    vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
+    if (rec_en_stack) vdev->recordON();
+    WARN(3, "\n");
+}
+
+static void
+recallMemcpyToSymbolH2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
+    WARN(3, "recall cudaMemcpyToSymbolH2D\n");
+    dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyHostToDevice);
+}
+
+static void
+recallMemcpyToSymbolD2D(void *argp)
+{
+    CudaMemcpyToSymbolArgs *argsrc;
+    argsrc = (CudaMemcpyToSymbolArgs *)argp;
+    WARN(3, "recall cudaMemcpyToSymbolD2D\n");
+    dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyDeviceToDevice);
+}
+
+static void
+recallFree(void *argp)
+{
+    //nothing to do
+}
+
+static void
+recallLoadModule(void *argp)
+{
+    CudaLoadModuleArgs *argsrc;
+    argsrc = (CudaLoadModuleArgs *)argp;
+}
+
+static void
+recallRpcLaunchKernel(void *argp)
+{
+    // note: dont insert pthread_mutex_lock or unlock.
+    CudaRpcLaunchKernelArgs *argsrc;
+    argsrc = (CudaRpcLaunchKernelArgs *)argp;
+    WARN(3, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
+	 argsrc->moduleid, argsrc->kid, argsrc->kname);
+#if 0
+    rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
+#else
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    bool rec_en_stack = vdev->isRecording();
+    vdev->recordOFF();
+    vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
+    if (rec_en_stack) vdev->recordON();
+#endif
+}
 
