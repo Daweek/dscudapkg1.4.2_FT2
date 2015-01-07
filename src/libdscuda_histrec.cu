@@ -64,8 +64,6 @@ static void recallMemcpyToSymbolD2D (void*);
 static void recallLoadModule        (void*);
 static void recallRpcLaunchKernel   (void*);
 
-
-
 /*
  *  CONSTRUCTOR
  */

@@ -41,7 +41,7 @@ PhyDev::PhyDev(void) {
     uniq         = RC_UNIQ_INVALID;
     ft_mode      = FT_UNDEF;
     ft_health    = hl_INIT;
-    this->recordON();
+    //    this->recordON();
     strcpy(ip,       "empty");
     strcpy(hostname, "empty");
     stat_error   = 0;
@@ -88,46 +88,46 @@ bool
 VirDev::isRecording(void) {
     return this->history_recording;
 }
-bool
-PhyDev::isRecording(void) {
-    return this->history_recording;
-}
+// bool
+// PhyDev::isRecording(void) {
+//     return this->history_recording;
+// }
 void
 VirDev::recordON(void) {
     WARN(10, "<-- VirDev::recordON()\n");
-    for (int i=0; i<nredundancy; i++) {
-	server[i].recordON();
-    }
+    // for (int i=0; i<nredundancy; i++) {
+    // 	server[i].recordON();
+    // }
     history_recording = true;
     WARN(10, "--> VirDev::recordON()\n");
 }
 void
 VirDev::recordOFF(void) {
-    for (int i=0; i<nredundancy; i++) {
-	server[i].recordOFF();
-    }
+    // for (int i=0; i<nredundancy; i++) {
+    // 	server[i].recordOFF();
+    // }
     history_recording = false;
 }
-void
-PhyDev::recordON(void) {
-    history_recording = true;
-}
-void
-PhyDev::recordOFF(void) {
-    history_recording = false;
-}
+// void
+// PhyDev::recordON(void) {
+//     history_recording = true;
+// }
+// void
+// PhyDev::recordOFF(void) {
+//     history_recording = false;
+// }
 void
 VirDev::appendRecord(int funcID, void *argp) {
     if (isRecording()) {
 	this->reclist.append(funcID, argp);
     }
 }
-void
-PhyDev::appendRecord(int funcID, void *argp) {
-    if (isRecording()) {
-	this->reclist.append(funcID, argp);
-    }
-}
+// void
+// PhyDev::appendRecord(int funcID, void *argp) {
+//     if (isRecording()) {
+// 	this->reclist.append(funcID, argp);
+//     }
+// }
 int
 PhyDev::setupConnection(void)
 {
@@ -1017,7 +1017,7 @@ PhyDev::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
 
 
 /*
- * cudaMemcpy( HostToDevice )
+ * cudaMemcpy( HostToDevice ) entry point and switch by its direction.
  */
 cudaError_t
 cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
@@ -1030,18 +1030,18 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     int         vdevid = Vdevid[ vdevidIndex() ];
     VirDev     *vdev   = St.Vdev + vdevid;
     switch (kind) {
+    case cudaMemcpyHostToDevice:
+	WARN(3, "cudaMemcpy(%p, %p, %zu, H->D) called\n", ldst, lsrc, count);
+	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
+	err = vdev->cudaMemcpyH2D(dst, src, count);
+	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+	break;
     case cudaMemcpyDeviceToHost:
 	WARN(3, "cudaMemcpy(%p, %p, %zu, D->H) called vdevid=%d...\n",
 	     dst, src, count, vdevid);
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 	err = vdev->cudaMemcpyD2H(dst, src, count);
 	pthread_mutex_unlock( &cudaMemcpyD2H_mutex ); 
-	break;
-    case cudaMemcpyHostToDevice:
-	WARN(3, "cudaMemcpy(%p, %p, %zu, H->D) called\n", ldst, lsrc, count);
-	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
-	err = vdev->cudaMemcpyH2D(dst, src, count);
-	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	break;
     case cudaMemcpyDeviceToDevice:
 	WARN(3, "cudaMemcpy(%p, %p, %zu, DeviceToDevice) called\n", ldst, lsrc, count);
@@ -1060,7 +1060,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
     WARN(3, "} %s().\n", __func__);
     WARN(3, "\n");
     return err;
-}//-->cudaMemcpy()
+}//-->cudaMemcpy(), "global scope"
 cudaError_t
 VirDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
     WARN(4, "   Vdev[%d].H2D() {\n", id);
@@ -1095,8 +1095,8 @@ VirDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
     return cuda_error;
 }//--> VirDev::cudaMemcpyH2D()
 cudaError_t
-PhyDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc_err *rpc_result)
-{
+PhyDev::cudaMemcpyH2D(const void *v_ptr, const void *h_ptr, size_t count,
+		      struct rpc_err *rpc_result) {
     dscudaResult *rp;
     RCbuf srcbuf;
     void *d_ptr;
@@ -1130,14 +1130,14 @@ PhyDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count, struct rpc_e
     //--> RPC communication.
 
     //****>>> Record called history of CUDA APIs. <<<***********
-    CudaMemcpyArgs args;
-    if (isRecording()) {
-	args.dst   = v_ptr;
-	args.src   = (void *)h_ptr;
-	args.count = count;
-	args.kind  = cudaMemcpyHostToDevice;
-	reclist.append(dscudaMemcpyH2DId, &args);
-    }
+    // CudaMemcpyArgs args;
+    // if (isRecording()) {
+    // 	args.dst   = (void *)v_ptr;
+    // 	args.src   = (void *)h_ptr;
+    // 	args.count = count;
+    // 	args.kind  = cudaMemcpyHostToDevice;
+    // 	reclist.append(dscudaMemcpyH2DId, &args);
+    // }
 
     return cuda_error;
 }//-->PhyDev::cudaMemcpyH2D()
@@ -1157,7 +1157,18 @@ VirDev::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
 	args.count = count;
 	args.kind  = cudaMemcpyDeviceToHost;
 	this->reclist.append(dscudaMemcpyD2HId, &args);
-    } 
+    }
+
+    if (this->ft.d2h_simple) {
+	
+    }
+    else {
+    }
+
+
+
+
+    /////////////////////////
     int matched_count   = 0;
     int unmatched_count = 0;
 
@@ -1254,20 +1265,19 @@ VirDev::cudaMemcpyD2H(void *dst, const void *src, size_t count) {
     return err;
 }//-->VirDev::cudaMemcpyD2H(...)
 cudaError_t
-PhyDev::cudaMemcpyD2H( void *h_ptr, const void *v_ptr, size_t count,
+PhyDev::cudaMemcpyD2H( const void *h_ptr, const void *v_ptr, size_t count,
 		       struct rpc_err *p_rpc_result) {
-    CudaMemcpyArgs args;
-    if (isRecording()) {
-	args.dst   = (void *)h_ptr;
-	args.src   = (void *)v_ptr;
-	args.count = count;
-	args.kind  = cudaMemcpyDeviceToHost;
-	reclist.append(dscudaMemcpyD2HId, (void *)&args);
-    }
-    
+    // CudaMemcpyArgs args;
+    // if (isRecording()) {
+    // 	args.dst   = (void *)h_ptr;
+    // 	args.src   = (void *)v_ptr;
+    // 	args.count = count;
+    // 	args.kind  = cudaMemcpyDeviceToHost;
+    // 	reclist.append( dscudaMemcpyD2HId, (void *)&args );
+    // }
     //<-- Translate virtual d_ptr to real d_ptr.
-    void *h_lptr = this->memlist.queryHostPtr(v_ptr);
-    void *d_ptr  = this->memlist.queryDevicePtr(v_ptr);
+    void *h_lptr = this->memlist.queryHostPtr  ( v_ptr );
+    void *d_ptr  = this->memlist.queryDevicePtr( v_ptr );
     WARN(4, "      + Phy[%d]:D2H( dst=%p, src=%p, count=%zu )\n",
 	 id, h_lptr, d_ptr, count);
     if (d_ptr==NULL) {//Unexpected error.
@@ -1470,9 +1480,9 @@ VirDev::updateMemlist(int svr_id) {
 // ***> only called in periodic-checkpointing thread <***
 //
 void VirDev::clearReclist(void) {
-    for (int i=0; i<nredundancy; i++) {
-	server[i].reclist.clear();
-    }
+    // for (int i=0; i<nredundancy; i++) {
+    // 	server[i].reclist.clear();
+    // }
     reclist.clear();
 }
 //
@@ -1496,11 +1506,11 @@ VirDev::restoreMemlist(void) {
 	h_src = mem_ptr->h_region;
 	size  = mem_ptr->size;
 	for (int i=0; i<nredundancy; i++) {
-	    rec_en_stack = server[i].isRecording();
-	    server[i].recordOFF();
+	    //	    rec_en_stack = server[i].isRecording();
+	    //	    server[i].recordOFF();
 	    server[i].cudaMemcpyH2D(v_ptr, h_src, size, &rpc_result);
-	    if (rec_en_stack) server[i].recordON();
-	    else              server[i].recordOFF();
+	    //	    if (rec_en_stack) server[i].recordON();
+	    //	    else              server[i].recordOFF();
 	}
 	mem_ptr = mem_ptr->next;
     }
@@ -1780,8 +1790,7 @@ void
 PhyDev::launchKernel(int module_index, int kid, char *kname,
 		       RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
 		       RCstream stream, RCargs args,
-		       struct rpc_err *rpc_result)
-{
+		       struct rpc_err *rpc_result) {
     WARN(5, "      + PhyDev[%d]::%s() {\n", id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
@@ -1832,21 +1841,21 @@ PhyDev::launchKernel(int module_index, int kid, char *kname,
     //--->
     free(lo_args.RCargs_val);
 
-    CudaRpcLaunchKernelArgs args2;
-    if (isRecording()) {
-        args2.moduleid = module_index;
-        args2.kid      = kid;
-        args2.kname    = kname;
-        args2.gdim     = gdim;
-        args2.bdim     = bdim;
-        args2.smemsize = smemsize;
-        args2.stream   = stream;
-        args2.args     = args;
-        reclist.append( dscudaLaunchKernelId, (void *)&args2 );
-    }
+    // CudaRpcLaunchKernelArgs args2;
+    // if (isRecording()) {
+    //     args2.moduleid = module_index;
+    //     args2.kid      = kid;
+    //     args2.kname    = kname;
+    //     args2.gdim     = gdim;
+    //     args2.bdim     = bdim;
+    //     args2.smemsize = smemsize;
+    //     args2.stream   = stream;
+    //     args2.args     = args;
+    //     reclist.append( dscudaLaunchKernelId, (void *)&args2 );
+    // }
 
     WARN(5, "      + } PhyDev[%d]::%s()\n", id, __func__);
-}
+}//PhyDev::launchKernel(int module_index, int kid, char *kname,
 
 void
 VirDev::launchKernel(int module_index, int kid, char *kname,

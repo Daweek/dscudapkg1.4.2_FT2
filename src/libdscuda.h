@@ -19,19 +19,16 @@
 //*** CUDA API arguments packing list.
 //***
 //**************************************************************************
-struct CudaSetDeviceArgs
-{
+struct CudaSetDeviceArgs {
     int      device;
 };
-struct CudaMallocArgs
-{
+struct CudaMallocArgs {
     void*    devPtr;
     size_t   size;
     CudaMallocArgs(void) { devPtr = NULL, size = 0; }
     CudaMallocArgs( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
 };
-struct CudaMemcpyArgs
-{
+struct CudaMemcpyArgs {
     void*    dst;
     void*    src;
     size_t   count;
@@ -41,8 +38,7 @@ struct CudaMemcpyArgs
 	dst = d; src = s; count = c; kind = k;
     }
 };
-struct CudaMemcpyToSymbolArgs
-{
+struct CudaMemcpyToSymbolArgs {
     int     *moduleid;
     char    *symbol;
     void    *src;
@@ -50,17 +46,14 @@ struct CudaMemcpyToSymbolArgs
     size_t   offset;
     cudaMemcpyKind kind;
 };
-struct CudaFreeArgs
-{
+struct CudaFreeArgs {
     void    *devPtr;
 };
-struct CudaLoadModuleArgs
-{
+struct CudaLoadModuleArgs {
     char    *name;
     char    *strdata;
 };
-struct CudaRpcLaunchKernelArgs
-{
+struct CudaRpcLaunchKernelArgs {
     int      moduleid;
     int      kid;
     char    *kname;
@@ -80,8 +73,7 @@ struct CudaRpcLaunchKernelArgs
 //***    - In case when using device don't response from client request,
 //***    - migrate to another device and restore with clean data.
 //************************************************************************
-struct BkupMem
-{
+struct BkupMem {
 public:
     BkupMem* prev;            // For double-linked-list next.
     BkupMem* next;            // For double-linked-list prev.
@@ -106,8 +98,7 @@ private:
 //***  Description:
 //***      - 
 //********************************************************************
-struct BkupMemList
-{
+struct BkupMemList {
 public:
     //--- construct/destruct
              BkupMemList(void);
@@ -157,8 +148,7 @@ enum DSCVMethod { DSCVMethodNone = 0,
 //***      - Recording the sequential CUDA-call.
 //********************************************************************
 typedef int64_t HistID;
-struct HistCell
-{
+struct HistCell {
     HistID  seq_num;  // unique serial ID.
     int     funcID;   // Recorded cuda*() function.
     void*   args;     // And its arguments.
@@ -168,8 +158,7 @@ struct HistCell
 //***  Class Name: "HistList"
 //***  Description: List structure of previously defined "HistCell"
 //********************************************************************
-struct HistList
-{
+struct HistList {
     /*CONSTRUCTOR*/
     HistList(void);
     
@@ -202,8 +191,7 @@ private:
 //***  Description:
 //***      - CUDA Kernel function module management for Client.
 //********************************************************************
-struct PtxRecord
-{
+struct PtxRecord {
     int  valid;   //1:valid, 0:invalid.
     char name[RC_KMODULENAMELEN];
     char ptx_image[RC_KMODULEIMAGELEN]; //!Caution; may be Large size.
@@ -213,8 +201,7 @@ struct PtxRecord
     void invalidate(void);
     void set(char *name0, char *ptx_image0);
 };
-struct PtxStore
-{
+struct PtxStore {
     PtxRecord ptx_record[RC_NKMODULEMAX];
     int used_count;
     /*CONSTRUCTOR*/
@@ -318,7 +305,7 @@ enum FTmode { FT_NONE    =0,   //-> No any Redundant or fault toleant behavior.
 	      FT_UNDEF   =999  //-> (Initial value, actually unused.)
 };
 struct FToption {   //-*- Static configuration -*-
-    //[0]
+    bool d2h_simple;   //[0] If "true" then disable all redundant func.
     bool d2h_reduncpy; //[1] 
     bool d2h_compare;  //[2] "true": compare data between redundant recieved.
     bool d2h_statics;  //[3] "true": count unmatched or matched.
@@ -357,12 +344,12 @@ public:
     int         uniq;         // unique in all PhyDev including svrCand[].
     
     BkupMemList memlist;      // GPU global memory mirroring region.
-    HistList    reclist;      // GPU CUDA function called history.
+    //HistList    reclist;      // GPU CUDA function called history.
     //<--- record history of CUDA API ON/OFF dynamically.
-    void        recordON(void);    // switch to enable.
-    void        recordOFF(void);   // switch to disable.
-    bool        isRecording(void); // get current stat.
-    void        appendRecord(int funcID, void *argp);
+    // void        recordON(void);    // switch to enable.
+    // void        recordOFF(void);   // switch to disable.
+    // bool        isRecording(void); // get current stat.
+    // void        appendRecord(int funcID, void *argp);
 private:
     bool        history_recording; //
     //--->
@@ -405,8 +392,10 @@ public:
 
     cudaError_t cudaMalloc(void **d_ptr, size_t, struct rpc_err *);
     cudaError_t cudaFree(void *d_ptr, struct rpc_err *);
-    cudaError_t cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t, struct rpc_err *);
-    cudaError_t cudaMemcpyD2H(void *h_ptr, const void *v_ptr, size_t, struct rpc_err *);
+    cudaError_t cudaMemcpyH2D(const void *v_ptr, const void *h_ptr, size_t,
+			      struct rpc_err *);
+    cudaError_t cudaMemcpyD2H(const void *h_ptr, const void *v_ptr, size_t,
+			      struct rpc_err *);
     cudaError_t cudaThreadSynchronize( struct rpc_err *);
 
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
@@ -451,12 +440,11 @@ enum VdevConf {  VDEV_MONO    = 0, //VirDev.nredundancy == 1
 //***  Description:
 //***      - Virtualized GPU Device class.
 //*************************************************
-struct VirDev
-{
+struct VirDev {
 public:
     int         id;
     PhyDev      server[RC_NREDUNDANCYMAX]; //Physical Device array.
-    int         nredundancy;               //Redundant count
+    int         nredundancy;               //Actual redundant devcount.
     
     //<-- Fault tolerant function control 
     FTmode      ft_mode;
