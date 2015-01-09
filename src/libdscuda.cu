@@ -23,14 +23,12 @@
 #include "dscudautil.h"
 #include "libdscuda.h"
 
-namespace dscuda {
-    int   searchDaemon(void);
-}
-static void extractENV(bool &bool_var, const char *envname);
-static void extractENV(int  &int_var,  const char *envname, int undef=0);
-static void extractENV(char *str_var,  const char *envname, int len);
-static void getenvDSCUDA_WARNLEVEL(void);
-static void updateSpareServerList(void);
+static void  extractENV(bool &bool_var, const char *envname);
+static void  extractENV(int  &int_var,  const char *envname, int undef=0);
+static void  extractENV(char *str_var,  const char *envname, int len);
+static void  getenvDSCUDA_WARNLEVEL(void);
+static void  updateSpareServerList(void);
+static char* readServerConf(char *fname);
 
 static int   VdevidIndexMax = 0; //# of pthreads which utilize virtual devices.
 const  char *DEFAULT_SVRIP = "localhost";
@@ -77,30 +75,38 @@ PtxStore      Ptx;
  * This function may be executed in parallel threads, so need mutex lock.
  */
 ClientState::ClientState(void) {
-    {// Open dscuda output file.
-	char curr_time[80];
-	dscuda::sprintfDate( curr_time );
-	sprintf( dslog_filename, "c%s.dslog", curr_time );
-	sprintf( dserr_filename, "c%s.dserr", curr_time );
-	
-	dscuda_stdout = fopen( dslog_filename, "w" );
-	if (dscuda_stdout == NULL) {
-	    fprintf(stderr, "dscuda: failed to open file %s.", dslog_filename);
-	    exit(EXIT_FAILURE);
-	}
-	else {
-	    fprintf(stderr, "dscuda: log file ==> %s\n", dslog_filename);
-	}
-	dscuda_stderr = fopen( dserr_filename, "w" );
-	if (dscuda_stderr == NULL) {
-	    fprintf(stderr, "dscuda: failed to open file %s.", dserr_filename);
-	    exit(EXIT_FAILURE);
-	}
-	else {
-	    fprintf(stderr, "dscuda: err file ==> %s\n", dserr_filename);
-	}
-    }
+    //<-- Open dscuda output file.
+    char curr_time[80];
+    dscuda::sprintfDate( curr_time );
+    sprintf( this->dslog_filename, "c%s.dslog", curr_time );
+    sprintf( this->dserr_filename, "c%s.dserr", curr_time );
+    sprintf( this->dschp_filename, "c%s.dschp", curr_time );
     
+    dscuda_stdout = fopen( dslog_filename, "w" );
+    if (dscuda_stdout == NULL) {
+	fprintf(stderr, "dscuda: failed to open file %s.", dslog_filename);
+	exit(EXIT_FAILURE);
+    } else {
+	fprintf(stderr, "dscuda: log file ==> %s\n", dslog_filename);
+    }
+    //
+    dscuda_stderr = fopen( dserr_filename, "w" );
+    if (dscuda_stderr == NULL) {
+	fprintf(stderr, "dscuda: failed to open file %s.", dserr_filename);
+	exit(EXIT_FAILURE);
+    } else {
+	fprintf(stderr, "dscuda: err file ==> %s\n", dserr_filename);
+    }
+    //
+    dscuda_chkpnt = fopen( dschp_filename, "w" );
+    if (dscuda_chkpnt == NULL) {
+	fprintf(stderr, "dscuda: failed to open file %s.", dschp_filename);
+	exit(EXIT_FAILURE);
+    } else {
+	fprintf(stderr, "dscuda: err file ==> %s\n", dschp_filename);
+    }
+    //--> Open dscuda output file.
+	
     INFO0("\
 ###******************************************************************************\n\
 ###***                                                                          *\n\
@@ -121,7 +127,7 @@ ClientState::ClientState(void) {
 	/* Print IP address of DS-CUDA client host. */
 	struct sockaddr_in addrin;
 	get_myaddress(&addrin);
-	setIpAddress(addrin.sin_addr.s_addr);
+	setMyIPAddr(addrin.sin_addr.s_addr);
 	INFO0("[ IP address of client ] %s\n",dscudaGetIpaddrString(St.getIpAddress()));
     }
     {
@@ -135,7 +141,7 @@ ClientState::ClientState(void) {
     use_ibv     = 0;
     autoverb    = 0;
     daemon      = 0;
-    historical_calling = 0;
+    this->unsetRollbackCalling();
 
     extractENV( dscuda_path, "DSCUDA_PATH", 512 );
     INFO0("[ Environment varialbe ] DSCUDA_PATH      = %s\n", dscuda_path);
@@ -168,16 +174,17 @@ ClientState::ClientState(void) {
 	WARN0(0, "(UNKNOWN).\n");
 	exit(EXIT_FAILURE);
     }
+    INFO0("[Environment var] DSCUDA_FT0  = %d (d2h_simple)\n",   ft.d2h_simple   );
     INFO0("[Environment var] DSCUDA_FT1  = %d (d2h_reduncpy)\n", ft.d2h_reduncpy );
-    INFO0("[Environment var] DSCUDA_FT2  = %d (d2h_compare)\n", ft.d2h_compare  );
-    INFO0("[Environment var] DSCUDA_FT3  = %d (d2h_statics)\n", ft.d2h_statics  );
+    INFO0("[Environment var] DSCUDA_FT2  = %d (d2h_compare)\n",  ft.d2h_compare  );
+    INFO0("[Environment var] DSCUDA_FT3  = %d (d2h_statics)\n",  ft.d2h_statics  );
     INFO0("[Environment var] DSCUDA_FT4  = %d (d2h_rollback)\n", ft.d2h_rollback );
     
-    INFO0("[Environment var] DSCUDA_FT8  = %d (cp_periodic)\n", ft.cp_periodic );
-    INFO0("[Environment var] DSCUDA_FT9  = %d (cp_reduncpy)\n", ft.cp_reduncpy );
-    INFO0("[Environment var] DSCUDA_FT10 = %d (cp_compare)\n", ft.cp_compare  );
-    INFO0("[Environment var] DSCUDA_FT11 = %d (cp_statics)\n", ft.cp_statics  );
-    INFO0("[Environment var] DSCUDA_FT12 = %d (cp_rollback)\n", ft.cp_rollback );
+    INFO0("[Environment var] DSCUDA_FT8  = %d (cp_periodic)\n",  ft.cp_periodic );
+    INFO0("[Environment var] DSCUDA_FT9  = %d (cp_reduncpy)\n",  ft.cp_reduncpy );
+    INFO0("[Environment var] DSCUDA_FT10 = %d (cp_compare)\n",   ft.cp_compare  );
+    INFO0("[Environment var] DSCUDA_FT11 = %d (cp_statics)\n",   ft.cp_statics  );
+    INFO0("[Environment var] DSCUDA_FT12 = %d (cp_rollback)\n",  ft.cp_rollback );
     
     INFO0("[Environment var] DSCUDA_FT16 = %d (rec_en)\n", ft.rec_en );
     INFO0("[Environment var] DSCUDA_FT24 = %d (migrate)\n", ft.gpu_migrate );
@@ -307,6 +314,217 @@ ClientState::~ClientState(void) {
 ###***                                                                          *\n\
 ###******************************************************************************\n");
 } //--> ClientState::~ClientState(void)
+void
+ClientState::configFT(void) {
+    extractENV( this->daemon,    "DSCUDA_USEDAEMON",  0 );
+    extractENV( this->cp_period, "DSCUDA_CP_PERIOD", 60 );
+    extractENV( this->autoverb,  "DSCUDA_AUTOVERB",   0 );
+    //<--- Define Fault Tolerant behavior from env.var.
+    switch (autoverb) {
+    case -1:
+	ft_mode = FT_OPTION;
+	break;
+    case 0:
+	ft_mode = FT_NONE;
+	break;
+    case 1:
+	ft_mode = FT_ERRSTAT;
+	break;
+    case 2:
+	ft_mode = FT_BYCPY;
+	break;
+    case 3:
+	ft_mode = FT_BYTIMER;
+	break;
+    default:
+	WARN(0, "Found invalid setting of DSCUDA_AUTOVERB=%d\n", autoverb);
+	exit(EXIT_FAILURE);
+    }
+    //---> Define Fault Tolerant behavior from env.var.
+    extractENV( ft.d2h_simple,    "DSCUDA_FT0" );
+    extractENV( ft.d2h_reduncpy,  "DSCUDA_FT1" );
+    extractENV( ft.d2h_compare,   "DSCUDA_FT2" );
+    extractENV( ft.d2h_statics,   "DSCUDA_FT3" );
+    extractENV( ft.d2h_rollback,  "DSCUDA_FT4" );
+    //
+    extractENV( ft.cp_periodic,   "DSCUDA_FT8" ); // 2nd: checkpointing
+    extractENV( ft.cp_reduncpy,   "DSCUDA_FT9" );
+    extractENV( ft.cp_compare,    "DSCUDA_FT10" );
+    extractENV( ft.cp_statics,    "DSCUDA_FT11" );
+    extractENV( ft.cp_rollback,   "DSCUDA_FT12" );
+    //
+    extractENV( ft.rec_en,        "DSCUDA_FT16" ); // 3rd: CUDA API recording
+    //
+    extractENV( ft.gpu_migrate,   "DSCUDA_FT24" ); // 4th: GPU Migration
+
+    //<--- copy same value to virtual and physical device.
+    for (int i=0; i<RC_NVDEVMAX; i++) {
+	Vdev[i].ft_mode = this->ft_mode;
+	for (int k=0; k<Vdev[i].nredundancy; k++) {
+	    Vdev[i].server[k].ft_mode = this->ft_mode;
+	}
+    }
+    //---> copy same value to virtual and physical device.
+
+    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
+	for (int i=0; i<RC_NVDEVMAX; i++) {
+	    Vdev[i].recordON();
+	}
+    }
+}//--> void ClientState::configsFT(void)
+/*
+ *
+ */
+void
+ClientState::initVirtualDevice(void) {
+    char   *ip;
+    char    ips[RC_NVDEVMAX][256];
+    char    buf[1024*RC_NVDEVMAX];
+    PhyDev *sp;
+    char   *vdev_token;
+    char   *pdev_token;
+    {// DSCUDA_SERVER
+	char *sconfname;
+	char *env;    
+	if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
+	    env = readServerConf(sconfname);
+	    INFO0("[ Environment variable ] DSCUDA_SERVER_CONF = %s\n", env);
+	} else {
+	    env = getenv("DSCUDA_SERVER");
+	    INFO0("[ Environment variable ] DSCUDA_SERVER    = %s\n", env);
+	}
+	// check DSCUDA_SERVER (1)
+	if (env == NULL) {
+	    Nvdev = 1;
+	    Vdev[0].nredundancy = 1;
+	    sp = Vdev[0].server;
+	    sp->id = 0;
+	    strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
+	    return;
+	}
+	
+	// check DSCUDA_SERVER (2)
+	if (sizeof(buf) < strlen(env)) {
+	    WARN(0, "Too long length of DSCUDA_SERVER.\n");
+	    exit(EXIT_FAILURE);
+	}
+	strncpy( buf, env, sizeof(buf) );
+    }
+    //<-- set "Nvdev", # of virtual device count.
+    Nvdev = 0;
+    vdev_token = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
+    while (vdev_token != NULL) {
+	strcpy(ips[Nvdev], vdev_token);
+	Nvdev++;
+	if (RC_NVDEVMAX < Nvdev) {
+	    WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
+		 RC_NVDEVMAX);
+	    exit(EXIT_FAILURE);
+	}
+	vdev_token = strtok(NULL, DELIM_VDEV);
+    }
+    //--> set "Nvdev", # of virtual device count.
+    
+    for (int i=0; i<Nvdev; i++) {
+	int nred=0;
+	int uniq=0; // begin with 0.
+	pdev_token = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a comma) of
+	// a single element of the vdev.
+	while (pdev_token != NULL) {
+	    strcpy(Vdev[i].server[nred].ip, pdev_token);
+	    pdev_token = strtok(NULL, DELIM_REDUN);
+	    nred++;
+	}
+	/*
+	 * update Vdev.info.
+	 */
+	Vdev[i].setConfInfo(nred);
+	
+	for (int j=0; j<nred; j++) {
+	    sp = &Vdev[i].server[j];
+	    strncpy(buf, sp->ip, sizeof(buf));
+	    ip = strtok(buf, ":");
+	    sp->setIP(ip);
+	    ip = strtok(NULL, ":");
+	    sp->setCID(ip);
+	    sp->setUNIQ(uniq);
+	    uniq++;
+	}
+    } // for ( int i=0; ...
+    /* convert hostname to ip address. */
+    char *hostname;
+    int  det_abc;
+    char letter;
+    char *ip_ref;
+    struct hostent *hostent0;
+    for (int i=0; i<Nvdev; i++) {
+	Vdev[i].id = i;
+	for (int j=0; j < Vdev[i].nredundancy; j++) {
+	    ip = Vdev[i].server[j].ip;
+	    hostname = Vdev[i].server[j].hostname;
+	    det_abc=1;
+	    for (int k=0; k < strlen(ip); k++) {
+		letter = ip[k];
+		if (isdigit((unsigned char)letter || letter=='.')) {
+		    det_abc = 0;
+		    printf("%c", letter);
+		} else {
+		    det_abc = 1;
+		    break;
+		}
+		printf("\n");
+	    }
+	    if (det_abc == 1) {
+		strcpy( hostname, ip );
+		hostent0 = gethostbyname( hostname );
+		if ( hostent0 == NULL ) {
+		    WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
+		    WARN( 0, "Program terminated.\n\n\n\n" );
+		    exit(EXIT_FAILURE);
+		} else {
+		    ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
+		    strcpy( ip, ip_ref );
+		}
+	    }
+	}
+    } // for (int i=0; ...
+} //---> void ClientState::initVirtualDevice(void)
+unsigned
+ClientState::getIpAddress(void) {
+    return this->ip_addr;
+}
+void
+ClientState::useIbv(void) {
+    this->use_ibv = true;
+}
+void
+ClientState::useRpc(void) {
+    this->use_ibv = false;
+}
+bool
+ClientState::isIbv(void) {
+    return this->use_ibv;     
+}
+bool
+ClientState::isRpc(void) {
+    return !this->use_ibv;     
+}
+void
+ClientState::setRollbackCalling(void) {
+    this->rollback_calling = true;
+}
+void
+ClientState::unsetRollbackCalling(void) {
+    this->rollback_calling = false;
+}
+bool
+ClientState::isRollbackCalling(void) {
+    return this->rollback_calling;
+}
+void
+ClientState::setMyIPAddr(unsigned val) {
+    this->ip_addr = val;
+}
 
 ServerArray::ServerArray(void) {
     num = 0;
@@ -521,7 +739,7 @@ ServerArray::print(void) {
 }
 
 int
-requestDaemonForDevice(char *ip, int devid, int useibv) {
+requestDaemonForDevice(char *ip, int devid, bool useibv) {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
@@ -914,8 +1132,7 @@ readServerConf(char *fname) {
  *
  */
 void
-printVirtualDeviceList( void )
-{
+printVirtualDeviceList( void ) {
     VirDev     *pVdev;
     PhyDev   *pSvr;
     int         i,j;
@@ -1021,7 +1238,25 @@ printModuleList(void) {
 	St.Vdev[i].printModuleList();
     }
 }
-
+uint32_t
+dscuda::calcChecksum(void *sta, size_t size_byte) {
+    uint32_t *p = (uint32_t *)sta;
+    uint32_t  s           = 0;
+    uint32_t  s_remain    = 0; // zero padding, ignore sign bit.
+    size_t    sum_count   = size_byte / sizeof(uint32_t);
+    size_t    size_remain = size_byte - (sum_count * sizeof(uint32_t));
+    for (int i=0; i<sum_count; i++) {
+	s += *p;
+	p++;
+    }
+    if (size_remain >= sizeof(s_remain)) {
+	fprintf(stderr, "Unexpected ERROR: %s()\n", __func__);
+	exit(1);
+    }
+    memcpy( &s_remain, p, size_remain );
+    s += s_remain;
+    return s;
+}
 int
 dscuda::searchDaemon(void) {
     int sendsock;
@@ -1183,126 +1418,6 @@ dscuda::searchDaemon(void) {
     }
     return num_daemon;
 } //---> int dscuda::searchDaemon(void)
-
-
-/*
- *
- */
-void
-ClientState::initVirtualDevice(void) {
-    char   *ip;
-    char    ips[RC_NVDEVMAX][256];
-    char    buf[1024*RC_NVDEVMAX];
-    PhyDev *sp;
-    char   *vdev_token;
-    char   *pdev_token;
-    {// DSCUDA_SERVER
-	char *sconfname;
-	char *env;    
-	if (sconfname = getenv("DSCUDA_SERVER_CONF")) {
-	    env = readServerConf(sconfname);
-	    INFO0("[ Environment variable ] DSCUDA_SERVER_CONF = %s\n", env);
-	} else {
-	    env = getenv("DSCUDA_SERVER");
-	    INFO0("[ Environment variable ] DSCUDA_SERVER    = %s\n", env);
-	}
-	// check DSCUDA_SERVER (1)
-	if (env == NULL) {
-	    Nvdev = 1;
-	    Vdev[0].nredundancy = 1;
-	    sp = Vdev[0].server;
-	    sp->id = 0;
-	    strncpy(sp->ip, DEFAULT_SVRIP, sizeof(sp->ip));
-	    return;
-	}
-	
-	// check DSCUDA_SERVER (2)
-	if (sizeof(buf) < strlen(env)) {
-	    WARN(0, "Too long length of DSCUDA_SERVER.\n");
-	    exit(EXIT_FAILURE);
-	}
-	strncpy( buf, env, sizeof(buf) );
-    }
-    //<-- set "Nvdev", # of virtual device count.
-    Nvdev = 0;
-    vdev_token = strtok(buf, DELIM_VDEV); // a list of IPs which consist a single vdev.
-    while (vdev_token != NULL) {
-	strcpy(ips[Nvdev], vdev_token);
-	Nvdev++;
-	if (RC_NVDEVMAX < Nvdev) {
-	    WARN(0, "number of devices exceeds the limit, RC_NVDEVMAX (=%d).\n",
-		 RC_NVDEVMAX);
-	    exit(EXIT_FAILURE);
-	}
-	vdev_token = strtok(NULL, DELIM_VDEV);
-    }
-    //--> set "Nvdev", # of virtual device count.
-    
-    for (int i=0; i<Nvdev; i++) {
-	int nred=0;
-	int uniq=0; // begin with 0.
-	pdev_token = strtok(ips[i], DELIM_REDUN); // an IP (optionally with devid preceded by a comma) of
-	// a single element of the vdev.
-	while (pdev_token != NULL) {
-	    strcpy(Vdev[i].server[nred].ip, pdev_token);
-	    pdev_token = strtok(NULL, DELIM_REDUN);
-	    nred++;
-	}
-	/*
-	 * update Vdev.info.
-	 */
-	Vdev[i].setConfInfo(nred);
-	
-	for (int j=0; j<nred; j++) {
-	    sp = &Vdev[i].server[j];
-	    strncpy(buf, sp->ip, sizeof(buf));
-	    ip = strtok(buf, ":");
-	    sp->setIP(ip);
-	    ip = strtok(NULL, ":");
-	    sp->setCID(ip);
-	    sp->setUNIQ(uniq);
-	    uniq++;
-	}
-    } // for ( int i=0; ...
-    /* convert hostname to ip address. */
-    char *hostname;
-    int  det_abc;
-    char letter;
-    char *ip_ref;
-    struct hostent *hostent0;
-    for (int i=0; i<Nvdev; i++) {
-	Vdev[i].id = i;
-	for (int j=0; j < Vdev[i].nredundancy; j++) {
-	    ip = Vdev[i].server[j].ip;
-	    hostname = Vdev[i].server[j].hostname;
-	    det_abc=1;
-	    for (int k=0; k < strlen(ip); k++) {
-		letter = ip[k];
-		if (isdigit((unsigned char)letter || letter=='.')) {
-		    det_abc = 0;
-		    printf("%c", letter);
-		} else {
-		    det_abc = 1;
-		    break;
-		}
-		printf("\n");
-	    }
-	    if (det_abc == 1) {
-		strcpy( hostname, ip );
-		hostent0 = gethostbyname( hostname );
-		if ( hostent0 == NULL ) {
-		    WARN( 0, "May be set invalid hostname \"%s\" to DSCUDA_SERVER or something.\n", hostname );
-		    WARN( 0, "Program terminated.\n\n\n\n" );
-		    exit(EXIT_FAILURE);
-		} else {
-		    ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
-		    strcpy( ip, ip_ref );
-		}
-	    }
-	}
-    } // for (int i=0; ...
-} //---> void ClientState::initVirtualDevice(void)
-
 //
 //
 //
@@ -1397,64 +1512,6 @@ extractENV(char *str_var, const char *envname, int len) {
 	strncpy(str_var, env, len);  
     }
 }
-void
-ClientState::configFT(void) {
-    extractENV( this->daemon,    "DSCUDA_USEDAEMON",  0 );
-    extractENV( this->cp_period, "DSCUDA_CP_PERIOD", 60 );
-    extractENV( this->autoverb,  "DSCUDA_AUTOVERB",   0 );
-    //<--- Define Fault Tolerant behavior from env.var.
-    switch (autoverb) {
-    case -1:
-	ft_mode = FT_OPTION;
-	break;
-    case 0:
-	ft_mode = FT_NONE;
-	break;
-    case 1:
-	ft_mode = FT_ERRSTAT;
-	break;
-    case 2:
-	ft_mode = FT_BYCPY;
-	break;
-    case 3:
-	ft_mode = FT_BYTIMER;
-	break;
-    default:
-	WARN(0, "Found invalid setting of DSCUDA_AUTOVERB=%d\n", autoverb);
-	exit(EXIT_FAILURE);
-    }
-    //---> Define Fault Tolerant behavior from env.var.
-    //getenvBool( ft.------,      "DSCUDA_FT0" ); // 1st: cudaMemcpy(D2H)
-    extractENV( ft.d2h_reduncpy,  "DSCUDA_FT1" );
-    extractENV( ft.d2h_compare,   "DSCUDA_FT2" );
-    extractENV( ft.d2h_statics,   "DSCUDA_FT3" );
-    extractENV( ft.d2h_rollback,  "DSCUDA_FT4" );
-    //
-    extractENV( ft.cp_periodic,   "DSCUDA_FT8" ); // 2nd: checkpointing
-    extractENV( ft.cp_reduncpy,   "DSCUDA_FT9" );
-    extractENV( ft.cp_compare,    "DSCUDA_FT10" );
-    extractENV( ft.cp_statics,    "DSCUDA_FT11" );
-    extractENV( ft.cp_rollback,   "DSCUDA_FT12" );
-    //
-    extractENV( ft.rec_en,        "DSCUDA_FT16" ); // 3rd: CUDA API recording
-    //
-    extractENV( ft.gpu_migrate,   "DSCUDA_FT24" ); // 4th: GPU Migration
-
-    //<--- copy same value to virtual and physical device.
-    for (int i=0; i<RC_NVDEVMAX; i++) {
-	Vdev[i].ft_mode = this->ft_mode;
-	for (int k=0; k<Vdev[i].nredundancy; k++) {
-	    Vdev[i].server[k].ft_mode = this->ft_mode;
-	}
-    }
-    //---> copy same value to virtual and physical device.
-
-    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
-	for (int i=0; i<RC_NVDEVMAX; i++) {
-	    Vdev[i].recordON();
-	}
-    }
-}//--> void ClientState::configsFT(void)
 /****** CHECK-POINTING THREAD ****************************************
  * Take the data backups of each virtualized GPU to client's host
  * memory after verifying between redundant physical GPUs every
@@ -1464,7 +1521,7 @@ ClientState::configFT(void) {
 void*
 periodicCheckpoint(void *arg) {
     int         cp_period = *(int *)arg;
-    int         age = 0;
+    int         age = 0; //
     int         devid;
     int         errcheck = 1;
     cudaError_t cuerr;
@@ -1484,24 +1541,33 @@ periodicCheckpoint(void *arg) {
     int  dst_color[RC_NREDUNDANCYMAX], next_color;
 
     int correct_count = 0;
-    for (;;) { /* activate every "cp_period" sec */
-	sleep( cp_period );
+    while (true) {
+	//<-- Wait for specified period (sec) passed.
+	sleep(cp_period);
+	//--> Wait for specified period (sec) passed.
 
-	// mutex locks
+	//<-- Output beginning message.
+	WARN_CP(1,
+	"=====================================================================\n");
+	WARN_CP( 1,"periodicCheckpoint( period = %d sec, age=%d )\n", cp_period, age);
+	WARN(9,"CP: periodicCheckpoint( period = %d sec, age=%d ) {\n", cp_period, age);
+	//--> Output beginning message.
+		
+	//<-- mutex locks for avoiding R/W collisions 
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_lock( &cudaKernelRun_mutex );
-	
-	WARN_CP(9, "periodicCheckpoint( period = %d[sec], age=%d ) {\n",
-	     cp_period, age++);
+	//--> mutex locks for avoiding R/W collisions 
 
+	//<-- copy from all cudaMalloc() regions of all devices.
 	St.collectEntireRegions();
 	//**  calling hierachical as following,
 	//**  +---> Vdev[*].collectEntireRegions();
 	//**           +---> server[*].collectEntireRegions();
+	//--> copy from all cudaMalloc() regions of all devices.
 
 	int correct = St.verifyEntireRegions();
-	if ( correct==1 ) {
+	if (correct==1) {
 	    correct_count++;
 	}
 #if 1 // force pseudo error
@@ -1515,39 +1581,42 @@ periodicCheckpoint(void *arg) {
 	    //*** Then, collect clean device memory regions to host memory.
 	    //*** and clear CUDA API called history.
 	    //***
-	    WARN_CP(1, "(^_^)Ready to update clean backup region.\n");
+	    WARN(1, "CP: (^_^)Ready to update clean backup region.\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].updateMemlist(0); // 0 means server[0].
 		St.Vdev[i].clearReclist();
 	    }
-	} else {
+	}
+	else {
 	    //***
 	    //*** Some memory regions on any virtual devices are currupted.
 	    //*** Then, restore clean memory regions to all devices, and
 	    //*** redo the historical cuda API calls.
 	    //***
-	    WARN_CP(1, "(+_+)Detected corrupted device region.\n");
-	    WARN_CP(1, "(+_+)Restore the device memory using backup.\n");
+	    WARN(1, "CP: (+_+)Detected corrupted device region.\n");
+	    WARN(1, "CP: (+_+)Restore the device memory using backup.\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
-	    WARN_CP(1, "(+_+)Redo the CUDA APIs Rollbacked.\n");	    
+	    WARN(1, "CP: (+_+)Redo the CUDA APIs Rollbacked.\n");	    
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
 		St.Vdev[i].reclist.recall();
 	    }
 	}
-
+	//<-- mutex unlocks for following R/W.
 	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_unlock( &cudaKernelRun_mutex );
+	//--> mutex unlocks for following R/W.
 	
-	WARN_CP(9, "} periodicCheckpoint().\n");
+	//<-- Output ending message.	
+	WARN(9,"CP: } periodicCheckpoint().\n");
+	//--> Output ending message.	
 	pthread_testcancel();/* cancelation available */
+	age++;
     }//for (;;)
 } // periodicCheckpoint()
-
-
 void
 VirDev::invalidateAllModuleCache(void) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
@@ -1801,8 +1870,7 @@ dscudaFuncGetAttributesWrapper(int *moduleid, struct cudaFuncAttributes *attr, c
 
 cudaError_t
 dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
-                           size_t count, size_t offset, enum cudaMemcpyKind kind)
-{
+                           size_t count, size_t offset, enum cudaMemcpyKind kind) {
     cudaError_t err = cudaSuccess;
     int nredundancy;
 
@@ -1829,7 +1897,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
     }
     WARN(3, "done.\n");
 
-    if (St.isAutoVerb() &&
+    if ((St.Vdev + Vdevid[vdevidIndex()])->isRecording() &&
 	(kind==cudaMemcpyHostToDevice || kind==cudaMemcpyDeviceToDevice)) {
         CudaMemcpyToSymbolArgs args;
         args.moduleid = moduleid;
@@ -1842,7 +1910,7 @@ dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
     }
 
     return err;
-}
+}//dscudaMemcpyToSymbolWrapper(int *moduleid, const char *symbol, const void *src,
 
 cudaError_t
 dscudaMemcpyFromSymbolWrapper(int *moduleid, void *dst, const char *symbol,
@@ -2273,13 +2341,13 @@ cudaDeviceDisablePeerAccess(int peerDevice) {
 void
 VirDev::remallocRegionsGPU(int num_svr) {
     BkupMem *mem = memlist.headPtr();
-    int     verb = St.isAutoVerb();
+    //int     verb = St.isAutoVerb();
     int     copy_count = 0;
     int     i = 0;
     
     WARN(1, "%s(PhyDev *sp).\n", __func__);
     //WARN(1, "Num. of realloc region = %d\n", BKUPMEM.length );
-    St.unsetAutoVerb();
+    //St.unsetAutoVerb();
     while ( mem != NULL ) {
 	/* TODO: select migrateded virtual device, not all region. */
 	WARN(5, "mem[%d]->dst = %p, size= %d\n", i, mem->d_region, mem->size);
@@ -2287,6 +2355,6 @@ VirDev::remallocRegionsGPU(int num_svr) {
 	mem = mem->next;
 	i++;
     }
-    St.setAutoVerb(verb);
+    //St.setAutoVerb(verb);
     WARN(1, "+--- Done.\n");
 }

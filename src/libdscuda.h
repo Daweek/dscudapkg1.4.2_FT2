@@ -80,17 +80,19 @@ public:
     void*    v_region;        // UVA, Search index, and also Virtual device address.
     void*    d_region;        //!UVA, server device memory space.
     void*    h_region;        //
-    int      size;            // in Byte.
+    size_t   size;            // in Byte.
     int      update_rdy;      // 1:"*dst" has valid data, 0:invalid.
     /*constructor/destructor.*/
-             BkupMem(void);
+             BkupMem           (void);
     //--- methods
-    bool     isHead(void);
-    bool     isTail(void);
-    void     init(void *uva_ptr, void *d_ptr, int isize);
-    int      calcSum(void);
-    void*    translateAddrVtoD(const void *v_ptr);
-    void*    translateAddrVtoH(const void *v_ptr);
+    bool     isHead            (void);
+    bool     isTail            (void);
+    void     init              (void *uva_ptr, void *d_ptr, int isize);
+    uint32_t calcChecksum      (void);
+    void*    translateAddrVtoD (const void *v_ptr);
+    void*    translateAddrVtoH (const void *v_ptr);
+    //
+    cudaError_t memcpyD2H( const void*, size_t, struct rpc_err*, CLIENT* );
 private:
 };
 //********************************************************************
@@ -104,17 +106,16 @@ public:
              BkupMemList(void);
              ~BkupMemList(void);
     //--- methods ---------------
-    void     print(void);
-    BkupMem* headPtr(void);
-    BkupMem* query(void *uva_ptr);
-    void     append(void *uva_ptr, void *dst, int size);
-    void     remove(void *uva_ptr);        // verbAllocatedMemUnregister()
-    int      getLen(void);
-    long     getTotalSize(void); // get total size of allocated memory.
-    int      countRegion(void);
-    int      checkSumRegion(void *targ, int size);
-    void*    queryHostPtr(const void *v_ptr);
+    void     print         (void);
+    BkupMem* headPtr       (void);
+    BkupMem* query         (const void *v_ptr);
+    void*    queryHostPtr  (const void *v_ptr);
     void*    queryDevicePtr(const void *v_ptr);
+    void     append        (void *uva_ptr, void *dst, int size);
+    void     remove        (void *uva_ptr);        // verbAllocatedMemUnregister()
+    int      getLen        (void);
+    long     getTotalSize  (void); // get total size of allocated memory.
+    int      countRegion   (void);
     void     restructDeviceRegion(void);              /* ReLoad backups */
 private:
     BkupMem* head;        /* pointer to 1st  BkupMem */
@@ -305,7 +306,7 @@ enum FTmode { FT_NONE    =0,   //-> No any Redundant or fault toleant behavior.
 	      FT_UNDEF   =999  //-> (Initial value, actually unused.)
 };
 struct FToption {   //-*- Static configuration -*-
-    bool d2h_simple;   //[0] If "true" then disable all redundant func.
+    bool d2h_simple;   //[0] If "true" then disable all redundant func, lower latency.
     bool d2h_reduncpy; //[1] 
     bool d2h_compare;  //[2] "true": compare data between redundant recieved.
     bool d2h_statics;  //[3] "true": count unmatched or matched.
@@ -344,16 +345,6 @@ public:
     int         uniq;         // unique in all PhyDev including svrCand[].
     
     BkupMemList memlist;      // GPU global memory mirroring region.
-    //HistList    reclist;      // GPU CUDA function called history.
-    //<--- record history of CUDA API ON/OFF dynamically.
-    // void        recordON(void);    // switch to enable.
-    // void        recordOFF(void);   // switch to disable.
-    // bool        isRecording(void); // get current stat.
-    // void        appendRecord(int funcID, void *argp);
-private:
-    bool        history_recording; //
-    //--->
-public:
     int        *d_faultconf;  //
 
     //<-- Fault tolerant static configurations.
@@ -503,8 +494,7 @@ public:
 //*******************************************************************************
 void *periodicCheckpoint(void *arg);
 
-struct ClientState
-{
+struct ClientState {
 public:
     char      dscuda_path[512];
     int       Nvdev;             // # of virtual devices available.
@@ -512,14 +502,25 @@ public:
     FTmode    ft_mode;
     FToption  ft;
     /* Mode */
-    int       use_ibv;             /* 1:IBV, 0:RPC   */
+    bool      use_ibv;             /* true:IBV, false:RPC   */
+    void      useIbv(void);
+    void      useRpc(void);
+    bool      isIbv(void);
+    bool      isRpc(void);
+    
     int       autoverb;           /* {0, 1, 2, 3} Redundant calculation level */
     int       cp_period;          // Period of checkpoint [sec] defined by DSCUDA_CP_PERIOD
     int       daemon;
-    int       historical_calling;
+    
+    bool      rollback_calling;
+    void      setRollbackCalling(void);
+    void      unsetRollbackCalling(void);
+    bool      isRollbackCalling(void);
+    
     //** <-- DS-CUDA client log/err output files.
     FILE     *dscuda_stdout;     // log-file descriptor.
     FILE     *dscuda_stderr;     // err-file descriptor.
+    FILE     *dscuda_chkpnt;     // err-file descriptor.
     //** --> DS-CUDA client log/err output files.
     
     /*CONSRUCTOR, DESTRUCTOR*/
@@ -527,26 +528,13 @@ public:
     ~ClientState(void);
     
     /*METHODS*/
-    unsigned getIpAddress() { return ip_addr; }
-    void initVirtualDevice(void); // Update the list of virtual devices
-    
-    void useIbv() { use_ibv = 1; }
-    void useRpc() { use_ibv = 0; }
-    int  isIbv()  { return use_ibv;       }
-    int  isRpc()  { return (1 - use_ibv); }
-
-    void   setAutoVerb(int val=1)  { autoverb = val; }
-    void unsetAutoVerb() { autoverb = 0; }
-    int  isAutoVerb(void)    { return autoverb; }
-
-    void   setHistoCalling() { historical_calling = 1; }
-    void unsetHistoCalling() { historical_calling = 0; }
-    int  isHistoCalling()   { return historical_calling; }
+    unsigned  getIpAddress(void);
+    void      initVirtualDevice(void); // Update the list of virtual devices
 
     /*CHECKPOINT*/
-    void  collectEntireRegions(void);
-    int   verifyEntireRegions(void);
-    void  udpateMemlist(void);
+    void      collectEntireRegions(void);
+    int       verifyEntireRegions(void);
+    void      udpateMemlist(void);
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
     unsigned  ip_addr;     // Client IP address.
@@ -556,8 +544,9 @@ private:
     //<-- DSCUDA log filename.
     char      dslog_filename[80]; // ex.) "c20141224_235901.dslog", 'c' means clnt.
     char      dserr_filename[80]; // ex.) "c20141224_235901.dserr", 'c' means clnt.
-    void setIpAddress(unsigned int val) { ip_addr = val; }
-    void configFT(void);
+    char      dschp_filename[80]; // ex.) "c20141224_235901.dschp", 'c' means clnt.
+    void      setMyIPAddr(unsigned);
+    void      configFT(void);
 }; // ClientState
 
 extern ClientState St;
@@ -579,7 +568,7 @@ extern RCmappedMem    *RCmappedMemListTail;
 
 void printModuleList(void);
 void printVirtualDeviceList();
-int  requestDaemonForDevice(char *ipaddr, int devid, int useibv);
+int  requestDaemonForDevice(char *ipaddr, int devid, bool useibv);
 int  vdevidIndex(void);
 
 int  dscudaLoadModule(char *srcname, char *strdata);

@@ -43,14 +43,12 @@ static void ibvDscudaLaunchKernel(int moduleid, int kid, char *kname,
                                   int narg, IbvArg *arg, int vdevid, int raidid);
 
 int
-dscudaRemoteCallType(void)
-{
+dscudaRemoteCallType(void) {
     return RC_REMOTECALL_TYPE_IBV;
 }
 
 void
-setupConnection(int idev, PhyDev *sp)
-{
+setupConnection(int idev, PhyDev *sp) {
     struct addrinfo *addr;
     struct rdma_cm_id *cmid= NULL;
     struct rdma_event_channel *ec = NULL;
@@ -464,7 +462,7 @@ cudaMemcpyD2H(void *dst, const void *src, size_t count, int vdevid)
         }
         else if (bcmp(dst, &rpkt->dstbuf, count) != 0) {
             WARN(1, "\n\ncudaMemcpy() data copied from device%d & device0 UNMATCHED.\n\n\n", i);
-            if (St.isAutoVerb()) {
+            if (St.isRecording()) {
                 CudaMemcpyArgs args( dst, (void *)src, count, cudaMemcpyDeviceToHost );
                 HISTREC.add(dscudaMemcpyD2HId, (void *)&args);
                 HISTREC.recall();
@@ -618,7 +616,7 @@ cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
         exit(1);
     }
 
-    if (St.isAutoVerb()) {
+    if (St.isRecording()) {
         CudaMemcpyArgs args;
         switch (kind) {
           case cudaMemcpyHostToDevice:
@@ -791,7 +789,7 @@ ibvDscudaLaunchKernelWrapper(int *moduleid, int kid, char *kname,
         mem = mem->next;
     }
 
-    if (St.isAutoVerb()) {
+    if (St.isRecording()) {
         cudaIbvLaunchKernelArgs args2;
         args2.moduleid = moduleid;
         args2.kid = kid;

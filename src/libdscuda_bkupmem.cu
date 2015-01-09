@@ -90,16 +90,63 @@ BkupMem::init( void *uva_ptr, void *d_ptr, int sz) {
     prev = NULL;
     next = NULL;
 }
-int
-BkupMem::calcSum(void) {
-    int sum=0;
-    int *ptr = (int *)h_region;
-
-    for (int i=0; i<size; i+=sizeof(int)) {
-	sum += *ptr;
-	ptr++;
+uint32_t
+BkupMem::calcChecksum(void) {
+    return dscuda::calcChecksum( this->h_region, this->size );
+}
+cudaError_t
+BkupMem::memcpyD2H( const void *v_ptr, size_t count,
+		    struct rpc_err *rpc_result, CLIENT *Clnt ) {
+    cudaError_t cuerr;
+    
+    void   *d_ptr;
+    void   *h_ptr;
+    size_t  rx_size;
+    if (v_ptr != NULL) 	{
+	d_ptr   = this->translateAddrVtoD( v_ptr );
+	h_ptr   = this->translateAddrVtoH( v_ptr );
+	rx_size = count;
     }
-    return sum;
+    else {
+	d_ptr   = this->d_region;
+	h_ptr   = this->h_region;
+	rx_size = this->size;
+    }
+    
+    if (d_ptr == NULL) {//Unexpected error.
+	WARN(0, "%s():d_ptr = NULL.\n", __func__);
+	exit(1);
+    }
+    if (h_ptr == NULL) {//Unexpected error.
+	WARN(0, "%s():h_ptr = NULL.\n", __func__);
+	exit(1);
+    }
+    //<-- Kick RPC!
+    dscudaMemcpyD2HResult *rp = dscudamemcpyd2hid_1((RCadr)d_ptr, rx_size, Clnt);
+    //--> Kick RPC!
+
+    //<--- RPC fault check.
+    clnt_geterr(Clnt, rpc_result);
+    if (rpc_result->re_status == RPC_SUCCESS) {//RPC was Completed successfully.
+	if (rp == NULL) {//NULL returned from cudaMemcpy() on remote host.
+	    WARN(0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n",
+		 __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, "dscudamemcpyd2hid_1() in BkupMem::memcpyD2H()");
+	    exit(EXIT_FAILURE);
+	}
+	else {
+	    cuerr = (cudaError_t)rp->err;
+	}
+    }
+#if 0 // temporary disable
+    else {
+	rpcErrorHook( &rpc_result );
+    }
+#endif
+    //--> RPC fault check.
+    memcpy( h_ptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
+    xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
+    return cuerr;
 }
 //========================================================================
 // Constuctor of "BkupMemList" class.
@@ -162,35 +209,58 @@ BkupMemList::countRegion( void ) {
     }
     return count;
 }
-
-int
-BkupMemList::checkSumRegion( void *targ, int size ) {
-    int sum=0;
-    int  *ptr = (int *)targ;
-    
-    for (int s=0; s < size; s+=sizeof(int)) {
-	sum += *ptr;
-	ptr++;
-    }
-    return sum;
-}
 /* Class: "BkupMemList"
  * Method: query()
- *
  */
 BkupMem*
-BkupMemList::query(void *uva_ptr) {
+BkupMemList::query(const void *v_ptr) {
     BkupMem *mem = head;
     int i = 0;
     while (mem != NULL) { // Search the target from head to tail in the list.
-	if (mem->v_region == uva_ptr) { /* tagged by its address on GPU */
-	    //WARN(10, "---> %s(%p): return %p\n", __func__, uva_ptr, mem);
+	char *v_region_end = (char *)mem->v_region + mem->size;
+	if ( (mem->v_region <= (char *)v_ptr) &&
+	     ((char *)v_ptr <  v_region_end ) ) {
+	    //WARN(10, "---> %s(%p): return %p\n", __func__, v_ptr, mem);
 	    return mem;
 	}
-	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, uva_ptr, i, mem->v_region);
+	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, v_ptr, i, mem->v_region);
 	mem = mem->next;
 	i++;
     }
+    return NULL;
+}
+void*
+BkupMemList::queryHostPtr(const void *v_ptr) {
+    BkupMem *mem   = head;
+    void    *h_ptr = NULL;
+    int   i = 0;
+    
+    while (mem) { /* Search */
+	h_ptr = mem->translateAddrVtoH(v_ptr);
+	if (h_ptr != NULL) {
+	    return h_ptr;
+	}
+	mem = mem->next;
+	i++;
+    }
+    WARN(0, "%s():not found host pointer.\n", __func__);
+    return NULL;
+}
+void*
+BkupMemList::queryDevicePtr(const void *v_ptr) {
+    BkupMem *mem   = head;
+    void    *d_ptr = NULL;
+    int   i = 0;
+    
+    while (mem) { /* Search */
+	d_ptr = mem->translateAddrVtoD(v_ptr);
+	if (d_ptr != NULL) {
+	    return d_ptr;
+	}
+	mem = mem->next;
+	i++;
+    }
+    WARN(0, "%s():not found device pointer.\n", __func__);
     return NULL;
 }
 /*
@@ -256,41 +326,6 @@ BkupMemList::remove(void *uva_ptr) {
     }
 }
 
-void*
-BkupMemList::queryHostPtr(const void *v_ptr) {
-    BkupMem *mem = head;
-    void *h_ptr = NULL;
-    int   i = 0;
-    
-    while (mem) { /* Search */
-	h_ptr = mem->translateAddrVtoH(v_ptr);
-	if (h_ptr != NULL) {
-	    return h_ptr;
-	}
-	mem = mem->next;
-	i++;
-    }
-    WARN(0, "%s():not found host pointer.\n", __func__);
-    return NULL;
-}
-
-void*
-BkupMemList::queryDevicePtr(const void *v_ptr) {
-    BkupMem *mem = head;
-    void *d_ptr = NULL;
-    int   i = 0;
-    
-    while (mem) { /* Search */
-	d_ptr = mem->translateAddrVtoD(v_ptr);
-	if (d_ptr != NULL) {
-	    return d_ptr;
-	}
-	mem = mem->next;
-	i++;
-    }
-    WARN(0, "%s():not found device pointer.\n", __func__);
-    return NULL;
-}
 
 /* 
  * Resore the all data of a GPU device with backup data on client node.
@@ -298,21 +333,21 @@ BkupMemList::queryDevicePtr(const void *v_ptr) {
 void
 BkupMemList::restructDeviceRegion(void) {
     BkupMem *mem = head;
-    int      verb = St.isAutoVerb();
+    //int      verb = St.isAutoVerb();
     int      copy_count = 0;
     unsigned char    *mon;
     float            *fmon;
     int              *imon;
 
     WARN(2, "%s(void).\n", __func__);
-    St.unsetAutoVerb();
+    //St.unsetAutoVerb();
     while (mem != NULL) {
 	WARN(1, "###   + region[%d] (dst=%p, src=%p, size=%d) . checksum=0x%08x\n",
-	     copy_count++, mem->d_region, mem->h_region, mem->size, mem->calcSum());
+	     copy_count++, mem->d_region, mem->h_region, mem->size, mem->calcChecksum());
 	//mem->restoreSafeRegion();
 	mem = mem->next;
     }
-    St.setAutoVerb( verb );
+    //St.setAutoVerb( verb );
     WARN(2, "+--- done.\n");
 }
 

@@ -37,6 +37,8 @@ export LD_LIBRARY_PATH=$DSCUDA_PATH/lib:$CUDAPATH/lib64:$CUDAPATH/lib:$LD_LIBRAR
 export PATH=$DSCUDA_PATH/src:$CUDAPATH/bin:$PATH
 export OMP_NUM_THREADS=1
 
+# @cudaMemcpyD2H, simple
+export DSCUDA_FT0=1
 # @cudaMemcpyD2H, reduncpy
 export DSCUDA_FT1=0
 # @cudaMemcpyD2H, compare
@@ -45,6 +47,7 @@ export DSCUDA_FT2=0
 export DSCUDA_FT3=0
 # @cudaMemcpyD2H, rollback
 export DSCUDA_FT4=0
+
 # @Checkpointing, enable
 export DSCUDA_FT8=1
 # @Checkpointing, reduncpy 

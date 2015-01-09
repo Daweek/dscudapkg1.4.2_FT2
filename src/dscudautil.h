@@ -12,6 +12,7 @@
 #define DSCUDAUTIL_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <time.h>
 
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);
@@ -24,6 +25,8 @@ namespace dscuda {
     int     sprintfDate(char *s, int fmt=0);
     void*   xmalloc(size_t size);
     void    xfree(void *p);
+    int      searchDaemon(void);
+    uint32_t calcChecksum(void *, size_t);
 }
 
 extern struct ClientState St;
@@ -79,12 +82,11 @@ extern struct ClientState St;
 #define WARN_CP(lv, fmt, args...) {\
 	if (lv <= dscuda::getWarnLevel()) {\
 	    MACRO_TSTAMP_FORMAT\
-            fprintf( St.dscuda_stdout, "[%s](%d)CP: ", tfmt, lv);\
-	    fprintf( St.dscuda_stdout, fmt, ## args);\
-	    fflush( St.dscuda_stdout );\
+            fprintf( St.dscuda_chkpnt, "[%s](%d) ", tfmt, lv);\
+	    fprintf( St.dscuda_chkpnt, fmt, ## args);\
+	    fflush( St.dscuda_chkpnt );\
 	}\
     }
-
 
 //-- [DSCUDA SERVER] WARNING Message.
 #define SWARN(lv, fmt, args...)						\
