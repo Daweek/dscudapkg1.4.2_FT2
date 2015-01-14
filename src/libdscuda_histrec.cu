@@ -204,7 +204,7 @@ HistList::clrRecallFlag(void) {
 }
 void
 HistList::print(void) {
-    const int print_lim = 64;
+    const int print_lim = 16;
     bool print_omit = false;
     WARN_CP(1, "<--- Record of CUDA API history Stack  *******\n");
     if (this->length == 0) {
@@ -245,11 +245,12 @@ int
 HistList::recall(void) {
     WARN_CP(1, "            HistList::%s() {\n", __func__);
     static int called_depth = 0;
-    const int print_lim = 64;
+    const int print_lim = 16;
     bool print_omit = false;
     int result;
     int warnlevel_stack = dscuda::getWarnLevel();
-   
+    double t_lap=0.0, dt;
+    
     setRecallFlag();
 
     WARN_CP(1, "            called_depth= %d.\n", called_depth);
@@ -261,7 +262,8 @@ HistList::recall(void) {
 	exit(1);
     }
     else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
-	called_depth++;       
+	called_depth++;
+	dscuda::stopwatch(&t_lap);
 	for (int i=0; i< this->length; i++) { /* Do recall history */
 	    if ( i < print_lim || i > (length - print_lim) ) {  // eliminate too many print line
 		WARN_CP(1, "            (._.)Rollback CUDA API call[%4d/%d]...............\n", i, length-1);
@@ -278,6 +280,8 @@ HistList::recall(void) {
 	    (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
 	    dscuda::setWarnLevel(warnlevel_stack);
 	}
+	dt = dscuda::stopwatch(&t_lap);
+	WARN_CP(1, "            Rollback elapsed %f sec\n", dt);
 	called_depth=0;
 	result = 0;
     }
@@ -595,8 +599,9 @@ recallRpcLaunchKernel(void *argp) {
 #else
     VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
     bool rec_en_stack = vdev->isRecording();
+    int  flag = 0;
     vdev->recordOFF();
-    vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
+    vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args, flag);
     if (rec_en_stack) vdev->recordON();
 #endif
 }

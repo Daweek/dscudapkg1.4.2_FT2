@@ -44,7 +44,7 @@ enum {
     RC_REMOTECALL_TYPE_IBV = 2,
 };
 
-typedef struct FaultConf {
+struct FaultConf {
     char tag[32];      /* <= "DSCUDA_FAULT_INJECTION" */
     int  overwrite_en; /* Overwrite by DS-CUDA server */
     int  fault_en;     /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
@@ -86,6 +86,6 @@ typedef struct FaultConf {
 	}
     }
 #endif
-} FaultConf_t;
+};
    
 #endif // DSCUDA_H

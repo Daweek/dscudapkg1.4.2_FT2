@@ -92,7 +92,7 @@ public:
     void*    translateAddrVtoD (const void *v_ptr);
     void*    translateAddrVtoH (const void *v_ptr);
     //
-    cudaError_t memcpyD2H( const void*, size_t, struct rpc_err*, CLIENT* );
+    cudaError_t memcpyD2H( const void*, size_t, struct rpc_err*, int, CLIENT* );
 private:
 };
 //********************************************************************
@@ -389,12 +389,12 @@ public:
     cudaError_t cudaMemcpyH2D(const void *v_ptr, const void *h_ptr, size_t,
 			      struct rpc_err *);
     cudaError_t cudaMemcpyD2H(const void *h_ptr, const void *v_ptr, size_t,
-			      struct rpc_err *);
+			      int flag/*FT*/, struct rpc_err *);
     cudaError_t cudaThreadSynchronize( struct rpc_err *);
 
     void        launchKernel(int moduleid, int kid, char *kname, RCdim3 gdim,
 			     RCdim3 bdim, RCsize smemsize, RCstream stream,
-			     RCargs args, struct rpc_err *);
+			     RCargs, struct rpc_err *, int );
     //<--- Migration series
     void rpcErrorHook(struct rpc_err *err);
     void migrateServer(PhyDev *spare);
@@ -403,7 +403,7 @@ public:
     void migrateDeliverAllModules(void);
     void migrateRebuildModulelist(void);
     //--->
-    void collectEntireRegions(void);
+    void collectEntireRegions(int flag/*FT*/);
 };  /* "RC" means "Remote Cuda" which is old name of DS-CUDA  */
 
 //*************************************************
@@ -479,8 +479,7 @@ public:
     cudaError_t cudaMemcpyD2H(void *h_ptr, const void *d_ptr, size_t size);
     cudaError_t cudaThreadSynchronize(void);
 
-    void  launchKernel(int module_index, int kid, char *kname, RCdim3 gdim,
-		       RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args);
+    void  launchKernel(int, int, char*, RCdim3, RCdim3, RCsize, RCstream, RCargs, int);
     /*CP*/
     void  remallocRegionsGPU(int num_svr); //cudaMemcpyD2H-all
     void  collectEntireRegions(void);
@@ -732,5 +731,6 @@ rpcDscudaLaunchKernelWrapper(int moduleid, int kid, char *kname,
 extern pthread_mutex_t cudaMemcpyD2H_mutex;
 extern pthread_mutex_t cudaMemcpyH2D_mutex;
 extern pthread_mutex_t cudaKernelRun_mutex;
+extern pthread_mutex_t cudaElse_mutex;
 
 #endif //__LIBDSCUDA_H__

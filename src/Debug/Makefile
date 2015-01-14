@@ -106,21 +106,24 @@ dscudasvr: dscudasvr.o dscudasvr_rpc.o $(DSCUDASVR_OBJ)
 	@echo "//**  dscudasvr  ***"
 	@echo "//******************"
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
-#----
+
 dscudasvr_rpc.o: dscudasvr_rpc.cu dscudasvr_rpc.h
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
-#----
+
 dscudasvr.o: dscudasvr.cu dscuda.h dscudarpc.h sockutil.h
 	@echo "//********************"
 	@echo "//**  dscudasvr.o  ***"
 	@echo "//********************"
 	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -c -o $@ $<
-#----
-dscudasvr_fault:  dscudasvr_fault.o dscudasvr_rpc.o $(DSCUDASVR_OBJ)
+#---- FAULT server 
+dscudasvr_fault:  dscudasvr_fault.o dscudasvr_rpc_fault.o $(DSCUDASVR_OBJ)
 	$(CXX) $(CUDALIBS) -lcufft -lcudart -lcuda -lpthread -o $@ $^
 
-dscudasvr_fault.o: dscudasvr.cu dscudasvr_rpc.cu dscuda.h dscudarpc.h sockutil.h  
+dscudasvr_fault.o: dscudasvr.cu dscuda.h dscudarpc.h sockutil.h  
 	$(NVCC) -c $(CUDAINCLUDES) -DRPC_ONLY=1 -DFAULT_AT_D2H=1 -o $@ $<
+
+dscudasvr_rpc_fault.o: dscudasvr_rpc.cu dscudasvr_rpc.h
+	$(NVCC) $(CUDAINCLUDES) -DRPC_ONLY=1 -DFAULT_AT_D2H=1 -c -o $@ $<
 
 sockutil.o: sockutil.c sockutil.h
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<

@@ -35,19 +35,19 @@ using dscuda::xmalloc;
 using dscuda::xfree;
 
 static int WarnLevel = 2;
-static int CallFaultServer = 0;
+static bool CallFaultServer = false;
 
-typedef struct Server_t {
+struct Server {
     pid_t pid;
     int   port;
-    struct Server_t *prev;
-    struct Server_t *next;
-} Server;
+    struct Server *prev;
+    struct Server *next;
+};
 
-static void signal_from_child(int sig);
+static void    signal_from_child(int sig);
 static Server *server_with_pid(pid_t pid);
-static int unused_server_port(int devid);
-static void* response_to_search( void *arg );
+static int     unused_server_port(int devid);
+static void   *response_to_search( void *arg );
 
 static int Daemonize = 0;
 static int Nserver = 0;
@@ -55,9 +55,8 @@ static Server *ServerListTop = NULL;
 static Server *ServerListTail = NULL;
 static char LogFileName[1024] = "dscudad.log";
 
-static
-int create_daemon_socket(in_port_t port, int backlog)
-{
+static int
+create_daemon_socket(in_port_t port, int backlog) {
     struct sockaddr_in me;
     int sock;
 
@@ -91,9 +90,8 @@ int create_daemon_socket(in_port_t port, int backlog)
     return sock;
 }
 
-static
-void register_server(pid_t pid, int port)
-{
+static void
+register_server(pid_t pid, int port) {
     DWARN(3, "register_server(%d, %d).\n", pid, port);
     Server *svr = (Server *)xmalloc(sizeof(Server));
 
@@ -110,9 +108,8 @@ void register_server(pid_t pid, int port)
     DWARN(3, "register_server done.\n");
 }
 
-static
-void unregister_server(pid_t pid)
-{
+static void
+unregister_server(pid_t pid) {
     DWARN(3, "unregister_server(%d).\n", pid);
     Server *svr = server_with_pid(pid);
     if (!svr) {
@@ -142,10 +139,8 @@ void unregister_server(pid_t pid)
     DWARN(3, "==============================================================================\n");
     xfree(svr);
 }
-
-static
-Server *server_with_pid(pid_t pid)
-{
+static Server*
+server_with_pid(pid_t pid) { 
     Server *svr = ServerListTop;
     while (svr) {
         if (svr->pid == pid) {
@@ -155,10 +150,8 @@ Server *server_with_pid(pid_t pid)
     }
     return NULL; // server with pid not found in the list.
 }
-
-static
-int unused_server_port(int devid)
-{
+static int
+unused_server_port(int devid) {
     int inuse;
     Server *s;
 
@@ -182,10 +175,8 @@ int unused_server_port(int devid)
     DWARN(3, "unused_server_port: all ports in use.\n");
     return -1;
 }
-
-static
-void spawn_server(int listening_sock)
-{
+static void
+spawn_server(int listening_sock) {
     int len, dev, sock, sport;
     pid_t pid;
     char *argv[16];
@@ -220,11 +211,12 @@ void spawn_server(int listening_sock)
         DWARN( 3, "spawn a server with sock: %d\n", sock );
         register_server( pid, sport );
         close( sock );
-    } else { // child
+    }
+    else { // child
 #if RPC_ONLY
         argv[0] = "dscudasvr_rpc";
 #else
-	if ( CallFaultServer == 0 ) {
+	if (!CallFaultServer) {
 	    argv[0] = "dscudasvr";
 	} else {
 	    argv[0] = "dscudasvr_fault";
@@ -249,12 +241,11 @@ void spawn_server(int listening_sock)
         exit( EXIT_FAILURE );
     }
 }
-
 /*
  *
  */
-static void signal_from_child( int sig )
-{
+static void
+signal_from_child( int sig ) {
     int status;
     int pid = waitpid(-1, &status, WNOHANG);
 
@@ -282,8 +273,8 @@ static void signal_from_child( int sig )
 /*
  * Run in separated thread by pthread_create();
  */
-static void *response_to_search( void *arg )
-{
+static void*
+response_to_search( void *arg ) {
     char sendbuf[ SEARCH_BUFLEN_TX ];
     char recvbuf[ SEARCH_BUFLEN_RX ];
 
@@ -367,13 +358,11 @@ static void *response_to_search( void *arg )
     close(sock);
     return NULL;
 }
-
 /*
  *
  */
-static
-void initEnv(void)
-{
+static void
+initEnv(void) {
     static int firstcall = 1;
     char *env;
 
@@ -396,8 +385,8 @@ void initEnv(void)
 /*
  *
  */
-void showUsage(char *command)
-{
+void
+showUsage(char *command) {
     fprintf(stderr,
             "usage: %s [-d]\n"
             "  -d: daemonize.\n",
@@ -406,9 +395,8 @@ void showUsage(char *command)
 
 extern char *optarg;
 extern int optind;
-static
-void parseArgv( int argc, char **argv )
-{
+static void
+parseArgv( int argc, char **argv ) {
     int c;
     char *param = "dfl:h";
 
@@ -418,7 +406,7 @@ void parseArgv( int argc, char **argv )
             Daemonize = 1;
             break;
 	case 'f':
-	    CallFaultServer = 1;
+	    CallFaultServer = true;
 	    break;
 	case 'l':
             strncpy( LogFileName, optarg, sizeof(LogFileName) );
@@ -430,22 +418,22 @@ void parseArgv( int argc, char **argv )
         }
     }
 }
-
-int main(int argc, char **argv)
-{
+int
+main(int argc, char **argv) {
     int sock, nserver0;
     int errfd;
     pthread_t th;
     
     pthread_create( &th, NULL, response_to_search, NULL );
     parseArgv( argc, argv );
-    if ( Daemonize ) {
+    if (Daemonize) {
         if ( fork() ) {
             exit(0);
-        } else {
+        }
+	else {
             close(2);
             errfd = open( LogFileName, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR );
-            if ( errfd < 0 ) {
+            if (errfd < 0) {
 		perror( "open:" );
             }
             close(0);
@@ -461,11 +449,11 @@ int main(int argc, char **argv)
 	exit(1);
     }
     nserver0 = Nserver;
-    for (;;) {
-        if ( Nserver < RC_NSERVERMAX ) {
+    while(true) {
+        if (Nserver < RC_NSERVERMAX) {
             spawn_server( sock );
 
-            if ( nserver0 != Nserver ) {
+            if (nserver0 != Nserver) {
                 if ( Nserver < RC_NSERVERMAX ) {
                     DWARN(0, "%d servers active (%d max possible).\n", Nserver, RC_NSERVERMAX);
                 } else {
@@ -481,3 +469,4 @@ int main(int argc, char **argv)
     pthread_join( th, NULL );
     exit(1);
 }
+//EOF

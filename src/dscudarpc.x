@@ -351,7 +351,8 @@ program DSCUDA_PROG {
         dscudaResult                     dscudaEventQueryId(RCevent event) = 506;
 
         /* Execution Control */
-        void                            dscudaLaunchKernelId(int moduleid, int kid, string kname, RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args) = 600;
+        /*void                            dscudaLaunchKernelId(int moduleid, int kid, string kname, RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args) = 600;*/
+        void                            dscudaLaunchKernelId(int moduleid, int kid, string kname, RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args, int flag) = 600;
         dscudaLoadModuleResult           dscudaLoadModuleId(RCipaddr ipaddr, RCpid pid, string mname, string image) = 601;
         dscudaFuncGetAttributesResult    dscudaFuncGetAttributesId(int moduleid, string kname) = 602;
 
@@ -361,7 +362,8 @@ program DSCUDA_PROG {
 
         dscudaMemcpyH2HResult            dscudaMemcpyH2HId(RCadr dst, RCbuf src, RCsize count) = 702;
         dscudaResult                     dscudaMemcpyH2DId(RCadr dst, RCbuf src, RCsize count) = 703;
-        dscudaMemcpyD2HResult            dscudaMemcpyD2HId(RCadr src, RCsize count) = 704;
+        /* dscudaMemcpyD2HResult            dscudaMemcpyD2HId(RCadr src, RCsize count) = 704; */
+        dscudaMemcpyD2HResult            dscudaMemcpyD2HId(RCadr src, RCsize count, int flag) = 704;
         dscudaResult                     dscudaMemcpyD2DId(RCadr dst, RCadr src, RCsize count) = 705;
 
         dscudaMemcpyAsyncH2HResult       dscudaMemcpyAsyncH2HId(RCadr dst, RCbuf src, RCsize count, RCstream stream) = 706;

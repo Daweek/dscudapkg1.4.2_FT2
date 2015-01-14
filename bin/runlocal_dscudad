@@ -54,15 +54,17 @@ Check_args() {
 #
 # main() 
 #
-Check_args;
+#Check_args;
 
-export DSCUDA_FAULT_INJECTION=${1}
+#export DSCUDA_FAULT_INJECTION=${1}
 
-Init_env ${1}
+Init_env;
 echo $LD_LIBRARY_PATH
 Print_env;
-#$DSCUDA_PATH/bin/dscudad 2>&1 | tee ${logpath}/${logfile} 
-${DSCUDA_PATH}/bin/dscudad
+#$DSCUDA_PATH/bin/dscudad 2>&1 | tee ${logpath}/${logfile}
+
+echo "${DSCUDA_PATH}/bin/dscudad $*"
+${DSCUDA_PATH}/bin/dscudad $* 2>&1 | tee ${logfile}
 #$DSCUDA_PATH/bin/dscudasvr -s 0 -d 0
 
 

@@ -66,13 +66,11 @@ dscudaGetIpaddrString(unsigned int addr) {
  * returns the number of seconds passed since *t0.
  */
 double
-RCgetCputime(double *t0) {
+dscuda::stopwatch(double *t0) {
     struct timeval t;
-    double tnow, dt;
-
     gettimeofday(&t, NULL);
-    tnow = t.tv_sec + t.tv_usec/1000000.0;
-    dt = tnow - *t0;
+    double tnow = t.tv_sec + t.tv_usec/1000000.0;
+    double dt   = tnow - *t0;
     *t0 = tnow;
     return dt;
 }

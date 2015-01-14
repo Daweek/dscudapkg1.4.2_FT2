@@ -75,8 +75,8 @@ rpcWatchDisconnection(void *arg) {
     return NULL;
 }
 
-int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
-{
+int
+rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     CUresult cuerr;
     CUfunction kfunc = *kfuncp;
     int ival;
@@ -84,7 +84,7 @@ int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
     void *pval;
     RCarg noarg;
     RCarg *argp = &noarg;
-    FaultConf_t *fault_conf; // moikawa add
+    FaultConf *fault_conf; // moikawa add
 
     noarg.offset = 0;
     noarg.size = 0;
@@ -139,7 +139,7 @@ int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
           case dscudaArgTypeV: /*Structure, etc.*/
             pval = argp->val.RCargVal_u.valuev;
 	    /*if environ var found, then update its value with localhost's one.*/
-	    fault_conf = (FaultConf_t *)pval;
+	    fault_conf = (FaultConf *)pval;
 	    if (strncmp(fault_conf->tag, IDTAG_0, 32)==0) {
                 SWARN(10, "DSCUDA_FAULT_INJECTION found, ");
 		if (fault_conf->overwrite_en) {
@@ -171,7 +171,8 @@ int rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp)
     return argp->offset + argp->size;
 }
 
-void setupRpc(void) {
+void
+setupRpc(void) {
     register SVCXPRT *transp;
     unsigned long int prog = DSCUDA_PROG;
     pthread_t tid;
@@ -358,8 +359,7 @@ dscudapeekatlasterrorid_1_svc(struct svc_req *sr)
 }
 
 dscudaGetErrorStringResult *
-dscudageterrorstringid_1_svc(int err, struct svc_req *sr)
-{
+dscudageterrorstringid_1_svc(int err, struct svc_req *sr) {
     static dscudaGetErrorStringResult res;
 
     SWARN(3, "cudaGetErrorString(");
@@ -369,15 +369,11 @@ dscudageterrorstringid_1_svc(int err, struct svc_req *sr)
     SWARN(3, "%d) done.\n", err);
     return &res;
 }
-
-
 /*
  * Device Management
  */
-
 dscudaGetDeviceResult *
-dscudagetdeviceid_1_svc(struct svc_req *sr)
-{
+dscudagetdeviceid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     int device;
     static dscudaGetDeviceResult res;
@@ -393,10 +389,8 @@ dscudagetdeviceid_1_svc(struct svc_req *sr)
          (unsigned long)&device, device, res.device);
     return &res;
 }
-
 dscudaGetDeviceCountResult *
-dscudagetdevicecountid_1_svc(struct svc_req *sr)
-{
+dscudagetdevicecountid_1_svc(struct svc_req *sr) {
     int count;
     static dscudaGetDeviceCountResult res;
 
@@ -419,8 +413,7 @@ dscudagetdevicecountid_1_svc(struct svc_req *sr)
 }
 
 dscudaGetDevicePropertiesResult *
-dscudagetdevicepropertiesid_1_svc(int device, struct svc_req *sr)
-{
+dscudagetdevicepropertiesid_1_svc(int device, struct svc_req *sr) {
     cudaError_t err;
     static int firstcall = 1;
     static dscudaGetDevicePropertiesResult res;
@@ -445,8 +438,7 @@ dscudagetdevicepropertiesid_1_svc(int device, struct svc_req *sr)
 }
 
 dscudaDriverGetVersionResult *
-dscudadrivergetversionid_1_svc(struct svc_req *sr)
-{
+dscudadrivergetversionid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     int ver;
     static dscudaDriverGetVersionResult res;
@@ -464,8 +456,7 @@ dscudadrivergetversionid_1_svc(struct svc_req *sr)
 }
 
 dscudaRuntimeGetVersionResult *
-dscudaruntimegetversionid_1_svc(struct svc_req *sr)
-{
+dscudaruntimegetversionid_1_svc(struct svc_req *sr) {
     cudaError_t err;
     int ver;
     static dscudaRuntimeGetVersionResult res;
@@ -483,8 +474,7 @@ dscudaruntimegetversionid_1_svc(struct svc_req *sr)
 }
 
 dscudaResult *
-dscudasetdeviceid_1_svc(int device, struct svc_req *sr)
-{
+dscudasetdeviceid_1_svc(int device, struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -501,8 +491,7 @@ dscudasetdeviceid_1_svc(int device, struct svc_req *sr)
 }
 
 dscudaResult *
-dscudasetdeviceflagsid_1_svc(unsigned int flags, struct svc_req *sr)
-{
+dscudasetdeviceflagsid_1_svc(unsigned int flags, struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -522,8 +511,7 @@ dscudasetdeviceflagsid_1_svc(unsigned int flags, struct svc_req *sr)
 }
 
 dscudaChooseDeviceResult *
-dscudachoosedeviceid_1_svc(RCbuf prop, struct svc_req *sr)
-{
+dscudachoosedeviceid_1_svc(RCbuf prop, struct svc_req *sr) {
     cudaError_t err;
     int device;
     static dscudaChooseDeviceResult res;
@@ -542,8 +530,7 @@ dscudachoosedeviceid_1_svc(RCbuf prop, struct svc_req *sr)
 
 
 dscudaResult *
-dscudadevicesynchronize_1_svc(struct svc_req *sr)
-{
+dscudadevicesynchronize_1_svc(struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
 
@@ -559,8 +546,7 @@ dscudadevicesynchronize_1_svc(struct svc_req *sr)
 }
 
 dscudaResult *
-dscudadevicereset_1_svc(struct svc_req *sr)
-{
+dscudadevicereset_1_svc(struct svc_req *sr) {
     cudaError_t err;
     bool all = true;
     static dscudaResult res;
@@ -582,8 +568,7 @@ dscudadevicereset_1_svc(struct svc_req *sr)
  */
 
 dscudaStreamCreateResult *
-dscudastreamcreateid_1_svc(struct svc_req *sr)
-{
+dscudastreamcreateid_1_svc(struct svc_req *sr) {
     static dscudaStreamCreateResult res;
     cudaError_t err;
     cudaStream_t stream;
@@ -598,10 +583,8 @@ dscudastreamcreateid_1_svc(struct svc_req *sr)
 
     return &res;
 }
-
 dscudaResult *
-dscudastreamdestroyid_1_svc(RCstream stream, struct svc_req *sr)
-{
+dscudastreamdestroyid_1_svc(RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -616,8 +599,7 @@ dscudastreamdestroyid_1_svc(RCstream stream, struct svc_req *sr)
 }
 
 dscudaResult *
-dscudastreamwaiteventid_1_svc(RCstream stream, RCevent event, unsigned int flags, struct svc_req *sr)
-{
+dscudastreamwaiteventid_1_svc(RCstream stream, RCevent event, unsigned int flags, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -632,8 +614,7 @@ dscudastreamwaiteventid_1_svc(RCstream stream, RCevent event, unsigned int flags
 }
 
 dscudaResult *
-dscudastreamsynchronizeid_1_svc(RCstream stream, struct svc_req *sr)
-{
+dscudastreamsynchronizeid_1_svc(RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -648,8 +629,7 @@ dscudastreamsynchronizeid_1_svc(RCstream stream, struct svc_req *sr)
 }
 
 dscudaResult *
-dscudastreamqueryid_1_svc(RCstream stream, struct svc_req *sr)
-{
+dscudastreamqueryid_1_svc(RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -669,8 +649,7 @@ dscudastreamqueryid_1_svc(RCstream stream, struct svc_req *sr)
  */
 
 dscudaEventCreateResult *
-dscudaeventcreateid_1_svc(struct svc_req *sr)
-{
+dscudaeventcreateid_1_svc(struct svc_req *sr) {
     static dscudaEventCreateResult res;
     cudaError_t err;
     cudaEvent_t event;
@@ -687,8 +666,7 @@ dscudaeventcreateid_1_svc(struct svc_req *sr)
 }
 
 dscudaEventCreateResult *
-dscudaeventcreatewithflagsid_1_svc(unsigned int flags, struct svc_req *sr)
-{
+dscudaeventcreatewithflagsid_1_svc(unsigned int flags, struct svc_req *sr) {
     static dscudaEventCreateResult res;
     cudaError_t err;
     cudaEvent_t event;
@@ -705,8 +683,7 @@ dscudaeventcreatewithflagsid_1_svc(unsigned int flags, struct svc_req *sr)
 }
 
 dscudaResult *
-dscudaeventdestroyid_1_svc(RCevent event, struct svc_req *sr)
-{
+dscudaeventdestroyid_1_svc(RCevent event, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -721,8 +698,7 @@ dscudaeventdestroyid_1_svc(RCevent event, struct svc_req *sr)
 }
 
 dscudaEventElapsedTimeResult *
-dscudaeventelapsedtimeid_1_svc(RCevent start, RCevent end, struct svc_req *sr)
-{
+dscudaeventelapsedtimeid_1_svc(RCevent start, RCevent end, struct svc_req *sr) {
     static dscudaEventElapsedTimeResult res;
     cudaError_t err;
     float millisecond;
@@ -739,8 +715,7 @@ dscudaeventelapsedtimeid_1_svc(RCevent start, RCevent end, struct svc_req *sr)
 }
 
 dscudaResult *
-dscudaeventrecordid_1_svc(RCevent event, RCstream stream, struct svc_req *sr)
-{
+dscudaeventrecordid_1_svc(RCevent event, RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -753,10 +728,8 @@ dscudaeventrecordid_1_svc(RCevent event, RCstream stream, struct svc_req *sr)
 
     return &res;
 }
-
 dscudaResult *
-dscudaeventsynchronizeid_1_svc(RCevent event, struct svc_req *sr)
-{
+dscudaeventsynchronizeid_1_svc(RCevent event, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -769,10 +742,8 @@ dscudaeventsynchronizeid_1_svc(RCevent event, struct svc_req *sr)
 
     return &res;
 }
-
 dscudaResult *
-dscudaeventqueryid_1_svc(RCevent event, struct svc_req *sr)
-{
+dscudaeventqueryid_1_svc(RCevent event, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -833,12 +804,11 @@ dscudafuncgetattributesid_1_svc(int moduleid, char *kname, struct svc_req *sr)
 
     return &res;
 }
-
 /*
  * Memory Management
  */
-
-dscudaMallocResult *dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
+dscudaMallocResult *
+dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
     static dscudaMallocResult res;
     cudaError_t err;
     int *devadr;
@@ -861,10 +831,8 @@ dscudaMallocResult *dscudamallocid_1_svc(RCsize size, struct svc_req *sr) {
 
     return &res;
 }
-
 dscudaResult *
-dscudafreeid_1_svc(RCadr mem, struct svc_req *)
-{
+dscudafreeid_1_svc(RCadr mem, struct svc_req *) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -877,18 +845,14 @@ dscudafreeid_1_svc(RCadr mem, struct svc_req *)
 
     return &res;
 }
-
 dscudaMemcpyH2HResult *
-dscudamemcpyh2hid_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *sr)
-{
+dscudamemcpyh2hid_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *sr) {
     static dscudaMemcpyH2HResult res;
     SWARN(0, "dscudaMemcpy() does not support cudaMemcpyHostToHost transfer yet.\n");
     return &res;
 }
-
 dscudaResult *
-dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *sr)
-{
+dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -901,10 +865,9 @@ dscudamemcpyh2did_1_svc(RCadr dst, RCbuf srcbuf, RCsize count, struct svc_req *s
 	 (long long)dst, (unsigned long)srcbuf.RCbuf_val, count, dscudaMemcpyKindName(cudaMemcpyHostToDevice));
     return &res;
 }
-
 dscudaMemcpyD2HResult *
-dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, struct svc_req *sr )
-{
+dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, int flag /*fault*/,
+			 struct svc_req *sr ) {
     static RCsize maxcount = 0;
     static dscudaMemcpyD2HResult res;
     cudaError_t err;
@@ -919,35 +882,69 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, struct svc_req *sr )
         maxcount = count;
     }
     res.buf.RCbuf_len = count;
-    err = cudaMemcpy( res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost );
+    err = cudaMemcpy(res.buf.RCbuf_val, (const void*)src, count, cudaMemcpyDeviceToHost);
     SWARN0( 3, "0x%08lx, 0x%08llx, %d, %s) done.\n",
          (unsigned long)res.buf.RCbuf_val, (long long)src, count, dscudaMemcpyKindName( cudaMemcpyDeviceToHost ));
     check_cuda_error(err);
     res.err = err;
 
-#if defined(FAULT_AT_D2H)
+//#if defined(FAULT_AT_D2H)
+    //<--
     // !!! [debugging purpose only] destroy some part of the returning data
     // !!! in order to emulate a malfunctional GPU.
-    {
-        static int    firstcall = 1;
-        static int    err_in_prev_call = 0; // avoid bad data generation in adjacent calls.
+    const  int period_err_d2h = 10; //sec
+    double period_err = (double)period_err_d2h;
+    static double t_prev_err;
+    double t_buf;
+    double dt_ok;
+    if (flag != 0) {
+	static bool firstcall = true;
+#if 1
+	if (firstcall) {
+	    firstcall = false;
+	    dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
+	    SWARN(2, "################ Good data (1st call).\n" );
+	}
+	else {
+	    t_buf = t_prev_err;
+	    dt_ok = dscuda::stopwatch( &t_buf );
+	    if ( dt_ok > period_err ) {
+		SWARN(2, "################\n" );
+		SWARN(2, "################\n" );
+		SWARN(2, "################ Bad data generatad.\n" );
+		SWARN(2, "################ (every %d sec)\n", period_err_d2h);
+		SWARN(2, "################\n" );
+		res.buf.RCbuf_val[0] = 123; // Overwrite with no mean bits.
+		t_prev_err = t_buf;
+	    }
+	    else {
+		SWARN(2, "################ Good data. (%5.1f/%d)\n", dt_ok, period_err_d2h );
+	    }
+	}
+#else
+        static bool err_prev_call = false; // avoid bad data generation in adjacent calls.
 	const  double err_rate = 1.0 / 10.0; // 1.0 / 1000.0;
 	
-        if ( firstcall ) {
-            firstcall = 0;
-            srand48( time(NULL) );
+        if (firstcall) {
+            firstcall = false;
+            srand48( time(NULL));
+        } 
+        else if (!err_prev_call && (drand48() < err_rate)) {
+            SWARN(2, "################\n" );
+            SWARN(2, "################\n" );
+            SWARN(2, "################ Bad data generatad.\n" );
+            SWARN(2, "################\n" );
+            SWARN(2, "################\n" );
+            res.buf.RCbuf_val[0] = 123; // Overwrite with no mean bits.
+            err_prev_call = true;
         }
-	
-        if ( drand48() < err_rate && err_in_prev_call==0 ) {
-            SWARN( 2, "################ bad data generatad.\n\n" );
-            res.buf.RCbuf_val[0] = 123;
-            err_in_prev_call = 1;
-        } else {
-            err_in_prev_call = 0;
+	else {
+            err_prev_call = false;
         }
-    }
 #endif
-
+    }
+    //--> !!! [debugging purpose only] 
+//#endif
     return &res;
 }
 
@@ -986,8 +983,7 @@ dscudamallocarrayid_1_svc(RCchanneldesc desc, RCsize width, RCsize height, unsig
 }
 
 dscudaResult *
-dscudafreearrayid_1_svc(RCadr array, struct svc_req *sr)
-{
+dscudafreearrayid_1_svc(RCadr array, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -1010,8 +1006,7 @@ dscudamemcpytoarrayh2hid_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf 
 }
 
 dscudaResult *
-dscudamemcpytoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf src, RCsize count, struct svc_req *sr)
-{
+dscudamemcpytoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf src, RCsize count, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -1026,16 +1021,14 @@ dscudamemcpytoarrayh2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCbuf 
 }
 
 dscudaMemcpyToArrayD2HResult *
-dscudamemcpytoarrayd2hid_1_svc(RCsize wOffset, RCsize hOffset, RCadr src, RCsize count, struct svc_req *sr)
-{
+dscudamemcpytoarrayd2hid_1_svc(RCsize wOffset, RCsize hOffset, RCadr src, RCsize count, struct svc_req *sr) {
     static dscudaMemcpyToArrayD2HResult res;
     SWARN(0, "dscudaMemcpyToArray() does not support cudaMemcpyDeviceToHost transfer yet.\n");
     return &res;
 }
 
 dscudaResult *
-dscudamemcpytoarrayd2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCadr src, RCsize count, struct svc_req *sr)
-{
+dscudamemcpytoarrayd2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCadr src, RCsize count, struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
     SWARN(3, "cudaMemcpyToArray(");
@@ -1048,8 +1041,7 @@ dscudamemcpytoarrayd2did_1_svc(RCadr dst, RCsize wOffset, RCsize hOffset, RCadr 
 }
 
 dscudaResult *
-dscudamemcpytosymbolh2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize count, RCsize offset, struct svc_req *sr)
-{
+dscudamemcpytosymbolh2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize count, RCsize offset, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUdeviceptr gsptr;
@@ -1071,8 +1063,7 @@ dscudamemcpytosymbolh2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize co
 }
 
 dscudaResult *
-dscudamemcpytosymbold2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize count, RCsize offset, struct svc_req *sr)
-{
+dscudamemcpytosymbold2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize count, RCsize offset, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUdeviceptr gsptr;
@@ -1094,8 +1085,7 @@ dscudamemcpytosymbold2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize co
 }
 
 dscudaMemcpyFromSymbolD2HResult *
-dscudamemcpyfromsymbold2hid_1_svc(int moduleid, char *symbol, RCsize count, RCsize offset, struct svc_req *sr)
-{
+dscudamemcpyfromsymbold2hid_1_svc(int moduleid, char *symbol, RCsize count, RCsize offset, struct svc_req *sr) {
     static RCsize maxcount = 0;
     static dscudaMemcpyFromSymbolD2HResult res;
     cudaError_t err;
@@ -1126,8 +1116,7 @@ dscudamemcpyfromsymbold2hid_1_svc(int moduleid, char *symbol, RCsize count, RCsi
 }
 
 dscudaResult *
-dscudamemcpyfromsymbold2did_1_svc(int moduleid, RCadr dst, char *symbol, RCsize count, RCsize offset, struct svc_req *sr)
-{
+dscudamemcpyfromsymbold2did_1_svc(int moduleid, RCadr dst, char *symbol, RCsize count, RCsize offset, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUdeviceptr gsptr;
@@ -1147,11 +1136,8 @@ dscudamemcpyfromsymbold2did_1_svc(int moduleid, RCadr dst, char *symbol, RCsize 
 
     return &res;
 }
-
-
 dscudaResult *
-dscudamemcpytosymbolasynch2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize count, RCsize offset, RCstream stream, struct svc_req *sr)
-{
+dscudamemcpytosymbolasynch2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsize count, RCsize offset, RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUdeviceptr gsptr;
@@ -1171,10 +1157,8 @@ dscudamemcpytosymbolasynch2did_1_svc(int moduleid, char *symbol, RCbuf src, RCsi
     res.err = err;
     return &res;
 }
-
 dscudaResult *
-dscudamemcpytosymbolasyncd2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize count, RCsize offset, RCstream stream, struct svc_req *sr)
-{
+dscudamemcpytosymbolasyncd2did_1_svc(int moduleid, char *symbol, RCadr src, RCsize count, RCsize offset, RCstream stream, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUdeviceptr gsptr;
@@ -1249,11 +1233,8 @@ dscudamemcpyfromsymbolasyncd2did_1_svc(int moduleid, RCadr dst, char *symbol, RC
 
     return &res;
 }
-
-
 dscudaResult *
-dscudamemsetid_1_svc(RCadr dst, int value, RCsize count, struct svc_req *sq)
-{
+dscudamemsetid_1_svc(RCadr dst, int value, RCsize count, struct svc_req *sq) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -1267,8 +1248,7 @@ dscudamemsetid_1_svc(RCadr dst, int value, RCsize count, struct svc_req *sq)
 }
 
 dscudaHostAllocResult *
-dscudahostallocid_1_svc(RCsize size, unsigned int flags, struct svc_req *sr)
-{
+dscudahostallocid_1_svc(RCsize size, unsigned int flags, struct svc_req *sr) {
     static dscudaHostAllocResult res;
     cudaError_t err;
     int *devadr;
@@ -1283,10 +1263,8 @@ dscudahostallocid_1_svc(RCsize size, unsigned int flags, struct svc_req *sr)
 
     return &res;
 }
-
 dscudaMallocHostResult *
-dscudamallochostid_1_svc(RCsize size, struct svc_req *sr)
-{
+dscudamallochostid_1_svc(RCsize size, struct svc_req *sr) {
     static dscudaMallocHostResult res;
     cudaError_t err;
     int *devadr;
@@ -1301,10 +1279,8 @@ dscudamallochostid_1_svc(RCsize size, struct svc_req *sr)
 
     return &res;
 }
-
 dscudaResult *
-dscudafreehostid_1_svc(RCadr ptr, struct svc_req *sr)
-{
+dscudafreehostid_1_svc(RCadr ptr, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -1335,10 +1311,8 @@ dscudahostgetdevicepointerid_1_svc(RCadr pHost, unsigned int flags , struct svc_
     SWARN(3, ") done.\n");
     return &res;
 }
-
 dscudaHostGetFlagsResult *
-dscudahostgetflagsid_1_svc(RCadr pHost, struct svc_req *sr)
-{
+dscudahostgetflagsid_1_svc(RCadr pHost, struct svc_req *sr) {
     cudaError_t err;
     static dscudaHostGetFlagsResult res;
     unsigned int flags;
@@ -1555,8 +1529,7 @@ dscudamemcpy2dd2hid_1_svc(RCsize dpitch, RCadr src, RCsize spitch, RCsize width,
 }
 
 dscudaResult *
-dscudamemcpy2dd2did_1_svc(RCadr dst, RCsize dpitch, RCadr src, RCsize spitch, RCsize width, RCsize height, struct svc_req *sr)
-{
+dscudamemcpy2dd2did_1_svc(RCadr dst, RCsize dpitch, RCadr src, RCsize spitch, RCsize width, RCsize height, struct svc_req *sr) {
     cudaError_t err;
     static dscudaResult res;
     SWARN(3, "cudaMemcpy2D(");
@@ -1570,8 +1543,7 @@ dscudamemcpy2dd2did_1_svc(RCadr dst, RCsize dpitch, RCadr src, RCsize spitch, RC
 }
 
 dscudaResult *
-dscudamemset2did_1_svc(RCadr dst, RCsize pitch, int value, RCsize width, RCsize height, struct svc_req *sq)
-{
+dscudamemset2did_1_svc(RCadr dst, RCsize pitch, int value, RCsize width, RCsize height, struct svc_req *sq) {
     static dscudaResult res;
     cudaError_t err;
 
@@ -1591,8 +1563,7 @@ dscudamemset2did_1_svc(RCadr dst, RCsize pitch, int value, RCsize width, RCsize 
  */
 
 dscudaCreateChannelDescResult *
-dscudacreatechanneldescid_1_svc(int x, int y, int z, int w, RCchannelformat f, struct svc_req *sr)
-{
+dscudacreatechanneldescid_1_svc(int x, int y, int z, int w, RCchannelformat f, struct svc_req *sr) {
     static dscudaCreateChannelDescResult res;
     cudaChannelFormatDesc desc;
 
@@ -1607,10 +1578,8 @@ dscudacreatechanneldescid_1_svc(int x, int y, int z, int w, RCchannelformat f, s
     SWARN(3, "%d, %d, %d, %d, %d) done.\n", x, y, z, w, f)
     return &res;
 }
-
 dscudaGetChannelDescResult *
-dscudagetchanneldescid_1_svc(RCadr array, struct svc_req *sr)
-{
+dscudagetchanneldescid_1_svc(RCadr array, struct svc_req *sr) {
     static dscudaGetChannelDescResult res;
     cudaError_t err;
     cudaChannelFormatDesc desc;
@@ -1627,10 +1596,8 @@ dscudagetchanneldescid_1_svc(RCadr array, struct svc_req *sr)
     SWARN(3, "0x%08llx, 0x&08llx) done.\n", &desc, array)
     return &res;
 }
-
 dscudaBindTextureResult *
-dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size, RCtexture texbuf, struct svc_req *sr)
-{
+dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size, RCtexture texbuf, struct svc_req *sr) {
     static dscudaBindTextureResult res;
     cudaError_t err;
     CUtexref texref;
@@ -1666,8 +1633,7 @@ dscudabindtextureid_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize size
 }
 
 dscudaBindTexture2DResult *
-dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize width, RCsize height, RCsize pitch, RCtexture texbuf, struct svc_req *sr)
-{
+dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize width, RCsize height, RCsize pitch, RCtexture texbuf, struct svc_req *sr) {
     static dscudaBindTexture2DResult res;
     cudaError_t err;
     CUtexref texref;
@@ -1709,10 +1675,8 @@ dscudabindtexture2did_1_svc(int moduleid, char *texname, RCadr devPtr, RCsize wi
          align, roundup_adr, devPtr, res.offset);
     return &res;
 }
-
 dscudaResult *
-dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtexture texbuf, struct svc_req *sr)
-{
+dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtexture texbuf, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err;
     CUtexref texref;
@@ -1747,8 +1711,7 @@ dscudabindtexturetoarrayid_1_svc(int moduleid, char *texname, RCadr array, RCtex
 }
 
 dscudaResult *
-dscudaunbindtextureid_1_svc(RCtexture texrefbuf, struct svc_req *sr)
-{
+dscudaunbindtextureid_1_svc(RCtexture texrefbuf, struct svc_req *sr) {
     static dscudaResult res;
     cudaError_t err = cudaSuccess;
 
@@ -1760,8 +1723,8 @@ dscudaunbindtextureid_1_svc(RCtexture texrefbuf, struct svc_req *sr)
 }
 
 dscudaLoadModuleResult *
-dscudaloadmoduleid_1_svc(RCipaddr ipaddr, RCpid pid, char *mname, char *image, struct svc_req *sr)
-{
+dscudaloadmoduleid_1_svc(RCipaddr ipaddr, RCpid pid, char *mname, char *image,
+			 struct svc_req *sr) {
     static dscudaLoadModuleResult res;
     res.id = dscudaLoadModule(ipaddr, pid, mname, image);
     return &res;
@@ -1773,8 +1736,8 @@ dscudaloadmoduleid_1_svc(RCipaddr ipaddr, RCpid pid, char *mname, char *image, s
  */
 void *
 dscudalaunchkernelid_1_svc(int moduleid, int kid, char *kname,
-                          RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args, struct svc_req *sr)
-{
+			   RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
+			   RCargs args, int flag, struct svc_req *sr) {
     static int dummyres     = 0;
     
     SWARN(5, "<---Entering %s()\n", __func__ );
@@ -1787,8 +1750,7 @@ dscudalaunchkernelid_1_svc(int moduleid, int kid, char *kname,
  * CUFFT library
  */
 dscufftPlanResult *
-dscufftplan3did_1_svc(int nx, int ny, int nz, unsigned int type, struct svc_req *sr)
-{
+dscufftplan3did_1_svc(int nx, int ny, int nz, unsigned int type, struct svc_req *sr) {
     static dscufftPlanResult res;
     cufftResult err = CUFFT_SUCCESS;
     cufftHandle plan;
@@ -1804,8 +1766,7 @@ dscufftplan3did_1_svc(int nx, int ny, int nz, unsigned int type, struct svc_req 
 }
 
 dscufftResult *
-dscufftdestroyid_1_svc(unsigned int plan, struct svc_req *sr)
-{
+dscufftdestroyid_1_svc(unsigned int plan, struct svc_req *sr) {
     static dscufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1818,8 +1779,7 @@ dscufftdestroyid_1_svc(unsigned int plan, struct svc_req *sr)
 }
 
 dscufftResult *
-dscufftexecc2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int direction, struct svc_req *sr)
-{
+dscufftexecc2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int direction, struct svc_req *sr) {
     static dscufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1842,10 +1802,8 @@ dscufftexecc2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int directio
 /*
  * cufft library functions
  */
-
 rcufftPlanResult *
-rcufftplan1did_1_svc(int nx, unsigned int type, int batch, struct svc_req *sr)
-{
+rcufftplan1did_1_svc(int nx, unsigned int type, int batch, struct svc_req *sr) {
     static rcufftPlanResult res;
     cufftResult err = CUFFT_SUCCESS;
         cufftHandle plan;
@@ -1859,10 +1817,8 @@ rcufftplan1did_1_svc(int nx, unsigned int type, int batch, struct svc_req *sr)
         res.plan = (unsigned int)plan;
     return &res;
 }
-
 rcufftPlanResult *
-rcufftplan2did_1_svc(int nx, int ny, unsigned int type, struct svc_req *sr)
-{
+rcufftplan2did_1_svc(int nx, int ny, unsigned int type, struct svc_req *sr) {
     static rcufftPlanResult res;
     cufftResult err = CUFFT_SUCCESS;
         cufftHandle plan;
@@ -1876,11 +1832,9 @@ rcufftplan2did_1_svc(int nx, int ny, unsigned int type, struct svc_req *sr)
         res.plan = (unsigned int)plan;
     return &res;
 }
-
 /*
 rcufftplanresult *
-rcufftplanmanyid_1_svc(int nx, int ny, int nz, unsigned int type, int batch, struct svc_req *sr)
-{
+rcufftplanmanyid_1_svc(int nx, int ny, int nz, unsigned int type, int batch, struct svc_req *sr) {
     static rcufftPlan1dResult res;
     cufftResult err = CUFFT_SUCCESS;
         cufftHandle plan;
@@ -1895,10 +1849,8 @@ rcufftplanmanyid_1_svc(int nx, int ny, int nz, unsigned int type, int batch, str
     return &res;
 }
 */
-
 rcufftResult *
-rcufftexecr2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr)
-{
+rcufftexecr2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1909,10 +1861,8 @@ rcufftexecr2cid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_re
     res.err = err;
     return &res;
 }
-
 rcufftResult *
-rcufftexecc2rid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr)
-{
+rcufftexecc2rid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1923,10 +1873,8 @@ rcufftexecc2rid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_re
     res.err = err;
     return &res;
 }
-
 rcufftResult *
-rcufftexecz2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int direction, struct svc_req *sr)
-{
+rcufftexecz2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int direction, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1939,8 +1887,7 @@ rcufftexecz2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, int direction
 }
 
 rcufftResult *
-rcufftexecd2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr)
-{
+rcufftexecd2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1953,8 +1900,7 @@ rcufftexecd2zid_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_re
 }
 
 rcufftResult *
-rcufftexecz2did_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr)
-{
+rcufftexecz2did_1_svc(unsigned int plan, RCadr idata, RCadr odata, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1972,8 +1918,7 @@ rcufftSetStreamId()
 */
 
 rcufftResult *
-rcufftsetcompatibilitymodeid_1_svc(unsigned int plan, unsigned int mode, struct svc_req *sr)
-{
+rcufftsetcompatibilitymodeid_1_svc(unsigned int plan, unsigned int mode, struct svc_req *sr) {
     static rcufftResult res;
     cufftResult err = CUFFT_SUCCESS;
 
@@ -1991,8 +1936,7 @@ rcufftsetcompatibilitymodeid_1_svc(unsigned int plan, unsigned int mode, struct 
  */
 
 rcublasCreateResult *
-rcublascreate_v2id_1_svc(struct svc_req *sr)
-{
+rcublascreate_v2id_1_svc(struct svc_req *sr) {
     static rcublasCreateResult res;
     cudaError_t err = cudaSuccess;
     cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;
@@ -2010,8 +1954,7 @@ rcublascreate_v2id_1_svc(struct svc_req *sr)
 }
 
 rcublasResult *
-rcublasdestroy_v2id_1_svc(RCadr handle, struct svc_req *sr)
-{
+rcublasdestroy_v2id_1_svc(RCadr handle, struct svc_req *sr) {
     static rcublasResult res;
     cudaError_t err = cudaSuccess;
     cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;
@@ -2027,8 +1970,7 @@ rcublasdestroy_v2id_1_svc(RCadr handle, struct svc_req *sr)
 }
 
 rcublasResult *
-rcublassetvectorid_1_svc(int n, int elemSize, RCbuf x, int incx, RCadr y, int incy, struct svc_req *sr)
-{
+rcublassetvectorid_1_svc(int n, int elemSize, RCbuf x, int incx, RCadr y, int incy, struct svc_req *sr) {
     static rcublasResult res;
     cudaError_t err = cudaSuccess;
     cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;
@@ -2044,8 +1986,7 @@ rcublassetvectorid_1_svc(int n, int elemSize, RCbuf x, int incx, RCadr y, int in
 }
 
 rcublasGetVectorResult *
-rcublasgetvectorid_1_svc(int n, int elemSize, RCadr x, int incx, int incy, struct svc_req *sr)
-{
+rcublasgetvectorid_1_svc(int n, int elemSize, RCadr x, int incx, int incy, struct svc_req *sr) {
     static rcublasGetVectorResult res;
     cudaError_t err = cudaSuccess;
     cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;
@@ -2064,8 +2005,7 @@ rcublasgetvectorid_1_svc(int n, int elemSize, RCadr x, int incx, int incy, struc
 }
 
 rcublasResult *
-rcublassgemm_v2id_1_svc(RCadr handle, unsigned int transa, unsigned int transb, int m, int n, int k, float alpha, RCadr A, int lda, RCadr B, int ldb, float beta, RCadr C, int ldc, struct svc_req *sr)
-{
+rcublassgemm_v2id_1_svc(RCadr handle, unsigned int transa, unsigned int transb, int m, int n, int k, float alpha, RCadr A, int lda, RCadr B, int ldb, float beta, RCadr C, int ldc, struct svc_req *sr) {
     static rcublasResult res;
     cudaError_t err = cudaSuccess;
     cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;

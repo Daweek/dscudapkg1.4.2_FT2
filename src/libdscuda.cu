@@ -39,6 +39,7 @@ static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid in
        pthread_mutex_t cudaMemcpyD2H_mutex = PTHREAD_MUTEX_INITIALIZER;
        pthread_mutex_t cudaMemcpyH2D_mutex = PTHREAD_MUTEX_INITIALIZER;
        pthread_mutex_t cudaKernelRun_mutex = PTHREAD_MUTEX_INITIALIZER;
+       pthread_mutex_t cudaElse_mutex      = PTHREAD_MUTEX_INITIALIZER;
 
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
@@ -228,6 +229,7 @@ ClientState::ClientState(void) {
     for (int i=0; i<Nvdev; i++) {
 	for (int j=0; j<Vdev[i].nredundancy; j++) {
 	    Vdev[i].server[j].setupConnection();
+	    Vdev[i].server[j].setID( j );
 	    WARN(1, "setupConn. Vdev[%d].server[%d].Clnt=%p\n",
 		 i, j, Vdev[i].server[j].Clnt);
         }
@@ -1530,7 +1532,7 @@ periodicCheckpoint(void *arg) {
 
 	//<-- Output beginning message.
 	WARN_CP(1,
-	"=====================================================================\n");
+	"=============================================================\n");
 	WARN_CP(1,"periodicCheckpoint( period = %d sec )\n", cp_period );
 	//--> Output beginning message.
 		
@@ -1538,6 +1540,7 @@ periodicCheckpoint(void *arg) {
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_lock( &cudaKernelRun_mutex );
+	pthread_mutex_lock( &cudaElse_mutex );
 	//--> mutex locks for avoiding R/W collisions 
 
 	//<-- copy from all cudaMalloc() regions of all devices.
@@ -1551,7 +1554,7 @@ periodicCheckpoint(void *arg) {
 	if (correct) {
 	    correct_count++;
 	}
-#if 1 // force pseudo error
+#if 0 // force pseudo error
 	if (correct_count % 5 == 4) {
 	    correct = false;
 	}
@@ -1597,15 +1600,17 @@ periodicCheckpoint(void *arg) {
 		St.Vdev[i].recordON();
 	    }
 	}
+	//<-- Output ending message.	
+	WARN_CP(1,"} periodicCheckpoint().\n");
+	//--> Output ending message.	
+	
 	//<-- mutex unlocks for following R/W.
 	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_unlock( &cudaKernelRun_mutex );
+	pthread_mutex_unlock( &cudaElse_mutex );
 	//--> mutex unlocks for following R/W.
 	
-	//<-- Output ending message.	
-	WARN_CP(1,"} periodicCheckpoint().\n");
-	//--> Output ending message.	
 	pthread_testcancel();/* cancelation available */
     }//for (;;)
 } // periodicCheckpoint()

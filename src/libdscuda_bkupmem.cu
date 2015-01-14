@@ -95,10 +95,9 @@ BkupMem::calcChecksum(void) {
     return dscuda::calcChecksum( this->h_region, this->size );
 }
 cudaError_t
-BkupMem::memcpyD2H( const void *v_ptr, size_t count,
-		    struct rpc_err *rpc_result, CLIENT *Clnt ) {
+BkupMem::memcpyD2H( const void *v_ptr, size_t count, struct rpc_err *rpc_result,
+		    int flag/*FT*/, CLIENT *Clnt ) {
     cudaError_t cuerr;
-    
     void   *d_ptr;
     void   *h_ptr;
     size_t  rx_size;
@@ -121,8 +120,8 @@ BkupMem::memcpyD2H( const void *v_ptr, size_t count,
 	WARN(0, "%s():h_ptr = NULL.\n", __func__);
 	exit(1);
     }
-    //<-- Kick RPC!
-    dscudaMemcpyD2HResult *rp = dscudamemcpyd2hid_1((RCadr)d_ptr, rx_size, Clnt);
+    //<-- Kick RPC!, 3rd param is flag
+     dscudaMemcpyD2HResult *rp = dscudamemcpyd2hid_1((RCadr)d_ptr, rx_size, flag, Clnt);
     //--> Kick RPC!
 
     //<--- RPC fault check.
@@ -147,7 +146,7 @@ BkupMem::memcpyD2H( const void *v_ptr, size_t count,
     memcpy( h_ptr, rp->buf.RCbuf_val, rp->buf.RCbuf_len );
     xdr_free( (xdrproc_t)xdr_dscudaMemcpyD2HResult, (char *)rp );
     return cuerr;
-}
+}//BkupMem::memcpyD2H()
 //========================================================================
 // Constuctor of "BkupMemList" class.
 //

@@ -44,13 +44,13 @@
 //--> oikawa
 
 //********************************************************************
-//***  Class Name: "ServerModule_t"
+//***  Class Name: "ServerModule"
 //***  Description:
 //***      - CUDA Kernel function module management for Server.
 //********************************************************************
 ServerModule SvrModulelist[RC_NKMODULEMAX] = {0};
 
-ServerState_t DscudaSvr;
+ServerState  DscudaSvr;
     
 int D2Csock = -1; // socket for sideband communication to the client. inherited from the daemon.
 int TcpPort = RC_SERVER_IP_PORT;
@@ -77,8 +77,8 @@ static void notifyIamReady(void) {
     }
 }
 
-static int receiveProtocolPreference(void)
-{
+static int
+receiveProtocolPreference(void) {
     char msg[256], rc[64];
 
     if (D2Csock >= 0) {
@@ -120,14 +120,15 @@ int main(int argc, char **argv)
     exit (1);
 }
 
-static void showUsage(char *command) {
+static void
+showUsage(char *command) {
     fprintf(stderr,
             "usage: %s [-s server_id] [-d 'deviceid'] [-p port] [-S socket]\n"
             "       (-p & -S are used by the daemon only.)\n",
             command);
 }
-
-static void showConf(void) {
+static void
+showConf(void) {
     int i;
     char str[1024], str0[1024];
 
@@ -206,7 +207,8 @@ parseArgv(int argc, char **argv) {
 }
 
 // should be called only once in a run.
-static cudaError_t initDscuda(void) {
+static cudaError_t
+initDscuda(void) {
     unsigned int flags = 0; // should always be 0.
     CUresult err;
 
@@ -237,8 +239,8 @@ static cudaError_t initDscuda(void) {
     return (cudaError_t)err;
 }
 
-cudaError_t createDscuContext(void)
-{
+cudaError_t
+createDscuContext(void) {
     //    unsigned int flags = 0; // should always be 0.
     CUdevice dev = 0;
     CUresult err;
@@ -262,8 +264,8 @@ cudaError_t createDscuContext(void)
     return (cudaError_t)err;
 }
 
-cudaError_t destroyDscuContext(void)
-{
+cudaError_t
+destroyDscuContext(void) {
 #if 0
 
     CUresult cuerr;
@@ -372,8 +374,8 @@ static void initEnv(void) {
 /*
  * Unload Modules never been used for a long time.
  */
-void releaseModules(bool releaseall = false)
-{
+void
+releaseModules(bool releaseall = false) {
     ServerModule *mp;
     int i;
     for (i=0, mp=SvrModulelist; i < RC_NKMODULEMAX; i++, mp++) {
@@ -393,8 +395,7 @@ void releaseModules(bool releaseall = false)
 }
 
 static void
-printSvrModuleList(ServerModule *module_list)
-{
+printSvrModuleList(ServerModule *module_list) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
 	if (module_list[i].isValid()) {
 	    SWARN(10, "#--- SvrModulelist[%d]\n", i);
@@ -443,8 +444,8 @@ getFunctionByName(CUfunction *kfuncp, const char *kname, int moduleid) {
     return cuerr;
 }
 
-void getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size)
-{
+void
+getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *size) {
     CUresult cuerr;
     ServerModule *mp;
 
@@ -468,9 +469,8 @@ void getGlobalSymbol(int moduleid, char *symbolname, CUdeviceptr *dptr, size_t *
         fatal_error(1);
     }
 }
-
-int dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
-{
+int
+dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image) {
     CUresult cuerr;
     ServerModule   *mp;
     int      i;
@@ -537,9 +537,9 @@ int dscudaLoadModule(RCipaddr ipaddr, RCpid pid, char *mname, char *image)
     return mp->id;
 }
 
-void *dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
-                   RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args)
-{
+void *
+dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func name*/,
+                   RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream, RCargs args) {
     static int called_count = 0;
     static int dummyres     = 123;
     SWARN(10, "%s(int moduleid=%d, int kid=%d, char *kname=%s), %d called.\n",
@@ -641,8 +641,7 @@ void *dscudaLaunchKernel(int moduleid, int kid, const char *kname /*kernel func 
 }
 
 cudaError_t
-setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DESCRIPTOR *descp)
-{
+setTextureParams(CUtexref texref, RCtexture texbuf, char *texname, CUDA_ARRAY_DESCRIPTOR *descp) {
     cudaError_t err;
     int ncomponent, i;
     unsigned int texref_flags = 0;

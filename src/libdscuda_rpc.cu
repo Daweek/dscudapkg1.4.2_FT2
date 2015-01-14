@@ -421,27 +421,20 @@ cudaThreadExit(void) {
 
     return err;
 }
-
 cudaError_t
-PhyDev::cudaThreadSynchronize( struct rpc_err *rpc_result) {
-    dscudaResult *rp;
-    cudaError_t   cuerr = cudaSuccess;
-    rp = dscudathreadsynchronizeid_1( Clnt );
-    clnt_geterr( Clnt, rpc_result );
-    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
-	if (rp == NULL) {
-	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n",
-		  __FILE__, __func__, __LINE__ );
-	    clnt_perror(Clnt, ip);
-	    exit(EXIT_FAILURE);
-	} else {
-	    cuerr = (cudaError_t)rp->err;
-	}
-    }
-    xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
+cudaThreadSynchronize(void) {
+    pthread_mutex_lock( &cudaElse_mutex );
+    cudaError_t cuerr = cudaSuccess;
+    int         vid = vdevidIndex();
+    VirDev    *vdev = St.Vdev + Vdevid[vid];
+    
+    WARN( 3, "cudaThreadSynchronize() {\n");
+    cuerr = vdev->cudaThreadSynchronize();
+    WARN( 3, "} cudaThrreadSynchronize()\n");
+    WARN( 3, "\n");
+    pthread_mutex_unlock( &cudaElse_mutex );
     return cuerr;
 }
-
 cudaError_t
 VirDev::cudaThreadSynchronize(void) {
     cudaError_t cuerr_phy;
@@ -463,19 +456,28 @@ VirDev::cudaThreadSynchronize(void) {
 	}
     }
 }
-    
+
 cudaError_t
-cudaThreadSynchronize(void) {
-    cudaError_t cuerr = cudaSuccess;
-    int         vid = vdevidIndex();
-    VirDev    *vdev = St.Vdev + Vdevid[vid];
-    
-    WARN( 3, "cudaThreadSynchronize() {\n");
-    cuerr = vdev->cudaThreadSynchronize();
-    WARN( 3, "} cudaThrreadSynchronize()\n");
-    WARN( 3, "\n");
+PhyDev::cudaThreadSynchronize( struct rpc_err *rpc_result) {
+    dscudaResult *rp;
+    cudaError_t   cuerr = cudaSuccess;
+    rp = dscudathreadsynchronizeid_1( Clnt );
+    clnt_geterr( Clnt, rpc_result );
+    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
+	if (rp == NULL) {
+	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n",
+		  __FILE__, __func__, __LINE__ );
+	    clnt_perror(Clnt, ip);
+	    exit(EXIT_FAILURE);
+	} else {
+	    cuerr = (cudaError_t)rp->err;
+	}
+    }
+    xdr_free((xdrproc_t)xdr_dscudaResult, (char *)rp);
     return cuerr;
 }
+
+    
 
 cudaError_t
 cudaThreadSetLimit( enum cudaLimit limit, size_t value) {
@@ -845,7 +847,6 @@ VirDev::cudaMalloc(void **d_ptr, size_t size) {
     *d_ptr = uva_ptr; // Return UVA address of physical[0].
     return cuerr_vir;
 }
-
 cudaError_t
 PhyDev::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
     dscudaMallocResult *rp;
@@ -1065,6 +1066,7 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
     //       is equal to physical address of a dominant devivce [0].
     WARN(4, "   Vir[%d]:D2H() {\n", id);
     struct rpc_err rpc_result;
+    int flag=0;
     cudaError_t    cuerr = cudaSuccess;
 
     //<-- Record called history of CUDA APIs.
@@ -1101,7 +1103,9 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 
 	//<-- Kick RPC!
 	dscudaMemcpyD2HResult *rp;
-	rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, server[0].Clnt );
+	flag=0;
+	//rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, server[0].Clnt );
+	rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, flag, server[0].Clnt ); //0:flag
 	//--> Kick RPC!
 	
 	//<--- RPC fault check.
@@ -1130,7 +1134,8 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	//** need additional one more memcpy();
 	//**
 	//<-- Copy from physical device
-	cuerr = server[0].cudaMemcpyD2H( h_dst, d_src, count, &rpc_result );
+	flag=0; // Suppose that dominant server is always correct.
+	cuerr = server[0].cudaMemcpyD2H( h_dst, d_src, count, flag, &rpc_result );
 	//--> Copy from physical device
 	//
 	// TODO: d2h_rollback or migration logic need ?
@@ -1151,7 +1156,8 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
     // MEMO: if (!d2h_simple && d2h_reduncpy) {
     //<--- Copy from physical device
     for (int i=0; i < this->nredundancy; i++) {
-	cuerr = server[i].cudaMemcpyD2H( h_dst, d_src, count, &rpc_result );
+	flag = (i==1)? 1 : 0; // 2nd server is always not correct.
+	cuerr = server[i].cudaMemcpyD2H( h_dst, d_src, count, flag, &rpc_result );
 	server[i].rpcErrorHook( &rpc_result );
 	if (rpc_result.re_status != RPC_SUCCESS) {
 	    this->restoreMemlist();
@@ -1227,7 +1233,7 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 }//-->VirDev::cudaMemcpyD2H(...)
 cudaError_t
 PhyDev::cudaMemcpyD2H( const void *h_ptr, const void *v_ptr, size_t count,
-		       struct rpc_err *p_rpc_result) {
+		       int flag/*FT*/, struct rpc_err *p_rpc_result) {
     BkupMem *mem = this->memlist.query( v_ptr );
     if (mem == NULL) {//Unexpected error.
 	WARN(0, "%s():mem == NULL.\n", __func__);
@@ -1235,8 +1241,8 @@ PhyDev::cudaMemcpyD2H( const void *h_ptr, const void *v_ptr, size_t count,
     }
     WARN(4, "      + Phy[%d]:D2H( dst=%p, src=%p, count=%zu )\n",
 	 this->id, mem->translateAddrVtoH(v_ptr), mem->translateAddrVtoD(v_ptr), count);
-    cudaError_t cuda_error = mem->memcpyD2H( v_ptr, count,
-					     p_rpc_result, this->Clnt );
+    cudaError_t cuda_error = mem->memcpyD2H( v_ptr, count, p_rpc_result,
+					     flag/*fault*/, this->Clnt );
     return cuda_error;
 }//--> PhyDev::cudaMemcpyD2H()
 void
@@ -1249,12 +1255,14 @@ ClientState::collectEntireRegions(void) {
 void
 VirDev::collectEntireRegions(void) {
     WARN_CP(1, "        VirDev[%d]\n", id);
+    int flag;
     for (int n=0; n < this->nredundancy; n++) {
-	server[n].collectEntireRegions();
+	flag = (n==1)? 1 : 0; // 2nd server is always touble.
+	server[n].collectEntireRegions( flag );
     }
 }
 void
-PhyDev::collectEntireRegions(void) {
+PhyDev::collectEntireRegions(int flag/*FT*/) {
     WARN_CP(1, "            PhyDev[%d]\n", id);
     struct rpc_err rpc_error;
     cudaError_t    cuda_error;
@@ -1262,7 +1270,7 @@ PhyDev::collectEntireRegions(void) {
     BkupMem       *bkupmem = memlist.headPtr();
     while (bkupmem != NULL) {
 	WARN_CP(1, "                + region[%d], %d Byte\n", i, bkupmem->size);
-	cuda_error = bkupmem->memcpyD2H( NULL, -1, &rpc_error, this->Clnt );
+	cuda_error = bkupmem->memcpyD2H( NULL, -1, &rpc_error, flag, this->Clnt );
 	bkupmem = bkupmem->next;
 	i++;
     } // while (...);
@@ -1608,40 +1616,6 @@ VirDev::loadModule(char *name, char *strdata) {
     WARN(5, "   + } // VirDev::loadModule().\n");
     return modulelist[j].index;
 }//VirDev::loadModule(
-
-void
-VirDev::launchKernel(int module_index, int kid, char *kname,
-		     RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-		     RCstream stream, RCargs args) {
-    WARN(5, "   + VirDev::%s() {\n", __func__);
-    /*     
-     * Automatic Recovery, Register to the called history.
-     */
-    if (isRecording()) {
-	CudaRpcLaunchKernelArgs args2;
-        args2.moduleid = module_index;
-        args2.kid      = kid;
-        args2.kname    = kname;
-        args2.gdim     = gdim;
-        args2.bdim     = bdim;
-        args2.smemsize = smemsize;
-        args2.stream   = stream;
-        args2.args     = args;
-        reclist.append( dscudaLaunchKernelId, (void *)&args2 );
-    }
-
-    struct rpc_err rpc_result;
-    for (int i=0; i<nredundancy; i++) {
-        server[i].launchKernel(module_index, kid, kname, gdim,
-			       bdim, smemsize, stream, args, &rpc_result);
-	server[i].rpcErrorHook( &rpc_result );
-	if (rpc_result.re_status != RPC_SUCCESS ) {
-	    this->restoreMemlist();
-	    this->reclist.recall();
-	}
-    }
-    WARN(5, "   + } // VirDev::%s()\n", __func__);
-}
 int
 PhyDev::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
 		   char *modulebuf, int module_index) {
@@ -1688,11 +1662,58 @@ PhyDev::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
  * 'kid' must be unique inside a single module.
  */
 void
+rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
+                             RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
+                             RCargs args) {
+    WARN(5, "%s() {\n", __func__);
+    pthread_mutex_lock( &cudaKernelRun_mutex );
+
+    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
+    int flag=0;
+    vdev->launchKernel(module_index, kid, kname, gdim, bdim, smemsize, stream, args, flag);
+    
+    pthread_mutex_unlock( &cudaKernelRun_mutex );
+    WARN(5, "} %s().\n", __func__)
+    WARN(5, "\n")
+}
+void
+VirDev::launchKernel(int module_index, int kid, char *kname,
+		     RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+		     RCstream stream, RCargs args, int flag) {
+    WARN(5, "   + Vir[%d]::%s() {\n", this->id, __func__);
+    /*     
+     * Automatic Recovery, Register to the called history.
+     */
+    if (isRecording()) {
+	CudaRpcLaunchKernelArgs args2;
+        args2.moduleid = module_index;
+        args2.kid      = kid;
+        args2.kname    = kname;
+        args2.gdim     = gdim;
+        args2.bdim     = bdim;
+        args2.smemsize = smemsize;
+        args2.stream   = stream;
+        args2.args     = args;
+        reclist.append( dscudaLaunchKernelId, (void *)&args2 );
+    }
+
+    struct rpc_err rpc_result;
+    for (int i=0; i<nredundancy; i++) {
+        server[i].launchKernel(module_index, kid, kname, gdim,
+			       bdim, smemsize, stream, args, &rpc_result, flag);
+	server[i].rpcErrorHook( &rpc_result );
+	if (rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
+    }
+}
+void
 PhyDev::launchKernel(int module_index, int kid, char *kname,
-		       RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-		       RCstream stream, RCargs args,
-		       struct rpc_err *rpc_result) {
-    WARN(5, "      + PhyDev[%d]::%s() {\n", id, __func__);
+		     RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+		     RCstream stream, RCargs args,
+		     struct rpc_err *rpc_result, int flag) {
+    WARN(5, "      + Phy[%d]::%s() {\n", this->id, __func__);
     RCargs lo_args;
     lo_args.RCargs_len = args.RCargs_len;
     lo_args.RCargs_val = (RCarg *)dscuda::xmalloc(args.RCargs_len * sizeof(RCarg));
@@ -1706,7 +1727,6 @@ PhyDev::launchKernel(int module_index, int kid, char *kname,
         WARN(0, "invalid stream : %p\n", stream);
         exit(1);
     }
-
     /*
      * Replace v_ptr to d_ptr int args.
      */
@@ -1728,8 +1748,7 @@ PhyDev::launchKernel(int module_index, int kid, char *kname,
     int moduleid = queryModuleID(module_index);
 
     void *rp = dscudalaunchkernelid_1(moduleid, kid, kname, gdim, bdim,
-				      smemsize, (RCstream)st->s[id], lo_args, Clnt);
-
+				      smemsize, (RCstream)st->s[id], lo_args, flag, Clnt);
     //<--- Timed Out
     clnt_geterr(Clnt, rpc_result);
     if (rpc_result->re_status == RPC_SUCCESS) {
@@ -1741,26 +1760,7 @@ PhyDev::launchKernel(int module_index, int kid, char *kname,
     }
     //--->
     free(lo_args.RCargs_val);
-
-    WARN(5, "      + } PhyDev[%d]::%s()\n", id, __func__);
 }//PhyDev::launchKernel(int module_index, int kid, char *kname,
-
-
-void
-rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */
-                             RCdim3 gdim, RCdim3 bdim, RCsize smemsize, RCstream stream,
-                             RCargs args)
-{
-    WARN(5, "%s() {\n", __func__);
-    pthread_mutex_lock( &cudaKernelRun_mutex );
-
-    VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
-    vdev->launchKernel(module_index, kid, kname, gdim, bdim, smemsize, stream, args);
-    
-    pthread_mutex_unlock( &cudaKernelRun_mutex );
-    WARN(5, "} %s().\n", __func__)
-    WARN(5, "\n")
-}
 
 cudaError_t
 cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,

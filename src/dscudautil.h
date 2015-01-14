@@ -17,7 +17,6 @@
 
 char       *dscudaMemcpyKindName(cudaMemcpyKind kind);
 const char *dscudaGetIpaddrString(unsigned int addr);
-double      RCgetCputime(double *t0);
 
 namespace dscuda {
     void    setWarnLevel(int level);
@@ -27,6 +26,7 @@ namespace dscuda {
     void    xfree(void *p);
     int      searchDaemon(void);
     uint32_t calcChecksum(void *, size_t);
+    double   stopwatch(double *t0);
 }
 
 extern struct ClientState St;
