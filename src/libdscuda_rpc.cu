@@ -1019,7 +1019,7 @@ VirDev::cudaMemcpyH2D(void *v_ptr, const void *h_ptr, size_t count) {
 	}
     }
     if (isRecording()) {
-#if 1
+#if 0
 	reclist.print();
 #endif
     }
@@ -1029,27 +1029,24 @@ cudaError_t
 PhyDev::cudaMemcpyH2D(const void *v_ptr, const void *h_ptr, size_t count,
 		      struct rpc_err *rpc_result) {
     dscudaResult *rp;
-    RCbuf         srcbuf;
-    void         *d_ptr;
     cudaError_t   cuda_error;
-
-    srcbuf.RCbuf_len = count;
-    srcbuf.RCbuf_val = (char *)h_ptr;
-
     //<-- Translate virtual v_ptr to real d_ptr.
-    d_ptr = memlist.queryDevicePtr(v_ptr);
+    void *d_ptr = memlist.queryDevicePtr(v_ptr);
     //--> Translate virtual v_ptr to real d_ptr.
+
     WARN(5, "      + Phy[%d]:H2D(v_ptr=%p ==> d_ptr=%p, size=%zu)\n",
 	 id, v_ptr, d_ptr, count);
-
-    rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, Clnt); //Kick RPC.
+    RCbuf srcbuf;
+    srcbuf.RCbuf_val = (char *)h_ptr;
+    srcbuf.RCbuf_len = count;
+    rp = dscudamemcpyh2did_1((RCadr)d_ptr, srcbuf, count, this->Clnt); //Kick RPC.
     
     //<--    RPC fault check.
-    clnt_geterr( Clnt, rpc_result );
-    if ( rpc_result->re_status == RPC_SUCCESS ) { /*Got response from remote client*/
+    clnt_geterr( this->Clnt, rpc_result );
+    if (rpc_result->re_status == RPC_SUCCESS) { /*Got response from remote client*/
 	if ( rp == NULL ) {
 	    WARN( 0, "NULL pointer returned, %s:%s():L%d.\nexit.\n\n\n", __FILE__, __func__, __LINE__ );
-	    clnt_perror(Clnt, ip);
+	    clnt_perror(this->Clnt, ip);
 	    exit(EXIT_FAILURE);
 	} else {
 	    cuda_error = (cudaError_t)rp->err;
@@ -1244,7 +1241,6 @@ PhyDev::cudaMemcpyD2H( const void *h_ptr, const void *v_ptr, size_t count,
 }//--> PhyDev::cudaMemcpyD2H()
 void
 ClientState::collectEntireRegions(void) {
-    WARN(9, "CP:    %s()\n", __func__);
     WARN_CP(1, "    %s()\n", __func__);
     for (int n=0; n < this->Nvdev; n++) {
 	Vdev[n].collectEntireRegions();
@@ -1252,7 +1248,6 @@ ClientState::collectEntireRegions(void) {
 }
 void
 VirDev::collectEntireRegions(void) {
-    WARN(9, "CP:        VirDev[%d]\n", id);
     WARN_CP(1, "        VirDev[%d]\n", id);
     for (int n=0; n < this->nredundancy; n++) {
 	server[n].collectEntireRegions();
@@ -1260,76 +1255,85 @@ VirDev::collectEntireRegions(void) {
 }
 void
 PhyDev::collectEntireRegions(void) {
-    WARN(9, "CP:            PhyDev[%d]\n", id);
     WARN_CP(1, "            PhyDev[%d]\n", id);
     struct rpc_err rpc_error;
     cudaError_t    cuda_error;
     int            i = 0;
     BkupMem       *bkupmem = memlist.headPtr();
     while (bkupmem != NULL) {
-	WARN(9, "CP:                + region[%d], %d Byte\n", i, bkupmem->size);
 	WARN_CP(1, "                + region[%d], %d Byte\n", i, bkupmem->size);
 	cuda_error = bkupmem->memcpyD2H( NULL, -1, &rpc_error, this->Clnt );
 	bkupmem = bkupmem->next;
 	i++;
     } // while (...);
 } // ---> void PhyDev::collectEntireRegions(void)
-int
+bool
 ClientState::verifyEntireRegions(void) {
-    WARN(9, "CP:    %s()\n", __func__);
     WARN_CP(1, "    %s()\n", __func__);
-    int virdev_matched;
-    int all_devices_matched = 1;
-    
+    bool virdev_matched;
+    bool all_virdev_matched = true;
+
+    //<-- Sweep all virtual devices.
     for (int n=0; n<Nvdev; n++) {
 	virdev_matched = Vdev[n].verifyEntireRegions();
-	if (virdev_matched != 1) {
-	    all_devices_matched = -1;
+	if (!virdev_matched) {
+	    all_virdev_matched = false;
 	}
     }
-    return all_devices_matched;
+    //--> Sweep all virtual devices.
+    return all_virdev_matched;
 }
-int
+bool
 VirDev::verifyEntireRegions(void) {
-    WARN(9, "CP:        VirDev[%d]\n", id);
     WARN_CP(1, "        VirDev[%d]\n", id);
-    void *v_region;
-    void *h_ptr_i;
-    void *h_ptr_j;
-    int   size;
-    int   all_matched = 1;
-    
-    BkupMem *bkupmem = memlist.headPtr();
+    bool     all_matched = true;
+    BkupMem *bkupmem = this->memlist.headPtr();
+    int   num_region = 0;
     while (bkupmem != NULL) {
-	v_region = bkupmem->v_region;
-	size     = bkupmem->size;
+	WARN_CP(1, "            region[%d], %d Byte\n", num_region, bkupmem->size);
+	void *v_region = bkupmem->v_region;
+	//<-- Memory compare between all combinations(i-j pair) of redunts.
 	for (int i=0; i<nredundancy-1; i++) {
-	    h_ptr_i = server[i].memlist.queryHostPtr(v_region);
-	    if (h_ptr_i == NULL) {
+	    BkupMem* imem    = server[i].memlist.query(v_region);
+	    int      ichksum = imem->calcChecksum(); 
+	    if (imem == NULL) {
 		WARN(0, "CP: %s():not found host pointer.\n", __func__);
 		exit(-1);
 	    }
 	    for (int j=i+1; j<nredundancy; j++) {
-		h_ptr_j = server[j].memlist.queryHostPtr(v_region);
-		if (h_ptr_j == NULL) {
+		BkupMem* jmem    = server[j].memlist.query(v_region);
+		int      jchksum = jmem->calcChecksum(); 
+		if (jmem == NULL) {
 		    WARN(0, "CP: %s():not found host pointer.\n", __func__);
 		    exit(-1);
 		}
-		WARN(9, "CP:            + memcmp(phy[%d], phy[%d], %d Byte)\n", i, j, size);
-		WARN_CP(1, "            + memcmp(phy[%d], phy[%d], %d Byte)\n", i, j, size);
-		if ( memcmp( h_ptr_i, h_ptr_j, size) != 0 ) {
-		    all_matched = -1;
+		WARN_CP(1, "            + phy[%d] <--> phy[%d], sum={ %d, %d } ",
+			i, j, ichksum, jchksum);
+		//<-- Do verify
+		if (imem->size != bkupmem->size || jmem->size != bkupmem->size) {
+		    WARN_CP(1, " %s():not matched compare size.\n", __func__);
+		    exit(-1);
 		}
+		if ( memcmp( imem->h_region, jmem->h_region, imem->size) != 0 ) {
+		    WARN_CP0(1, "NG\n");
+		    all_matched = false;
+		}
+		else {
+		    WARN_CP0(1, "OK\n");
+		}
+		//--> Do verify
 	    }
 	}
+	//--> Memory compare between all combinations of redunts.
+	//<-- Point next region.
 	bkupmem = bkupmem->next;
+	num_region++;
+	//--> Point next region.
     }//while
     if (all_matched) {
-	WARN(9, "CP:   + ALL MATCHED\n");
-	WARN_CP(1, "   + ALL MATCHED\n");
+	WARN_CP(1, "   --> (^_^) ALL MATCHED\n");
     }
     else {
-	WARN(9, "CP:   + NOT MATCHED *************************\n");
 	WARN_CP(1, "   + NOT MATCHED *************************\n");
     }
     return all_matched;
@@ -1340,41 +1344,30 @@ VirDev::verifyEntireRegions(void) {
 // *only called in periodic-checkpointing thread.
 //
 void
-VirDev::updateMemlist(int svr_id) {
-    WARN(9, "VirDev::updateMemlist(%d) {\n", svr_id);
-    PhyDev *svr_ptr;
-    BkupMem    *mem_ptr;
-    void       *v_ptr, *h_src, *h_dst;
-    int         size;
-
-    if (svr_id >= RC_NREDUNDANCYMAX) {
-	WARN(0, "VirDev::updateMemlist(): Too large server index(%d). exit.", svr_id);
-	exit(1);
-    }
-    mem_ptr = memlist.headPtr();
-    svr_ptr = &server[svr_id];
+VirDev::updateMemlist(void) {
+    WARN_CP(1, "VirDev::updateMemlist() {\n");
     int i = 0;
-    while (mem_ptr != NULL) {
-	h_dst = mem_ptr->h_region;
-	size  = mem_ptr->size;
-	h_src = svr_ptr->memlist.queryHostPtr(mem_ptr->v_region);
-	memcpy( h_dst, h_src, size );
-	WARN(3, "   + region[%d]: %d[Byte] updated.\n", i, size);
-
-	mem_ptr = mem_ptr->next;
+    BkupMem *virmem = this->memlist.headPtr();
+    while (virmem != NULL) {
+	BkupMem *phymem = this->server[0].memlist.query(virmem->v_region);
+	memcpy( virmem->h_region, phymem->h_region, virmem->size );
+	WARN_CP(1, "   + region[%d]: %d Byte updated. sum=%d\n",
+		i, virmem->size, virmem->calcChecksum());
+	virmem = virmem->next;
 	i++;
     }
-    WARN(9, "VirDev::updateMemlist(%d) {\n", svr_id);
+    this->memlist.incrAge();
+    WARN_CP(1, "}\n");
 }
 //
 // Clear all the CUDA API called history in vdevs and pdevs.
 // ***> only called in periodic-checkpointing thread <***
 //
 void VirDev::clearReclist(void) {
-    // for (int i=0; i<nredundancy; i++) {
-    // 	server[i].reclist.clear();
-    // }
-    reclist.clear();
+    this->reclist.print();
+    WARN_CP(1, "VirDev[%d] clearReclist() length=%d\n",
+	    this->id, this->reclist.length);
+    this->reclist.clear();
 }
 //
 // Restore reliable data into the global memory region of GPU devices.
@@ -1383,30 +1376,21 @@ void VirDev::clearReclist(void) {
 //
 void
 VirDev::restoreMemlist(void) {
-    WARN(9, "VirDev[%d]::%s() {\n", this->id, __func__);
-    BkupMem   *mem_ptr;
-    void      *v_ptr;
-    void      *h_src;
-    int        size;
-    int        rec_en_stack;
-    struct rpc_err rpc_result;
-
-    mem_ptr = memlist.headPtr();    
-    while ( mem_ptr != NULL ) {
-	v_ptr = mem_ptr->v_region;
-	h_src = mem_ptr->h_region;
-	size  = mem_ptr->size;
-	for (int i=0; i<nredundancy; i++) {
-	    //	    rec_en_stack = server[i].isRecording();
-	    //	    server[i].recordOFF();
-	    server[i].cudaMemcpyH2D(v_ptr, h_src, size, &rpc_result);
-	    //	    if (rec_en_stack) server[i].recordON();
-	    //	    else              server[i].recordOFF();
-	}
+    WARN_CP(1, "        VirDev[%d]\n", this->id);
+    int num_region=0;
+    BkupMem       *mem_ptr = this->memlist.headPtr();    
+    while (mem_ptr != NULL) {
+	WARN_CP(1, "            region[%d], %d Byte, sum= %d\n",
+		num_region, mem_ptr->size, mem_ptr->calcChecksum() );
+	//***
+	this->recordOFF();
+	this->cudaMemcpyH2D( mem_ptr->v_region,
+			     mem_ptr->h_region,
+			     mem_ptr->size );
+	this->recordON();
 	mem_ptr = mem_ptr->next;
+	num_region++;
     }
-    WARN(9, "} VirDev[%d]::%s().\n", this->id, __func__);
-    return;
 }
 //
 // Rollback and redo the CUDA API called histories.
@@ -1624,6 +1608,40 @@ VirDev::loadModule(char *name, char *strdata) {
     WARN(5, "   + } // VirDev::loadModule().\n");
     return modulelist[j].index;
 }//VirDev::loadModule(
+
+void
+VirDev::launchKernel(int module_index, int kid, char *kname,
+		     RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
+		     RCstream stream, RCargs args) {
+    WARN(5, "   + VirDev::%s() {\n", __func__);
+    /*     
+     * Automatic Recovery, Register to the called history.
+     */
+    if (isRecording()) {
+	CudaRpcLaunchKernelArgs args2;
+        args2.moduleid = module_index;
+        args2.kid      = kid;
+        args2.kname    = kname;
+        args2.gdim     = gdim;
+        args2.bdim     = bdim;
+        args2.smemsize = smemsize;
+        args2.stream   = stream;
+        args2.args     = args;
+        reclist.append( dscudaLaunchKernelId, (void *)&args2 );
+    }
+
+    struct rpc_err rpc_result;
+    for (int i=0; i<nredundancy; i++) {
+        server[i].launchKernel(module_index, kid, kname, gdim,
+			       bdim, smemsize, stream, args, &rpc_result);
+	server[i].rpcErrorHook( &rpc_result );
+	if (rpc_result.re_status != RPC_SUCCESS ) {
+	    this->restoreMemlist();
+	    this->reclist.recall();
+	}
+    }
+    WARN(5, "   + } // VirDev::%s()\n", __func__);
+}
 int
 PhyDev::loadModule(unsigned int ipaddr, pid_t pid, char *modulename,
 		   char *modulebuf, int module_index) {
@@ -1727,39 +1745,6 @@ PhyDev::launchKernel(int module_index, int kid, char *kname,
     WARN(5, "      + } PhyDev[%d]::%s()\n", id, __func__);
 }//PhyDev::launchKernel(int module_index, int kid, char *kname,
 
-void
-VirDev::launchKernel(int module_index, int kid, char *kname,
-			    RCdim3 gdim, RCdim3 bdim, RCsize smemsize,
-			    RCstream stream, RCargs args) {
-    WARN(5, "   + VirDev::%s() {\n", __func__);
-    /*     
-     * Automatic Recovery, Register to the called history.
-     */
-    CudaRpcLaunchKernelArgs args2;
-    if (isRecording()) {
-        args2.moduleid = module_index;
-        args2.kid      = kid;
-        args2.kname    = kname;
-        args2.gdim     = gdim;
-        args2.bdim     = bdim;
-        args2.smemsize = smemsize;
-        args2.stream   = stream;
-        args2.args     = args;
-        reclist.append( dscudaLaunchKernelId, (void *)&args2 );
-    }
-
-    struct rpc_err rpc_result;
-    for (int i=0; i<nredundancy; i++) {
-        server[i].launchKernel(module_index, kid, kname, gdim,
-			       bdim, smemsize, stream, args, &rpc_result);
-	server[i].rpcErrorHook( &rpc_result );
-	if (rpc_result.re_status != RPC_SUCCESS ) {
-	    this->restoreMemlist();
-	    this->reclist.recall();
-	}
-    }
-    WARN(5, "   + } // VirDev::%s()\n", __func__);
-}
 
 void
 rpcDscudaLaunchKernelWrapper(int module_index, int kid, char *kname,  /* moduleid is got by "dscudaLoadModule()" */

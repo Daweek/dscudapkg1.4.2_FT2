@@ -19,16 +19,16 @@ static int WarnLevel = 2; /* warning message output level. the higher the more v
                              2: default
                              >= 3: for debugging purpose
                           */
-int dscuda::getWarnLevel(void)
-{
+int
+dscuda::getWarnLevel(void) {
     return WarnLevel;
 }
-void dscuda::setWarnLevel(int level)
-{
+void
+dscuda::setWarnLevel(int level) {
     WarnLevel = level;
 }
-char *dscudaMemcpyKindName(cudaMemcpyKind kind)
-{
+char*
+dscudaMemcpyKindName(cudaMemcpyKind kind) {
     static char *name;
 
     switch (kind) {
@@ -52,9 +52,8 @@ char *dscudaMemcpyKindName(cudaMemcpyKind kind)
     }
     return name;
 }
-const
-char *dscudaGetIpaddrString(unsigned int addr)
-{
+const char*
+dscudaGetIpaddrString(unsigned int addr) {
     static char buf[128];
     char *p = (char *)&addr;
     sprintf(buf, "%hhu.%hhu.%hhu.%hhu", p[0], p[1], p[2], p[3]);
@@ -66,8 +65,8 @@ char *dscudaGetIpaddrString(unsigned int addr)
  * t0 : time of day (in second) the last time this function is called.
  * returns the number of seconds passed since *t0.
  */
-double RCgetCputime(double *t0)
-{
+double
+RCgetCputime(double *t0) {
     struct timeval t;
     double tnow, dt;
 
@@ -80,8 +79,8 @@ double RCgetCputime(double *t0)
 //--
 //--
 //--
-int dscuda::sprintfDate(char *s, int fmt)
-{
+int
+dscuda::sprintfDate(char *s, int fmt) {
     time_t now;
     struct tm *local;
     //--
@@ -100,8 +99,8 @@ int dscuda::sprintfDate(char *s, int fmt)
     }
     return 0;
 }
-void *dscuda::xmalloc(size_t size)
-{
+void*
+dscuda::xmalloc(size_t size) {
     void *p;
     size_t sz=size;
     if (size == 0) {
@@ -115,8 +114,8 @@ void *dscuda::xmalloc(size_t size)
     return p;
 }
 
-void dscuda::xfree(void *p)
-{
+void
+dscuda::xfree(void *p) {
     if (p == NULL) {
 	fprintf(stderr, "xfree() called with NULL. \n");
 	exit(1);

@@ -18,9 +18,9 @@
 #define DEBUG
 
 #define DSCUDAVERB_SET_STUBS(mthd) \
-  storeArgsStub[DSCVMethod ## mthd] = store ## mthd; \
+    storeArgsStub[DSCVMethod ## mthd] = store ## mthd; \
   releaseArgsStub[DSCVMethod ## mthd] = release ## mthd; \
-  recallStub[DSCVMethod ## mthd] = recall ## mthd;
+       recallStub[DSCVMethod ## mthd] = recall ## mthd;
 
 #define DSCUDAVERB_STORE_ARGS(mthd) \
   Cuda ## mthd ## Args *argsrc;		\
@@ -112,8 +112,7 @@ HistList::HistList(void) {
 } // HistList::HistList()
 
 void
-HistList::extendLen(void)
-{
+HistList::extendLen(void) {
     max_len += EXTEND_LEN;
     histrec = (HistCell*)realloc( histrec, sizeof(HistCell) * max_len );
     if (histrec == NULL) {
@@ -127,8 +126,7 @@ HistList::extendLen(void)
  * Add one item to called histry of CUDA API. 
  */
 void
-HistList::append(int funcID, void *argp)
-{
+HistList::append(int funcID, void *argp) {
     int DSCVMethodId;
     if (length == max_len) { /* Extend the existing memory region. */
 	extendLen();
@@ -152,6 +150,7 @@ HistList::append(int funcID, void *argp)
 	break;
     case dscudaMemcpyH2DId:
 	byte_size += sizeof( CudaMemcpyArgs );
+	byte_size += ((CudaMemcpyArgs *)argp)->count + 1; //must record data too.
 	break;
     case dscudaMemcpyD2HId:
 	byte_size += sizeof( CudaMemcpyArgs );
@@ -205,68 +204,92 @@ HistList::clrRecallFlag(void) {
 }
 void
 HistList::print(void) {
-    WARN0(1, "<--- Record of CUDA API history Stack  *******\n");
+    const int print_lim = 64;
+    bool print_omit = false;
+    WARN_CP(1, "<--- Record of CUDA API history Stack  *******\n");
     if (this->length == 0) {
-	WARN0(1, "%s(): RecList[]> (Empty).\n", __func__);
+	WARN_CP(1, "%s(): RecList[]> (Empty).\n", __func__);
 	return;
     }
+    //
     for (int i=0; i<length; i++) { /* Print recall history. */
-	WARN0(1, "        [%d] = #%lld:", i, histrec[i].seq_num);
-	switch (histrec[i].funcID) { /* see "dscudarpc.h" */
-	case 305: WARN0(1, "cudaSetDevice()\n");        break;
-	case 504: WARN0(1, "cudaEventRecord()\n");      break;
-	case 505: WARN0(1, "cudaEventSynchronize()\n"); break;
-	case 600: WARN0(1, "kernel-call<<< >>>()\n");   break;
-	case 700: WARN0(1, "cudaMalloc()\n");           break;
-	case 701: WARN0(1, "cudaFree()\n");             break;
-	case 703: WARN0(1, "cudaMemcpy(H2D)\n");        break;
-	case 704: WARN0(1, "cudaMemcpy(D2H)\n");        break;
-	default:  WARN0(1, "/* %d */()\n", histrec[i].funcID);
+	if ( i < print_lim || i > (length - print_lim) ) {
+	    WARN_CP(1, "        [%d] = #%lld:", i, histrec[i].seq_num);
+	    switch (histrec[i].funcID) { /* see "dscudarpc.h" */
+	    case 305: WARN_CP0(1, "cudaSetDevice()\n");        break;
+	    case 504: WARN_CP0(1, "cudaEventRecord()\n");      break;
+	    case 505: WARN_CP0(1, "cudaEventSynchronize()\n"); break;
+	    case 600: WARN_CP0(1, "launch-kernel()\n");   break;
+	    case 700: WARN_CP0(1, "cudaMalloc()\n");           break;
+	    case 701: WARN_CP0(1, "cudaFree()\n");             break;
+	    case 703: WARN_CP0(1, "cudaMemcpy(H2D)\n");        break;
+	    case 704: WARN_CP0(1, "cudaMemcpy(D2H)\n");        break;
+	    default:  WARN_CP0(1, "/* %d */()\n", histrec[i].funcID);
+	    }
+	}
+	else {
+	    if (!print_omit) {
+		WARN_CP(1, "        [...] = ...\n");
+		WARN_CP(1, "        [...] = ... (avoid printing too many lines.\n");
+		WARN_CP(1, "        [...] = ...\n");
+	    }
+	    print_omit = true;
 	}
     }
-    WARN0(1, "Occupied memory size is %d Byte.\n",  byte_size);
-    WARN0(1, "---> Record of CUDA API history  *************\n");
+    WARN_CP(1, "Occupied size = %d Byte.\n",  byte_size);
 }
 /*
  * Rerun the recorded history of cuda function series.
  */
 int
 HistList::recall(void) {
-    WARN(9, "HistList::%s() {\n", __func__);
+    WARN_CP(1, "            HistList::%s() {\n", __func__);
     static int called_depth = 0;
+    const int print_lim = 64;
+    bool print_omit = false;
     int result;
-    int verb_curr = St.autoverb;
+    int warnlevel_stack = dscuda::getWarnLevel();
    
     setRecallFlag();
 
-    WARN(1, "called_depth= %d.\n", called_depth);
+    WARN_CP(1, "            called_depth= %d.\n", called_depth);
     if (called_depth < 0) {       /* irregal error */
-	WARN(1, "#**********************************************************************\n");
-	WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-	WARN(1, "#       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
-	WARN(1, "#**********************************************************************\n\n");
+	WARN_CP(1, "    #**********************************************************************\n");
+	WARN_CP(1, "    # (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+	WARN_CP(1, "    #       Unexpected error occured. called_depth=%d in %s()             *\n", called_depth, __func__);
+	WARN_CP(1, "    #**********************************************************************\n\n");
 	exit(1);
-    } else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
+    }
+    else if (called_depth < RC_REDUNDANT_GIVEUP_COUNT) { /* redundant calculation.*/
 	called_depth++;       
-	for (int i=0; i< length; i++) { /* Do recall history */
-	    WARN(3, "(._.)Rollback API[%4d/%d]................................\n", i, length-1);
+	for (int i=0; i< this->length; i++) { /* Do recall history */
+	    if ( i < print_lim || i > (length - print_lim) ) {  // eliminate too many print line
+		WARN_CP(1, "            (._.)Rollback CUDA API call[%4d/%d]...............\n", i, length-1);
+	    }
+	    else {
+		if (!print_omit) {
+		    WARN_CP(1, "            (._.)Rollback CUDA API call[.../%d]...............\n", length-1);
+		    WARN_CP(1, "            (._.)Rollback CUDA API call[.../%d]...............\n", length-1);
+		    WARN_CP(1, "            (._.)Rollback CUDA API call[.../%d]...............\n", length-1);
+		}
+		print_omit = true;
+		dscuda::setWarnLevel(0);
+	    }
 	    (recallStub[funcID2DSCVMethod( histrec[i].funcID )])(histrec[i].args); /* partially recursive */
+	    dscuda::setWarnLevel(warnlevel_stack);
 	}
 	called_depth=0;
 	result = 0;
-    } else { /* try migraion or not. */
-	WARN(1, "#**********************************************************************\n");
-	WARN(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
-	WARN(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
-	WARN(1, "#**********************************************************************\n\n");
+    }
+    else { /* try migraion or not. */
+	WARN_CP(1, "#**********************************************************************\n");
+	WARN_CP(1, "# (;_;) DS-CUDA gave up the redundant calculation.                    *\n"); 
+	WARN_CP(1, "#       I have tried %2d times but never matched.                    *\n", RC_REDUNDANT_GIVEUP_COUNT);
+	WARN_CP(1, "#**********************************************************************\n\n");
 	called_depth=0;
 	result = 1;
    }
-
-    WARN(9, "} HistList::%s()\n", __func__);
-    St.autoverb = verb_curr;
     clrRecallFlag();
-    
    return result;
 } // HistList::recall(void)
 
@@ -314,8 +337,10 @@ storeMalloc(void *argp) {
 static void*
 storeMemcpyH2D(void *argp) {
     DSCUDAVERB_STORE_ARGS(Memcpy);
+    //<--- Need to memorize also copy data. Great.
     argdst->src = malloc(argsrc->count + 1);
     memcpy(argdst->src, (const void *)argsrc->src, argsrc->count);
+    //---> Need to memorize also copy data. Great.
     return argdst;
 }
 static void*
@@ -407,20 +432,19 @@ releaseSetDevice(void *argp) {
     argsrc = (CudaSetDeviceArgs *)argp;
     free(argsrc);
 }
-
 static void
 releaseMalloc(void *argp) {
     //nothing to do
 }
-
 static void
 releaseMemcpyH2D(void *argp) {
     CudaMemcpyArgs *argsrc;
     argsrc = (CudaMemcpyArgs *)argp;
+    //<--- Need to memorize also copy data. Great.
     free(argsrc->src);
+    //---> Need to memorize also copy data. Great.
     free(argsrc);
 }
-
 static void
 releaseMemcpyD2D(void *argp) {
     CudaMemcpyArgs *argsrc;
@@ -434,8 +458,7 @@ releaseMemcpyD2H(void *argp) {
     free(argsrc);
 }
 static void
-releaseMemcpyToSymbolH2D(void *argp)
-{
+releaseMemcpyToSymbolH2D(void *argp) {
     CudaMemcpyToSymbolArgs *argsrc;
     argsrc = (CudaMemcpyToSymbolArgs *)argp;
     
@@ -484,15 +507,14 @@ recallSetDevice(void *argp) {
     CudaSetDeviceArgs *argsrc;
     argsrc = (CudaSetDeviceArgs *)argp;
 
-    WARN(3, "Recall cudaSetDevice()...\n");
+    WARN_CP(1,  "                 ");
+    WARN_CP0(1, "Recall cudaSetDevice()...\n");
     cudaSetDevice(argsrc->device);
 }
-
 static void
 recallMalloc(void *argp) {
     //nothing to do
 }
-
 static void
 recallMemcpyH2D(void *argp) {
     // note: dont insert pthread_mutex_lock or unlock.
@@ -502,27 +524,26 @@ recallMemcpyH2D(void *argp) {
     bool rec_en_stack = vdev->isRecording();
     
     argsrc = (CudaMemcpyArgs *)argp;
-    WARN(3, "Recall cudaMemcpyH2D() \n");
+    WARN_CP(1,  "                 ");
+    WARN_CP0(1, "Recall cudaMemcpyH2D() \n");
 
     vdev->recordOFF();
+    //<--- Need to memorize also copy data. Great.
     vdev->cudaMemcpyH2D(argsrc->dst, argsrc->src, argsrc->count);
+    //---> Need to memorize also copy data. Great.
     if (rec_en_stack) vdev->recordON();
-    WARN(3, "\n");
 }
-
 static void
 recallMemcpyD2D(void *argp) {
     // note: dont insert pthread_mutex_lock or unlock.
     CudaMemcpyArgs *argsrc;
     argsrc = (CudaMemcpyArgs *)argp;
     
-    WARN(3, "Recall cudaMemcpyD2D()...\n");
+    WARN_CP(1, "Recall cudaMemcpyD2D()...\n");
     cudaMemcpy(argsrc->dst, argsrc->src, argsrc->count, cudaMemcpyDeviceToDevice);
 }
-
 static void
-recallMemcpyD2H(void *argp)
-{
+recallMemcpyD2H(void *argp) {
     // note: dont insert pthread_mutex_lock or unlock.
     CudaMemcpyArgs *argsrc;
     int         vdevid = Vdevid[ vdevidIndex() ];
@@ -530,52 +551,44 @@ recallMemcpyD2H(void *argp)
     bool rec_en_stack = vdev->isRecording();
 
     argsrc = (CudaMemcpyArgs *)argp;
-    WARN(3, "Recall cudaMemcpyD2H()...\n");
+    WARN_CP(1,  "                 ");
+    WARN_CP0(1, "Recall cudaMemcpyD2H()...\n");
 
     vdev->recordOFF();
     vdev->cudaMemcpyD2H(argsrc->dst, argsrc->src, argsrc->count);
     if (rec_en_stack) vdev->recordON();
-    WARN(3, "\n");
 }
-
 static void
-recallMemcpyToSymbolH2D(void *argp)
-{
+recallMemcpyToSymbolH2D(void *argp) {
     CudaMemcpyToSymbolArgs *argsrc;
     argsrc = (CudaMemcpyToSymbolArgs *)argp;
-    WARN(3, "recall cudaMemcpyToSymbolH2D\n");
+    WARN_CP(1, "recall cudaMemcpyToSymbolH2D\n");
     dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyHostToDevice);
 }
 
 static void
-recallMemcpyToSymbolD2D(void *argp)
-{
+recallMemcpyToSymbolD2D(void *argp) {
     CudaMemcpyToSymbolArgs *argsrc;
     argsrc = (CudaMemcpyToSymbolArgs *)argp;
-    WARN(3, "recall cudaMemcpyToSymbolD2D\n");
+    WARN_CP(1, "recall cudaMemcpyToSymbolD2D\n");
     dscudaMemcpyToSymbolWrapper(argsrc->moduleid, argsrc->symbol, argsrc->src, argsrc->count, argsrc->offset, cudaMemcpyDeviceToDevice);
 }
-
 static void
-recallFree(void *argp)
-{
+recallFree(void *argp) {
     //nothing to do
 }
-
 static void
-recallLoadModule(void *argp)
-{
+recallLoadModule(void *argp) {
     CudaLoadModuleArgs *argsrc;
     argsrc = (CudaLoadModuleArgs *)argp;
 }
-
 static void
-recallRpcLaunchKernel(void *argp)
-{
+recallRpcLaunchKernel(void *argp) {
     // note: dont insert pthread_mutex_lock or unlock.
     CudaRpcLaunchKernelArgs *argsrc;
     argsrc = (CudaRpcLaunchKernelArgs *)argp;
-    WARN(3, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
+    WARN_CP(1,  "                 ");
+    WARN_CP0(1, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
 	 argsrc->moduleid, argsrc->kid, argsrc->kname);
 #if 0
     rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
@@ -587,4 +600,5 @@ recallRpcLaunchKernel(void *argp)
     if (rec_en_stack) vdev->recordON();
 #endif
 }
+//EOF
 

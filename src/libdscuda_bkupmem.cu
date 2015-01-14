@@ -157,6 +157,7 @@ BkupMemList::BkupMemList(void) {
     tail       = NULL;
     length     = 0;
     total_size = 0;
+    age        = 0;
     //WARN( 5, "The constructor %s() called.\n", __func__);
 }
 
@@ -223,7 +224,7 @@ BkupMemList::query(const void *v_ptr) {
 	    //WARN(10, "---> %s(%p): return %p\n", __func__, v_ptr, mem);
 	    return mem;
 	}
-	WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, v_ptr, i, mem->v_region);
+	//WARN(10, "%s(): search %p, check[%d]= %p\n", __func__, v_ptr, i, mem->v_region);
 	mem = mem->next;
 	i++;
     }
@@ -325,8 +326,6 @@ BkupMemList::remove(void *uva_ptr) {
 	exit(EXIT_FAILURE);
     }
 }
-
-
 /* 
  * Resore the all data of a GPU device with backup data on client node.
  */
@@ -349,5 +348,13 @@ BkupMemList::restructDeviceRegion(void) {
     }
     //St.setAutoVerb( verb );
     WARN(2, "+--- done.\n");
+}
+void
+BkupMemList::incrAge(void) {
+    this->age++;
+}
+int
+BkupMemList::getAge(void) {
+    return this->age;
 }
 

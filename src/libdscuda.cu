@@ -366,7 +366,7 @@ ClientState::configFT(void) {
     }
     //---> copy same value to virtual and physical device.
 
-    if (ft_mode==FT_BYCPY || ft_mode==FT_BYTIMER) {
+    if (ft.rec_en) {
 	for (int i=0; i<RC_NVDEVMAX; i++) {
 	    Vdev[i].recordON();
 	}
@@ -1521,25 +1521,7 @@ extractENV(char *str_var, const char *envname, int len) {
 void*
 periodicCheckpoint(void *arg) {
     int         cp_period = *(int *)arg;
-    int         age = 0; //
-    int         devid;
-    int         errcheck = 1;
-    cudaError_t cuerr;
-    int         pmem_devid;
-    BkupMem    *pmem;
-    int         pmem_count;
-    void       *lsrc;
-    void       *ldst;
-    int         redun;
-    int         size;
     
-    int  cmp_result[RC_NREDUNDANCYMAX][RC_NREDUNDANCYMAX]; //verify
-    int  regional_match;
-    int  snapshot_match = 1;
-    int  snapshot_count = 0;
-    void *dst_cand[RC_NREDUNDANCYMAX];
-    int  dst_color[RC_NREDUNDANCYMAX], next_color;
-
     int correct_count = 0;
     while (true) {
 	//<-- Wait for specified period (sec) passed.
@@ -1549,8 +1531,7 @@ periodicCheckpoint(void *arg) {
 	//<-- Output beginning message.
 	WARN_CP(1,
 	"=====================================================================\n");
-	WARN_CP( 1,"periodicCheckpoint( period = %d sec, age=%d )\n", cp_period, age);
-	WARN(9,"CP: periodicCheckpoint( period = %d sec, age=%d ) {\n", cp_period, age);
+	WARN_CP(1,"periodicCheckpoint( period = %d sec )\n", cp_period );
 	//--> Output beginning message.
 		
 	//<-- mutex locks for avoiding R/W collisions 
@@ -1566,24 +1547,30 @@ periodicCheckpoint(void *arg) {
 	//**           +---> server[*].collectEntireRegions();
 	//--> copy from all cudaMalloc() regions of all devices.
 
-	int correct = St.verifyEntireRegions();
-	if (correct==1) {
+	bool correct = St.verifyEntireRegions();
+	if (correct) {
 	    correct_count++;
 	}
 #if 1 // force pseudo error
 	if (correct_count % 5 == 4) {
-	    correct = 0;
+	    correct = false;
 	}
 #endif
-	if ( correct==1 ) {
+	if (correct) {
 	    //***
 	    //*** All memory regions on all virtual devices are correct.
 	    //*** Then, collect clean device memory regions to host memory.
 	    //*** and clear CUDA API called history.
 	    //***
-	    WARN(1, "CP: (^_^)Ready to update clean backup region.\n");
+
+	    
 	    for (int i=0; i<St.Nvdev; i++) {
-		St.Vdev[i].updateMemlist(0); // 0 means server[0].
+		St.Vdev[i].updateMemlist();
+	    }
+	    WARN_CP(1, "(^_^)Update clean backup region, age=%d\n",
+		    St.Vdev[0].memlist.getAge());
+	    
+	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].clearReclist();
 	    }
 	}
@@ -1593,15 +1580,21 @@ periodicCheckpoint(void *arg) {
 	    //*** Then, restore clean memory regions to all devices, and
 	    //*** redo the historical cuda API calls.
 	    //***
-	    WARN(1, "CP: (+_+)Detected corrupted device region.\n");
-	    WARN(1, "CP: (+_+)Restore the device memory using backup.\n");
+	    WARN_CP(1, "(+_+)Detect corrupted region.\n");
+
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
-	    WARN(1, "CP: (+_+)Redo the CUDA APIs Rollbacked.\n");	    
+	    WARN_CP(1, "(._.)Completed restoring the device memory previous backup ");
+	    WARN_CP0(1, "age=%d\n", St.Vdev[0].memlist.getAge());
+		    
+	    WARN_CP(1, "(+_+)Rollback the CUDA APIs.\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
+		St.Vdev[i].recordOFF();
+		WARN_CP(1, "        VirDev[%d]\n", St.Vdev[i].id);
 		St.Vdev[i].reclist.recall();
+		St.Vdev[i].recordON();
 	    }
 	}
 	//<-- mutex unlocks for following R/W.
@@ -1611,10 +1604,9 @@ periodicCheckpoint(void *arg) {
 	//--> mutex unlocks for following R/W.
 	
 	//<-- Output ending message.	
-	WARN(9,"CP: } periodicCheckpoint().\n");
+	WARN_CP(1,"} periodicCheckpoint().\n");
 	//--> Output ending message.	
 	pthread_testcancel();/* cancelation available */
-	age++;
     }//for (;;)
 } // periodicCheckpoint()
 void

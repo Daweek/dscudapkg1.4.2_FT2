@@ -117,11 +117,14 @@ public:
     long     getTotalSize  (void); // get total size of allocated memory.
     int      countRegion   (void);
     void     restructDeviceRegion(void);              /* ReLoad backups */
+    void     incrAge(void);
+    int      getAge(void);
 private:
     BkupMem* head;        /* pointer to 1st  BkupMem */
     BkupMem* tail;        /* pointer to last BkupMem */
     int      length;       /* Counts of allocated memory region */    
     long     total_size;   /* Total size of backuped memory in Byte */
+    int      age;
     bool     isEmpty(void);
 };
 //********************************************************************
@@ -481,8 +484,8 @@ public:
     /*CP*/
     void  remallocRegionsGPU(int num_svr); //cudaMemcpyD2H-all
     void  collectEntireRegions(void);
-    int   verifyEntireRegions(void);
-    void  updateMemlist(int svr_id);
+    bool  verifyEntireRegions(void);
+    void  updateMemlist(void);
     void  restoreMemlist(void);
     void  clearReclist(void);
 }; // struct VirDev
@@ -533,7 +536,7 @@ public:
 
     /*CHECKPOINT*/
     void      collectEntireRegions(void);
-    int       verifyEntireRegions(void);
+    bool      verifyEntireRegions(void);
     void      udpateMemlist(void);
 private:
     pthread_t tid;        /* thread ID of Checkpointing */

@@ -84,7 +84,19 @@ extern struct ClientState St;
 	    MACRO_TSTAMP_FORMAT\
             fprintf( St.dscuda_chkpnt, "[%s](%d) ", tfmt, lv);\
 	    fprintf( St.dscuda_chkpnt, fmt, ## args);\
-	    fflush( St.dscuda_chkpnt );\
+	    fflush ( St.dscuda_chkpnt );\
+	    fprintf( St.dscuda_stdout, "[%s](%d)CP: ", tfmt, lv);	\
+	    fprintf( St.dscuda_stdout, fmt, ## args);\
+	    fflush ( St.dscuda_stdout );\
+	}\
+    }
+
+#define WARN_CP0(lv, fmt, args...) {\
+	if (lv <= dscuda::getWarnLevel()) {\
+	    fprintf( St.dscuda_chkpnt, fmt, ## args);\
+	    fflush ( St.dscuda_chkpnt );\
+	    fprintf( St.dscuda_stdout, fmt, ## args);\
+	    fflush ( St.dscuda_stdout );\
 	}\
     }
 
