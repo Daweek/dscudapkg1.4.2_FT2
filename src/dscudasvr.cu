@@ -96,8 +96,8 @@ receiveProtocolPreference(void) {
     }
 }
 
-int main(int argc, char **argv)
-{
+int
+main(int argc, char **argv) {
     parseArgv(argc, argv);
     initEnv();
     initDscuda();
@@ -386,6 +386,8 @@ initEnv(void) {
 	}
     }
     SWARN(1, "Fault period Config: %d\n", DscudaSvr.fault_period);
+    DscudaSvr.first_fault_time = (double)DscudaSvr.fault_period / 2.0;
+    DscudaSvr.next_fault_time = DscudaSvr.first_fault_time;
     
     /* Timed out */
     env = getenv("DSCUDA_FORCE_TIMEOUT"); // integer type.

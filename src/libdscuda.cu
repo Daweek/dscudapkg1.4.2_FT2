@@ -1556,9 +1556,9 @@ periodicCheckpoint(void *arg) {
 	dscuda::stopwatch(&Tc_sta);
 
 	//<-- Wait for specified period (sec) passed.
-	Tc_exp = ((double)cp_period * (double)cp_count) - Tc_sum - Tm_avrx; //in sec
-	if      (Tc_exp < Tc_exp_l) Tc_exp = Tc_exp_l;
-	else if (Tc_exp > Tc_exp_h) Tc_exp = Tc_exp_h;
+	Tc_exp = ((double)cp_period * (double)cp_count) - Tc_sum - Tm_avr; //in sec
+	if      (Tc_exp < Tc_exp_l) Tc_exp = Tc_exp_l; // saturate to lower bound time.
+	else if (Tc_exp > Tc_exp_h) Tc_exp = Tc_exp_h; //             upper bound time.
 	Tc_exp_sec  = (int)floor(Tc_exp);
 	Tc_exp_usec = (Tc_exp - Tc_exp_sec)*1e6;
 	for (int i=0; i<Tc_exp_sec; i++) {
@@ -1640,9 +1640,10 @@ periodicCheckpoint(void *arg) {
 	    //*** Then, restore clean memory regions to all devices, and
 	    //*** redo the historical cuda API calls.
 	    //***
-	    WARN_CP(0, "(+_+)Detect corrupted region.\n");
-
 	    dscuda::stopwatch(&Tr_sta);
+	    WARN_CP(0,"(+_+) Detect corrupted region.\n");
+	    WARN_CP(0,"%8.3f sec from start. nth=%d\n",
+		    Tr_sta - (double)St.start_time, faulted_count);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }

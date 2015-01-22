@@ -519,6 +519,10 @@ public:
     void      unsetRollbackCalling(void);
     bool      isRollbackCalling(void);
     
+    //<-- Error/Fault Static Information
+    time_t    start_time;  // Clinet start time.
+    time_t    stop_time;   // Client stop time.
+
     //** <-- DS-CUDA client log/err output files.
     FILE     *dscuda_stdout;     // log-file descriptor.
     FILE     *dscuda_stderr;     // err-file descriptor.
@@ -540,9 +544,6 @@ public:
 private:
     pthread_t tid;        /* thread ID of Checkpointing */
     unsigned  ip_addr;     // Client IP address.
-    //<-- Error/Fault Static Information
-    time_t    start_time;  // Clinet start time.
-    time_t    stop_time;   // Client stop time.
     //<-- DSCUDA log filename.
     char      dslog_filename[80]; // ex.) "c20141224_235901.dslog", 'c' means clnt.
     char      dserr_filename[80]; // ex.) "c20141224_235901.dserr", 'c' means clnt.

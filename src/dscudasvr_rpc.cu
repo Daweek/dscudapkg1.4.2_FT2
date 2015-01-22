@@ -894,42 +894,28 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, int flag /*fault*/,
     //<--
     // !!! [debugging purpose only] destroy some part of the returning data
     // !!! in order to emulate a malfunctional GPU.
-    static bool   firstcall  = true;
-    static double t_prev_err;
-           double period_err = (double)DscudaSvr.fault_period; 
-           double t_tmp;
-           double dt_ok;
     if (flag != 0) {
+	double passed_time = DscudaSvr.getPassedTime();
 	if (DscudaSvr.fault_period > 0) {
-	    if (firstcall) {
-		firstcall = false;
-		dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
-		SWARN(2, "################ Good data (1st call).\n" );
+	    if ( passed_time > DscudaSvr.next_fault_time ) { // specified time passed or not.
+		SWARN(2, "################\n" );
+		SWARN(2, "################\n" );
+		SWARN(2, "################ Bad data generatad.\n" );
+		SWARN(2, "################ (every %d sec)\n", DscudaSvr.fault_period);
+		SWARN(2, "################\n" );
+		res.buf.RCbuf_val[0] = 123; // Overwrite no mean bits.
+		DscudaSvr.last_fault_time = passed_time;
+		DscudaSvr.faultCountUp();
+		DscudaSvr.next_fault_time = DscudaSvr.first_fault_time +
+		    ((double)DscudaSvr.fault_period * (double)DscudaSvr.fault_count);
 	    }
 	    else {
-		t_tmp = t_prev_err;
-		dt_ok = dscuda::stopwatch( &t_tmp );
-		if ( dt_ok > period_err ) { // specified time passed or not.
-		    SWARN(2, "################\n" );
-		    SWARN(2, "################\n" );
-		    SWARN(2, "################ Bad data generatad.\n" );
-		    SWARN(2, "################ (every %d sec)\n", DscudaSvr.fault_period);
-		    SWARN(2, "################\n" );
-		    res.buf.RCbuf_val[0] = 123; // Overwrite no mean bits.
-		    t_prev_err = t_tmp;
-		}
-		else {
-		    SWARN(2, "################ Good data. (%5.1f/%d)\n",
-			  dt_ok, DscudaSvr.fault_period );
-		}
+		SWARN(2, "################ Good data. (%5.1f/%d)\n",
+		      passed_time, DscudaSvr.fault_period );
 	    }
 	}
 	if (DscudaSvr.fault_period < 0) {
-	    if (firstcall) {
-		firstcall = false;
-		dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
-		SWARN(2, "################ Good data (1st call).\n" );
-	    }
+	    SWARN(2, "################ Good data (1st call).\n" );
 	}
 #if 0 // DS-CUDA original.
 	static bool err_prev_call = false; // avoid bad data generation in adjacent calls.
