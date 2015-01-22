@@ -74,6 +74,21 @@ dscuda::stopwatch(double *t0) {
     *t0 = tnow;
     return dt;
 }
+double
+dscuda::stopwatch(double *t0, double *min, double *max) {
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    double tnow = t.tv_sec + t.tv_usec/1000000.0;
+    double dt   = tnow - *t0;
+    if (dt < *min) {
+	*min = dt;
+    }
+    if (dt > *max) {
+	*max = dt;
+    }
+    *t0 = tnow;
+    return dt;
+}
 //--
 //--
 //--
@@ -104,7 +119,7 @@ dscuda::xmalloc(size_t size) {
     if (size == 0) {
 	sz=1;
     }
-    p = malloc( size ) ;
+    p = malloc( sz ) ;
     if (p == NULL) {
 	fprintf(stderr, "dscuda:xmalloc() out of memory. requested size was %d bytes.\n", size);
 	exit(1);

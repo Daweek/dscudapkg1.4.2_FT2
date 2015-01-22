@@ -30,6 +30,7 @@ struct ServerModule {
 };
 struct ServerState {
     int  fault_injection; // fault injection pattarn. "0" means no faults.
+    int  fault_period; // 0: "never", >0: "fixed", <0: "Distributed"
     int  force_timeout;
     
     void setFaultInjection(int val=1) { fault_injection=val; }
@@ -37,6 +38,7 @@ struct ServerState {
     int  getFaultInjection(void)      { return fault_injection; }
     ServerState() {
 	fault_injection = 0;
+	fault_period = 60;//sec
 	force_timeout = 0;
     }
 };

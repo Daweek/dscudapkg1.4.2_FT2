@@ -1,6 +1,10 @@
 #!/bin/bash
 ###
 ### "runlocal_dacudad"
+###    -f            : invoke fault dscuda server.
+###    -s            : silent mode.
+###    -h            : print usage.
+###    -l [filename] : generate logfile.
 ###
 
 # Define Variables
@@ -22,6 +26,7 @@ Init_env() {
     export DSCUDA_REMOTECALL="rpc"
     export LD_LIBRARY_PATH=${CUDAPATH}/lib64:${CUDAPATH}/lib
 #    export DSCUDA_FAULT_INJECTION=0
+
     export OMP_NUM_THREADS=1
 }
 Print_env() {
@@ -57,14 +62,15 @@ Check_args() {
 #Check_args;
 
 #export DSCUDA_FAULT_INJECTION=${1}
-
+export DSCUDA_FAULT_PERIOD=${1}
 Init_env;
 echo $LD_LIBRARY_PATH
 Print_env;
 #$DSCUDA_PATH/bin/dscudad 2>&1 | tee ${logpath}/${logfile}
 
-echo "${DSCUDA_PATH}/bin/dscudad $*"
-${DSCUDA_PATH}/bin/dscudad $* 2>&1 | tee ${logfile}
+echo "${DSCUDA_PATH}/bin/dscudad"
+#${DSCUDA_PATH}/bin/dscudad 2>&1 | tee ${logfile}
+${DSCUDA_PATH}/bin/dscudad 2>&1 | tee ${logfile}
 #$DSCUDA_PATH/bin/dscudasvr -s 0 -d 0
 
 

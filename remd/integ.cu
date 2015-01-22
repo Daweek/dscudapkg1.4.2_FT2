@@ -110,8 +110,7 @@ integTime_dev(int t0,
 	      Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	      Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
 	      Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar,
-	      FaultConf_t FAULT_CONF)
-{
+	      FaultConf FAULT_CONF) {
     __shared__ Real3_t  shared_mem[SMEM_COUNT];
     __shared__ Real_t   potential_ar[SMEM_COUNT];
     __shared__ Real_t   zeta;
@@ -120,10 +119,6 @@ integTime_dev(int t0,
     
    
     Real_t calc_err;
-    if (threadIdx.x==0) {
-	fault_cnt = *FAULT_CONF.d_Nfault;
-	printf("FAULT_CONF= %d/%d %s.\n", fault_cnt, FAULT_CONF.fault_en, FAULT_CONF.tag);
-    }
 
     Real3_t *pos_ar    = d_pos_ar + (Nmol * blockIdx.x);
     Real3_t *vel_ar    = d_vel_ar + (Nmol * blockIdx.x);
@@ -135,28 +130,7 @@ integTime_dev(int t0,
     int      ret_code;
 
     __syncthreads();
-#if 1
-    //<--- checksum
-    if (blockIdx.x==0 && threadIdx.x==0) printf("checksum -------------------------------\n");
-    int checksum;
-    int checksize;
-    
-    checksize = sizeof(Real3_t) * Nmol;
-    checksum  = chksum((int *)pos_ar, checksize);
 
-    if (threadIdx.x==0) printf("checksum(pos_ar[%d])= %+d\n", blockIdx.x, checksum);
-    __syncthreads();
-   
-    checksum  = chksum((int *)vel_ar, checksize);
-    if (threadIdx.x==0) printf("checksum(vel_ar[%d])= %+d\n", blockIdx.x, checksum);
-    __syncthreads();
-   
-    checksum  = chksum((int *)foc_ar, checksize);
-    if (threadIdx.x==0) printf("checksum(foc_ar[%d])= %+d\n", blockIdx.x, checksum);
-    __syncthreads();
-    
-    //---> checksum
-#endif
     Real_t   zeta_sum = 0.0; // unused?
     Real_t   Q        = 70.0;
     
@@ -179,34 +153,6 @@ integTime_dev(int t0,
     // ---> calc_LRC
 
     __syncthreads();
-    if (blockIdx.x==0 && threadIdx.x==0) {
-	if (FAULT_CONF.fault_en==0 || fault_cnt==0) {  /* Normal calc */
-	    printf("[Normal calculation] (t0=%d)\n", t0);
-	    /* nop */
-	}
-	else { /* Fault calc */
-	    printf("[Fault  calculation] (t0=%d)\n", t0);
-	}
-    }
-    
-    /***********************************************************************
-     *  <--- FAULT INJECTION
-     */
-    if (threadIdx.x==0) {
-	if (FAULT_CONF.fault_en==0 || fault_cnt==0) {
-	    calc_err = 0.0;
-	}
-	else {
-	   if (blockIdx.x==0) { calc_err = +500.0; }
-	   if (blockIdx.x==1) { calc_err = -500.0; }
-	   if (blockIdx.x==2) { calc_err = +500.0; }
-	   if (blockIdx.x==3) { calc_err = -500.0; }
-	}
-	printf("(%d,%d)calc_err[%d]:blockIdx.x=%d= %f\n", FAULT_CONF.fault_en, fault_cnt, t0, blockIdx.x, calc_err);
-    }
-    /*
-     *  ---> FAULT INJECTION 
-     ***********************************************************************/
    
     // if exchanged, scale velocity //
     if (exch_flag == 1) {
@@ -282,16 +228,10 @@ integTime_dev(int t0,
     } // for (int t=0; ...
     
     __syncthreads();
-    if (blockIdx.x==0 && threadIdx.x==0) {
-	if (FAULT_CONF.fault_en>0 && fault_cnt>0) {
-	    *FAULT_CONF.d_Nfault = fault_cnt - 1;
-	}
-   }
 } //--> integTime_dev()
 //==============================================================================
-static
-int checkSum(void *targ, int size)
-{
+static int
+checkSum(void *targ, int size) {
     int sum=0;
     int *ptr = (int *)targ;
     for (int s=0; s<size; s+=sizeof(int)) {
@@ -304,8 +244,7 @@ int checkSum(void *targ, int size)
 // simRemd()
 //------------------------------------------------------------------------------
 void
-simRemd( Remd_t &remd, Simu_t &simu ) 
-{
+simRemd( Remd_t &remd, Simu_t &simu ) {
     debug_print(2, "Entering %s().\n", __func__);
    
 #if !defined(HOST_RUN) && !defined(DEVICE_RUN)
@@ -374,11 +313,11 @@ simRemd( Remd_t &remd, Simu_t &simu )
     next_progress = 0.0;
     step_progress = 0.05;
 
-    FaultConf_t FAULT_CONF(5); // fault 1 times.
+    FaultConf FAULT_CONF(5); // fault 1 times.
     for (int t0 = 0; t0 < simu.step_max; t0++) {
-	printf("###=============================================================\n");
+#if 0
 	printf("### t0 = %d / %d\n", t0, simu.step_max-1);
-	printf("###=============================================================\n");
+#endif
 	fflush(stdout);
 	curr_progress = (double)t0 / (double)simu.step_max;
 	if (curr_progress >= next_progress) {
@@ -436,8 +375,6 @@ simRemd( Remd_t &remd, Simu_t &simu )
 		  remd.d_energy[gpu_i], remd.d_temp_ar[gpu_i],remd.d_temp_meas[gpu_i],
 		  remd.d_exch_ar[gpu_i], FAULT_CONF );
 	}
-	//	printf("checksum: Pos[t0=%d after ]= %d\n",
-	//      t0, checkSum((void*)remd.h_pos_ar, sizeof(Real3_t)*Nmol*Nrep)); fflush(stdout);
 	
 //     #pragma omp parallel for
 //      for (gpu_i = 0; gpu_i < Ngpu; gpu_i++) {                          // Sweep GPU.
@@ -960,7 +897,8 @@ swapTemp(Real_t *temp_ar, int idx1, int idx2) {
    temp_ar[idx2] = buf;
 }
 //===============================================================================
-void exchTemp(int t0, Remd_t &remd, Simu_t &simu) {
+void
+exchTemp(int t0, Remd_t &remd, Simu_t &simu) {
    int    rep_i, rep_j;
    Real_t ene1, ene2;
    Real_t delta;
@@ -999,11 +937,11 @@ void exchTemp(int t0, Remd_t &remd, Simu_t &simu) {
 	 remd.acc_ratio[rep_i] += 1;
       }
    }
-   
+#if 0   
    for (int i=0; i<remd.Nrep; i++) {
        printf("%s(): t0=%d, h_exch_ar[%d]= %d\n", __func__, t0, i, remd.h_exch_ar[i]);
    }
-   
+#endif
 } // exchTemp
 
 //==============================================================================

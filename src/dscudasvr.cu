@@ -293,7 +293,8 @@ destroyDscuContext(void) {
     return cudaSuccess;
 }
 
-static void initEnv(void) {
+static void
+initEnv(void) {
     static int firstcall = 1;
     int tmp, tmp2[FAULT_INJECTION_LEN];
     char *env;
@@ -354,7 +355,38 @@ static void initEnv(void) {
 	}
     }
     SWARN(1, "Fault Injection Config: 0x%x\n", DscudaSvr.getFaultInjection());
-
+    
+    env = getenv("DSCUDA_FAULT_PERIOD"); // integer type.
+    if (env == NULL) {
+	DscudaSvr.fault_period = 0;
+    }
+    else {
+	tmp = atoi(env);
+	if (tmp == 0) {
+	    DscudaSvr.fault_period = 0;
+	    SWARN(0, "*************************************\n");
+	    SWARN(0, "*** Never fault.\n");
+	    SWARN(0, "*************************************\n");
+	}
+	else if (tmp >= 10) {
+	    DscudaSvr.fault_period = tmp;
+	    SWARN(0, "*************************************\n");
+	    SWARN(0, "*** Fault period is constant %d sec \n", DscudaSvr.fault_period);
+	    SWARN(0, "*************************************\n");
+	}
+	else if (tmp <= -10) {
+	    DscudaSvr.fault_period = tmp;
+	    SWARN(0, "*************************************\n");
+	    SWARN(0, "*** Fault period is distributed %d sec \n", -DscudaSvr.fault_period);
+	    SWARN(0, "*************************************\n");
+	}
+	else {
+	    SWARN(0, "Fault period value %d is too little, equal/over 10.\n", tmp);
+	    exit(1);
+	}
+    }
+    SWARN(1, "Fault period Config: %d\n", DscudaSvr.fault_period);
+    
     /* Timed out */
     env = getenv("DSCUDA_FORCE_TIMEOUT"); // integer type.
     if (env) {

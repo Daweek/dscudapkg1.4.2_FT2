@@ -23,8 +23,7 @@ static void copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir);
 //     filename is {t0000, t0001, t0002, ...}
 //------------------------------------------------------------------------------
 void
-saveLocalTemp(Remd_t &remd)
-{
+saveLocalTemp(Remd_t &remd) {
     static int seq_num = 0;
     FILE *fp;
     char path_filename[1024];
@@ -38,8 +37,7 @@ saveLocalTemp(Remd_t &remd)
     seq_num++;
 }
 void
-saveMeasTemp(Remd_t &remd)
-{
+saveMeasTemp(Remd_t &remd) {
     static int seq_num = 0;
     FILE *fp;
     char path_filename[1024];
@@ -52,15 +50,13 @@ saveMeasTemp(Remd_t &remd)
     xfclose(fp);
     seq_num++;
 }
-
 //==============================================================================
 // saveFormat *  
 //------------------------------------------------------------------------------
 static void
 saveFormatPos( const char *filename,
 	       Real_t      temp,
-	       long        simstep )
-{
+	       long        simstep ) {
     const Real_t box      = 0.5 * remd.cellsize;
     double       simclock = simu.dt * (double)simstep;
     Real3_t     *pos_ar   = remd.h_pos_ar;
@@ -81,8 +77,7 @@ saveFormatPos( const char *filename,
     xfclose(fp);
 }
 static void
-saveFormatVel(const char *filename, long simstep)
-{
+saveFormatVel(const char *filename, long simstep) {
     double simclock = simu.dt * (double)simstep;
     FILE *fp = xfopen(filename, "w");
     Real3_t *vel_ar = remd.h_vel_ar;
@@ -96,8 +91,7 @@ saveFormatVel(const char *filename, long simstep)
     xfclose(fp);
 }
 static void
-saveFormatForce(const char *filename, const Real_t *potential_ar, long simstep)
-{
+saveFormatForce(const char *filename, const Real_t *potential_ar, long simstep) {
     double simclock = simu.dt * (double)simstep;
     FILE *fp = fopen(filename, "w");
     Real3_t *foc_ar = remd.h_foc_ar;
@@ -203,32 +197,28 @@ savePosAll(int t)
     }
 }
 void
-saveVelAll(int t)
-{
+saveVelAll(int t) {
     for (int i=0; i<remd.Nrep; i++) {
 	copyVel(i, D2H);
 	saveVel(i, t);
     }
 }
 void
-saveFocAll(int t)
-{
+saveFocAll(int t) {
     for (int i=0; i<remd.Nrep; i++) {
 	copyFoc(i, D2H);
 	saveFoc(i, t);
     }
 }
 void
-saveTempMeasAll(int t)
-{
+saveTempMeasAll(int t) { 
     for (int rep_i = 0; rep_i < remd.Nrep; rep_i++) {
 	copyTempMeas(rep_i, D2H);
 	saveTempMeas(rep_i, t);
     }
 }
 void
-savePos(int rep_i, Real_t temp, long simstep)
-{
+savePos(int rep_i, Real_t temp, long simstep) {
     static int seq_num[MAX_NREP] = {0};
     char savepath[1024];
 
@@ -244,8 +234,7 @@ savePos(int rep_i, Real_t temp, long simstep)
     seq_num[rep_i]++;
 }
 void
-saveVel(int rep_i, long simstep)
-{
+saveVel(int rep_i, long simstep) {
     static int seq_num[MAX_NREP] = {0};
     char savepath[1024];
     char filename[1024];
@@ -256,10 +245,8 @@ saveVel(int rep_i, long simstep)
     saveFormatVel(filename, simstep);
     seq_num[rep_i]++;
 }
-
 void
-saveFoc(int rep_i, long simstep, Real_t *potential_ar)
-{
+saveFoc(int rep_i, long simstep, Real_t *potential_ar) {
     static int seq_num[MAX_NREP] = {0};
     char savepath[1024];
     char filename[1024];
@@ -270,10 +257,8 @@ saveFoc(int rep_i, long simstep, Real_t *potential_ar)
     saveFormatForce(filename, potential_ar, simstep);
     seq_num[rep_i]++;
 }
-
 void
-saveLocalPos(Remd_t &remd, long simstep)
-{
+saveLocalPos(Remd_t &remd, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[LEN_FILENAME];
@@ -282,10 +267,8 @@ saveLocalPos(Remd_t &remd, long simstep)
     saveFormatPos(filename, 1000, simstep);
     seq_num++;
 }
-
 void
-saveTempMeas(int rep_i, long simstep)
-{
+saveTempMeas(int rep_i, long simstep) {
     static int seq_num[MAX_NREP] = {0};
     char savepath[1024];
     char filename[1024];
@@ -301,8 +284,7 @@ saveTempMeas(int rep_i, long simstep)
 // position data copy.
 //------------------------------------------------------------------------------
 void
-copyPos(int rep_i, CopyKind_t dir)
-{
+copyPos(int rep_i, CopyKind_t dir) {
     int      dev_i = simu.which_dev[rep_i];
     Real3_t *d_pos_ar = remd.d_pos_ar[dev_i] + (remd.Nmol * simu.offset_dev[rep_i]);
     debug_print(6, "Entering %s(rep_i=%d)\n", __func__, rep_i);
@@ -313,8 +295,7 @@ copyPos(int rep_i, CopyKind_t dir)
 // velocity data copy.
 //------------------------------------------------------------------------------
 void
-copyVel(int rep_i, CopyKind_t dir)
-{
+copyVel(int rep_i, CopyKind_t dir) {
     int      dev_i = simu.which_dev[rep_i];
     Real3_t *d_vel_ar = remd.d_vel_ar[dev_i] + (remd.Nmol * simu.offset_dev[rep_i]);
     copyReal3(remd.h_vel_ar, d_vel_ar, rep_i, dir);
@@ -323,16 +304,14 @@ copyVel(int rep_i, CopyKind_t dir)
 // Force data copy.
 //------------------------------------------------------------------------------
 void
-copyFoc(int rep_i, CopyKind_t dir)
-{
+copyFoc(int rep_i, CopyKind_t dir) {
     int      dev_i = simu.which_dev[rep_i];
     Real3_t *d_foc_ar = remd.d_foc_ar[dev_i] + (remd.Nmol * simu.offset_dev[rep_i]);
     copyReal3(remd.h_foc_ar, d_foc_ar, rep_i, dir);
 }
 
 void
-saveEne(Remd_t &remd, long simstep)
-{
+saveEne(Remd_t &remd, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[1024];
@@ -345,8 +324,7 @@ saveEne(Remd_t &remd, long simstep)
 }
 //==============================================================================
 void
-copyTempMeas(int rep_i, CopyKind_t dir)
-{
+copyTempMeas(int rep_i, CopyKind_t dir) {
     int     dev_i = simu.which_dev[rep_i];
     Real_t *host  = remd.h_temp_meas;
     Real_t *dev   = remd.d_temp_meas[dev_i] + (simu.step_exch * simu.offset_dev[rep_i]);
@@ -383,8 +361,8 @@ copyTempMeas(int rep_i, CopyKind_t dir)
 //==============================================================================
 //
 //------------------------------------------------------------------------------
-void saveLocalVel(Remd_t &remd, long simstep)
-{
+void
+saveLocalVel(Remd_t &remd, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[LEN_FILENAME];
@@ -396,8 +374,8 @@ void saveLocalVel(Remd_t &remd, long simstep)
 //==============================================================================
 //
 //------------------------------------------------------------------------------
-void saveLocalFoc(Remd_t &remd, Real_t *potential_ar, int Nmol, long simstep)
-{
+void
+saveLocalFoc(Remd_t &remd, Real_t *potential_ar, int Nmol, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[LEN_FILENAME];
@@ -411,8 +389,7 @@ void saveLocalFoc(Remd_t &remd, Real_t *potential_ar, int Nmol, long simstep)
  * [description]
  */
 void
-copyEnergy(CopyKind_t dir, Remd_t &remd, Simu_t &simu)
-{
+copyEnergy(CopyKind_t dir, Remd_t &remd, Simu_t &simu) {
     debug_print(6, "Entering %s\n", __func__);
 
     int     step_exch  = simu.step_exch;
@@ -471,10 +448,7 @@ copyEnergy(CopyKind_t dir, Remd_t &remd, Simu_t &simu)
 //
 //------------------------------------------------------------------------------
 void
-copyTempTarg(CopyKind_t dir)
-{
-    printf("<--- Entering %s()\n", __func__); fflush(stdout);
-
+copyTempTarg(CopyKind_t dir) {
     Real_t *h_temp_ar;
     Real_t *d_temp_ar;
     const int copysize = sizeof(Real_t) * simu.Nrep_1dev;
@@ -504,7 +478,7 @@ copyTempTarg(CopyKind_t dir)
 	for (int gpu_i = 0; gpu_i < simu.Ngpu; gpu_i++) {
 	    h_temp_ar = remd.h_temp_ar + (gpu_i * simu.Nrep_1dev);
 	    d_temp_ar = remd.d_temp_ar[gpu_i];
-#     if 1 //monitor copied data
+#     if 0 //monitor copied data
 	    for (int i=0; i<simu.Nrep_1dev; i++) {
 		printf("h_temp_ar[%d]= %f\n", i, h_temp_ar[i]);
 	    }
@@ -528,13 +502,9 @@ copyTempTarg(CopyKind_t dir)
 #else
     die("undefined HOST_RUN or DEVICE_RUN.\n");
 #endif
-    printf("---> Exiting  %s()\n", __func__); fflush(stdout);
 }
-
-
 void
-saveTempTarg(Remd_t &remd, long simstep)
-{
+saveTempTarg(Remd_t &remd, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[1024];
@@ -556,10 +526,7 @@ saveSorted(Remd_t &remd, long simstep)
 } // saveSorted()
 
 void
-copyExch(CopyKind_t dir, Remd_t &remd, Simu_t &simu)
-{
-    printf("<--- Entering %s\n", __func__);fflush(stdout);
-
+copyExch(CopyKind_t dir, Remd_t &remd, Simu_t &simu) {
     int *h_exch_ar;
     int *d_exch_ar;
     const int copysize = sizeof(int) * simu.Nrep_1dev;
@@ -606,7 +573,6 @@ copyExch(CopyKind_t dir, Remd_t &remd, Simu_t &simu)
 #else
     die("undefined HOST_RUN or DEVICE_RUN.\n");
 #endif
-    printf("---> Exiting  %s\n", __func__);fflush(stdout);
 }
 //===============================================================================
 // core function of "copyPos", "copyVel", and "copyFoc".
@@ -624,8 +590,7 @@ int checkSum(void *targ, int size) {
 }
 
 static void
-copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir)
-{
+copyReal3(Real3_t *host, Real3_t *dev, int rep_i, CopyKind_t dir) {
     int size = sizeof(Real3_t) * remd.Nmol;
 
 #if defined(HOST_RUN)

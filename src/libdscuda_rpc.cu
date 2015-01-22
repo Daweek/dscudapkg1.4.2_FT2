@@ -430,7 +430,7 @@ cudaThreadSynchronize(void) {
     
     WARN( 3, "cudaThreadSynchronize() {\n");
     cuerr = vdev->cudaThreadSynchronize();
-    WARN( 3, "} cudaThrreadSynchronize()\n");
+    WARN( 3, "} cudaThreadSynchronize()\n");
     WARN( 3, "\n");
     pthread_mutex_unlock( &cudaElse_mutex );
     return cuerr;

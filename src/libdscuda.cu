@@ -36,6 +36,7 @@ const  char *DEFAULT_SVRIP = "localhost";
 static pthread_mutex_t VdevidMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t       VdevidIndex2ptid[RC_NPTHREADMAX]; // convert an Vdevid index into pthread id.
 // CheckPointing mutual exclusion
+int cp_thread_exit=0;
        pthread_mutex_t cudaMemcpyD2H_mutex = PTHREAD_MUTEX_INITIALIZER;
        pthread_mutex_t cudaMemcpyH2D_mutex = PTHREAD_MUTEX_INITIALIZER;
        pthread_mutex_t cudaKernelRun_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -126,7 +127,7 @@ ClientState::ClientState(void) {
     }
     {
 	/* Print IP address of DS-CUDA client host. */
-	struct sockaddr_in addrin;
+	sockaddr_in addrin;
 	get_myaddress(&addrin);
 	setMyIPAddr(addrin.sin_addr.s_addr);
 	INFO0("[ IP address of client ] %s\n",dscudaGetIpaddrString(St.getIpAddress()));
@@ -268,9 +269,11 @@ ClientState::~ClientState(void) {
     struct tm *my_local;
 
     //--- Terminate the checkpointing thread.
+    cp_thread_exit = 1;
     if (ft.cp_periodic) {
 	WARN(1, "Stops Automatic CheckPointing Threads.\n" );
-	pthread_cancel(tid);
+	//pthread_cancel(tid);
+	pthread_join(tid, NULL);
     }
 	
     stop_time = time( NULL);
@@ -484,7 +487,7 @@ ClientState::initVirtualDevice(void) {
 		    WARN( 0, "Program terminated.\n\n\n\n" );
 		    exit(EXIT_FAILURE);
 		} else {
-		    ip_ref = inet_ntoa( *(struct in_addr*)hostent0->h_addr_list[0] );
+		    ip_ref = inet_ntoa( *(in_addr*)hostent0->h_addr_list[0] );
 		    strcpy( ip, ip_ref );
 		}
 	    }
@@ -745,7 +748,7 @@ requestDaemonForDevice(char *ip, int devid, bool useibv) {
     int dsock; // socket for side-band communication with the daemon & server.
     int sport; // port number of the server. given by the daemon.
     char msg[256];
-    struct sockaddr_in sockaddr;
+    sockaddr_in sockaddr;
 
     sockaddr = setupSockaddr( ip, RC_DAEMON_IP_PORT );
     dsock = socket(AF_INET, SOCK_STREAM, 0);
@@ -1276,7 +1279,7 @@ dscuda::searchDaemon(void) {
     socklen_t    sin_size;
     int          setsockopt_ret;
 
-    struct sockaddr_in addr, svr;
+    sockaddr_in addr, svr;
     struct ifreq ifr[2];
     struct ifconf ifc;
     struct passwd *pwd;
@@ -1302,18 +1305,18 @@ dscuda::searchDaemon(void) {
 
     ifr[1].ifr_addr.sa_family = AF_INET;
     ioctl(sendsock, SIOCGIFADDR, &ifr[1]);
-    adr = ((struct sockaddr_in *)(&ifr[1].ifr_addr))->sin_addr.s_addr;
+    adr = ((sockaddr_in *)(&ifr[1].ifr_addr))->sin_addr.s_addr;
     ioctl(sendsock, SIOCGIFNETMASK, &ifr[1]);
-    mask = ((struct sockaddr_in *)(&ifr[1].ifr_netmask))->sin_addr.s_addr;
+    mask = ((sockaddr_in *)(&ifr[1].ifr_netmask))->sin_addr.s_addr;
 
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(RC_DAEMON_IP_PORT - 1);
     addr.sin_addr.s_addr = adr | ~mask;
 
     strncpy( sendbuf, SEARCH_PING, SEARCH_BUFLEN_TX - 1 );
-    sendto( sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&addr, sizeof(addr));
+    sendto( sendsock, sendbuf, SEARCH_BUFLEN_TX, 0, (sockaddr *)&addr, sizeof(addr));
     INFO0("Broadcast \"%s\" message\n", SEARCH_PING);
-    sin_size = sizeof(struct sockaddr_in);
+    sin_size = sizeof(sockaddr_in);
 
     svr.sin_family      = AF_INET;
     svr.sin_port        = htons(RC_DAEMON_IP_PORT - 2);
@@ -1321,7 +1324,7 @@ dscuda::searchDaemon(void) {
     
     // Set timeout for recvsock.
     {
-	struct timeval tout;
+	timeval tout;
 	tout.tv_sec  = RC_SEARCH_DAEMON_TIMEOUT ;
 	tout.tv_usec = 0;
 	setsockopt_ret = setsockopt(recvsock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tout, sizeof(tout));
@@ -1520,78 +1523,138 @@ extractENV(char *str_var, const char *envname, int len) {
  * specified wall clock
  * time period. The period is defined in second.
  */
+
 void*
 periodicCheckpoint(void *arg) {
-    int         cp_period = *(int *)arg;
-    
+    int cp_period = *(int *)arg;
+    int cp_trim = 3;
+    int trim_grid_usec = 100000; //100msec
     int correct_count = 0;
-    while (true) {
+    int faulted_count = 0;
+    int cp_count = 1;
+    //<-- timer
+    double Tc_exp,Tc_exp_l=(double)cp_period*0.7, Tc_exp_h=(double)cp_period*1.3;
+    int    Tc_exp_sec;
+    double Tc_exp_usec;
+    double Ta, Ta_sum=0.0, Ta_sta, Ta_avr=-1.0, Ta_min=1.0e6, Ta_max=0.0; //all
+    double Tm, Tm_sum=0.0, Tm_sta, Tm_avr=0.0,  Tm_min=1.0e6, Tm_max=0.0; //mutexlock
+    double Ts, Ts_sum=0.0, Ts_sta, Ts_avr=-1.0, Ts_min=1.0e6, Ts_max=0.0; //store
+    double Tc, Tc_sum=0.0, Tc_sta, Tc_avr=-1.0, Tc_min=1.0e6, Tc_max=0.0; //cp sleep
+    double Tr, Tr_sum=0.0, Tr_sta, Tr_avr=-1.0, Tr_min=1.0e6, Tr_max=0.0; //restre mem
+    double Tx, Tx_sum=0.0, Tx_sta, Tx_avr=-1.0, Tx_min=1.0e6, Tx_max=0.0; //redo api
+    //--> timer 
+    /*
+      Memo: "Tc" is defined by "int cp_period" above.
+            "Ts" is not able to defined.
+      |<----  Ta  ----->| 
+      |<--  Tc  -->| Ts |
+      +------------+====+
+      |         |Tm|
+     */
+    while (cp_thread_exit==0) {
+	dscuda::stopwatch(&Ta_sta);
+	dscuda::stopwatch(&Tc_sta);
+
 	//<-- Wait for specified period (sec) passed.
-	sleep(cp_period);
+	Tc_exp = ((double)cp_period * (double)cp_count) - Tc_sum - Tm_avrx; //in sec
+	if      (Tc_exp < Tc_exp_l) Tc_exp = Tc_exp_l;
+	else if (Tc_exp > Tc_exp_h) Tc_exp = Tc_exp_h;
+	Tc_exp_sec  = (int)floor(Tc_exp);
+	Tc_exp_usec = (Tc_exp - Tc_exp_sec)*1e6;
+	for (int i=0; i<Tc_exp_sec; i++) {
+	    usleep( 1000000 );
+	}
+	usleep( (int)Tc_exp_usec );
 	//--> Wait for specified period (sec) passed.
 
-	//<-- Output beginning message.
-	WARN_CP(1,
-	"=============================================================\n");
-	WARN_CP(1,"periodicCheckpoint( period = %d sec )\n", cp_period );
-	//--> Output beginning message.
-		
-	//<-- mutex locks for avoiding R/W collisions 
+	dscuda::stopwatch(&Tm_sta);
+	//<-- mutex locks for avoiding R/W collisions
 	pthread_mutex_lock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_lock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_lock( &cudaKernelRun_mutex );
 	pthread_mutex_lock( &cudaElse_mutex );
-	//--> mutex locks for avoiding R/W collisions 
+	//--> mutex locks for avoiding R/W collisions
+
+	//<-- flush all cuda stream
+	for (int i=0; i<St.Nvdev; i++) {
+	    St.Vdev[i].cudaThreadSynchronize();
+	}
+	//--> flush all cuda stream
+		    
+	//*****
+	//***** <-- "Ts" starts here.
+	//*****
+	Tm = dscuda::stopwatch(&Tm_sta, &Tm_min, &Tm_max);
+	Tm_sum += Tm;
+	Tm_avr =  Tm_sum / (double)cp_count;
+
+	Tc = dscuda::stopwatch(&Tc_sta, &Tc_min, &Tc_max);
+	Tc_sum += Tc;
+	Tc_avr =  Tc_sum / (double)cp_count;
+	
+	dscuda::stopwatch(&Ts_sta);	
+	//<-- Output beginning message.
+	WARN_CP(0,
+		"==================================================== #%d\n", cp_count);
+	WARN_CP(0,"periodicCheckpoint( period = %d sec )\n", cp_period );
+	//--> Output beginning message.
 
 	//<-- copy from all cudaMalloc() regions of all devices.
 	St.collectEntireRegions();
-	//**  calling hierachical as following,
-	//**  +---> Vdev[*].collectEntireRegions();
-	//**           +---> server[*].collectEntireRegions();
 	//--> copy from all cudaMalloc() regions of all devices.
 
 	bool correct = St.verifyEntireRegions();
-	if (correct) {
-	    correct_count++;
-	}
 #if 0 // force pseudo error
 	if (correct_count % 5 == 4) {
 	    correct = false;
 	}
 #endif
 	if (correct) {
+	    correct_count++;
 	    //***
 	    //*** All memory regions on all virtual devices are correct.
 	    //*** Then, collect clean device memory regions to host memory.
 	    //*** and clear CUDA API called history.
 	    //***
-
-	    
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].updateMemlist();
 	    }
-	    WARN_CP(1, "(^_^)Update clean backup region, age=%d\n",
+	    WARN_CP(0, "(^_^)Update clean backup region, age=%d\n",
 		    St.Vdev[0].memlist.getAge());
 	    
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].clearReclist();
 	    }
 	}
-	else {
+	//*****
+	//***** --> "Ts" completes here.
+	//*****
+	Ts = dscuda::stopwatch(&Ts_sta, &Ts_min, &Ts_max);
+	Ts_sum += Ts;
+	Ts_avr =  Ts_sum / (double)cp_count;
+	
+	if (!correct) {
+	    faulted_count++;
 	    //***
 	    //*** Some memory regions on any virtual devices are currupted.
 	    //*** Then, restore clean memory regions to all devices, and
 	    //*** redo the historical cuda API calls.
 	    //***
-	    WARN_CP(1, "(+_+)Detect corrupted region.\n");
+	    WARN_CP(0, "(+_+)Detect corrupted region.\n");
 
+	    dscuda::stopwatch(&Tr_sta);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
-	    WARN_CP(1, "(._.)Completed restoring the device memory previous backup ");
-	    WARN_CP0(1, "age=%d\n", St.Vdev[0].memlist.getAge());
+	    Tr = dscuda::stopwatch(&Tr_sta, &Tr_min, &Tr_max);
+	    Tr_sum += Tr;
+	    Tr_avr =  Tr_sum / (double)faulted_count;
+
+	    WARN_CP(0, "(._.)Completed restoring the device memory previous backup ");
+	    WARN_CP0(0, "age=%d\n", St.Vdev[0].memlist.getAge());
 		    
-	    WARN_CP(1, "(+_+)Rollback the CUDA APIs.\n");
+	    WARN_CP(0, "(+_+)Rollback the CUDA APIs.\n");
+	    dscuda::stopwatch(&Tx_sta);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
 		St.Vdev[i].recordOFF();
@@ -1599,20 +1662,74 @@ periodicCheckpoint(void *arg) {
 		St.Vdev[i].reclist.recall();
 		St.Vdev[i].recordON();
 	    }
+	    //<-- flush all cuda stream
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].cudaThreadSynchronize();
+	    }
+	    //--> flush all cuda stream
+	    Tx = dscuda::stopwatch(&Tx_sta, &Tx_min, &Tx_max);
+	    Tx_sum += Tx;
+	    Tx_avr =  Tx_sum / (double)faulted_count;
 	}
-	//<-- Output ending message.	
-	WARN_CP(1,"} periodicCheckpoint().\n");
-	//--> Output ending message.	
-	
 	//<-- mutex unlocks for following R/W.
 	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
 	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
 	pthread_mutex_unlock( &cudaKernelRun_mutex );
 	pthread_mutex_unlock( &cudaElse_mutex );
 	//--> mutex unlocks for following R/W.
+
+
+	Ta = dscuda::stopwatch(&Ta_sta, &Ta_min, &Ta_max);
+	Ta_sum  += Ta;
+	Ta_avr  =  Ta_sum / (double)cp_count;
 	
-	pthread_testcancel();/* cancelation available */
-    }//for (;;)
+	//<-- Output ending message.	
+	WARN_CP(0,"} elapsed time report #%d (sec)\n", cp_count);
+	WARN_CP(0," 'Name' = 'now' { 'min' , 'avr' , 'max' } 'sum'\n");
+	WARN_CP(0," Tm = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
+		Tm, Tm_min, Tm_avr, Tm_max, Tm_sum);
+	WARN_CP(0," Tc = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
+		Tc, Tc_min, Tc_avr, Tc_max, Tc_sum);
+	WARN_CP(0," Ts = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
+		Ts, Ts_min, Ts_avr, Ts_max, Ts_sum);
+	WARN_CP(0," Ta = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
+		Ta, Ta_min, Ta_avr, Ta_max, Ta_sum);
+	if (faulted_count>0) {
+	    WARN_CP(0," *Tr= %8.3f { %8.3f , %8.3f , %8.3f } %8.3f (%d)\n",
+		    Tr, Tr_min, Tr_avr, Tr_max, Tr_sum, faulted_count);
+	    WARN_CP(0," *Tx= %8.3f { %8.3f , %8.3f , %8.3f } %8.3f (%d)\n",
+		    Tx, Tx_min, Tx_avr, Tx_max, Tx_sum, faulted_count);
+	}
+	else {
+	    WARN_CP(0," *Tr= - { - , - , - } %8.3f (%d)\n", Tr_sum, faulted_count);
+	    WARN_CP(0," *Tx= - { - , - , - } %8.3f (%d)\n", Tx_sum, faulted_count);
+	}
+	//--> Output ending message.
+	cp_count++;
+	pthread_testcancel();/* thread cancelation point */
+    }//while(true)
+    WARN_CP0(0,"periodicCheckpoint() thread completed.\n");
+    WARN_CP0(0,"====================================================\n");
+    WARN_CP0(0,"= Summary\n");
+    WARN_CP0(0,"= Total Checkpointed count = %d times.\n", cp_count-1);
+    WARN_CP0(0,"=       Correct      count = %d times.\n", correct_count);
+    WARN_CP0(0,"=       Fault        count = %d times.\n", faulted_count);
+    WARN_CP0(0,"=    : { 'min' , 'avr' , 'max' } 'sum' [sec]\n");
+    WARN_CP0(0,"=  Tm: { %8.3f , %8.3f , %8.3f } %8.3f\n", Tm_min, Tm_avr, Tm_max, Tm_sum);
+    WARN_CP0(0,"=  Tc: { %8.3f , %8.3f , %8.3f } %8.3f\n", Tc_min, Tc_avr, Tc_max, Tc_sum);
+    WARN_CP0(0,"=  Ts: { %8.3f , %8.3f , %8.3f } %8.3f\n", Ts_min, Ts_avr, Ts_max, Ts_sum);
+    WARN_CP0(0,"=  Ta: { %8.3f , %8.3f , %8.3f } %8.3f\n", Ta_min, Ta_avr, Ta_max, Ta_sum);
+    if (faulted_count > 0) {
+	WARN_CP0(0,"=  *Tr:{ %8.3f , %8.3f , %8.3f } %8.3f\n", Tr_min, Tr_avr, Tr_max, Tr_sum);
+	WARN_CP0(0,"=  *Tx:{ %8.3f , %8.3f , %8.3f } %8.3f\n", Tx_min, Tx_avr, Tx_max, Tx_sum);
+    }
+    else {
+	WARN_CP0(0,"=  *Tr= - { - , - , - } %8.3f (%d)\n", Tr_sum, faulted_count);
+	WARN_CP0(0,"=  *Tx= - { - , - , - } %8.3f (%d)\n", Tx_sum, faulted_count);
+    }
+    WARN_CP0(0, "====================================================\n");
+    sleep(1);
+    return NULL;
 } // periodicCheckpoint()
 void
 VirDev::invalidateAllModuleCache(void) {

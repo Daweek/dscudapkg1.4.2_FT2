@@ -31,17 +31,25 @@
 
 #define NBACKLOG 1   // max # of servers can be put into the listening queue.
 
+static int  WarnLevel = 2;
+//-- [DSCUDA DAEMON] WARNING Message.
+#define DWARN(lv, fmt, args...) {					\
+	if (lv <= WarnLevel) {						\
+	    TSTAMP_FORMAT						\
+	    fprintf( stderr, "[%s]", tfmt);				\
+	    fprintf( stderr, "(DAEMON-%d) " fmt, lv, ## args);		\
+	}								\
+    }
 using dscuda::xmalloc;
 using dscuda::xfree;
 
-static int WarnLevel = 2;
 static bool CallFaultServer = false;
 
 struct Server {
-    pid_t pid;
-    int   port;
-    struct Server *prev;
-    struct Server *next;
+    pid_t   pid;
+    int     port;
+    Server *prev;
+    Server *next;
 };
 
 static void    signal_from_child(int sig);
@@ -50,14 +58,14 @@ static int     unused_server_port(int devid);
 static void   *response_to_search( void *arg );
 
 static int Daemonize = 0;
-static int Nserver = 0;
-static Server *ServerListTop = NULL;
+static int Nserver   = 0;
+static Server *ServerListTop  = NULL;
 static Server *ServerListTail = NULL;
 static char LogFileName[1024] = "dscudad.log";
 
 static int
 create_daemon_socket(in_port_t port, int backlog) {
-    struct sockaddr_in me;
+    sockaddr_in me;
     int sock;
 
     memset((char *)&me, 0, sizeof(me));
@@ -70,13 +78,12 @@ create_daemon_socket(in_port_t port, int backlog) {
 	perror("dscudad:socket");
 	return -1;
     }
-
     /* <-- For avoiding TIME_WAIT status on TCP port. */
     bool yes=1;
     setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
     /* --> For avoiding TIME_WAIT status on TCP port. */
     
-    if (bind(sock, (struct sockaddr *)&me, sizeof(me)) == -1) {
+    if (bind(sock, (sockaddr *)&me, sizeof(me)) == -1) {
         perror("dscudad:bind");
         return -1;
     }
@@ -177,14 +184,13 @@ unused_server_port(int devid) {
 }
 static void
 spawn_server(int listening_sock) {
-    int len, dev, sock, sport;
-    pid_t pid;
-    char *argv[16];
+    int  dev;
     char msg[256];
-    char portstr[128], devstr[128], sockstr[128];
-
+    char portstr[128];
+    char devstr[128];
+    char sockstr[128];
     DWARN(3, "listening request from client...\n");
-    sock = accept(listening_sock, NULL, NULL);
+    int sock = accept(listening_sock, NULL, NULL);
     if (sock == -1) {
         DWARN(0, "accept() error\n");
         exit(1);
@@ -193,7 +199,7 @@ spawn_server(int listening_sock) {
     sscanf(msg, "deviceid:%d", &dev); // deviceid to be handled by the server.
     DWARN(3, "---> Recv message \"%s\"\n", msg);
 
-    sport = unused_server_port(dev);
+    int sport = unused_server_port(dev);
     sprintf(msg, "sport:%d", sport); // server port to be connected by the client.
     sendMsgBySocket(sock, msg);
     DWARN(3, "<--- Send message \"%s\"\n", msg);        
@@ -205,7 +211,7 @@ spawn_server(int listening_sock) {
     }
 
     Nserver++;
-    pid = fork();
+    pid_t pid = fork();
     if ( pid ) { // parent
         signal( SIGCHLD, signal_from_child );
         DWARN( 3, "spawn a server with sock: %d\n", sock );
@@ -213,6 +219,7 @@ spawn_server(int listening_sock) {
         close( sock );
     }
     else { // child
+	char *argv[16];
 #if RPC_ONLY
         argv[0] = "dscudasvr_rpc";
 #else
@@ -240,7 +247,7 @@ spawn_server(int listening_sock) {
         DWARN( 0, "%s may not be in the PATH?\n", argv[0] );
         exit( EXIT_FAILURE );
     }
-}
+}//spawn_server(int listening_sock)
 /*
  *
  */
@@ -283,8 +290,8 @@ response_to_search( void *arg ) {
     socklen_t sin_size;
     uid_t     uid;
     char      host[256];
-    struct sockaddr_in addr, clt;
-    struct passwd *pwd = NULL;
+    sockaddr_in addr, clt;
+    passwd *pwd = NULL;
     int       retval;
     cudaError_t cuerr;
 
@@ -312,7 +319,7 @@ response_to_search( void *arg ) {
     setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
     /* --> For avoiding TIME_WAIT status on TCP port. */
     
-    if ( bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1 ) {
+    if ( bind(sock, (sockaddr *)&addr, sizeof(addr)) == -1 ) {
 	perror("response_to_search:bind()");
 	return NULL;
     }
@@ -334,9 +341,9 @@ response_to_search( void *arg ) {
     }
 
     memset( recvbuf, 0, SEARCH_BUFLEN_RX );
-    for(;;) {
-	sin_size = sizeof( struct sockaddr_in );
-	recvfrom( sock, recvbuf, SEARCH_BUFLEN_RX, 0, (struct sockaddr *)&clt, &sin_size );
+    while (true) {
+	sin_size = sizeof(sockaddr_in);
+	recvfrom( sock, recvbuf, SEARCH_BUFLEN_RX, 0, (sockaddr *)&clt, &sin_size );
 	if( strcmp( recvbuf, SEARCH_PING ) != 0 ) continue;
 
 	DWARN(2, "Received message \"%s\" from %s\n", SEARCH_PING, inet_ntoa(clt.sin_addr));
@@ -350,46 +357,53 @@ response_to_search( void *arg ) {
 	clt.sin_port   = htons( RC_DAEMON_IP_PORT - 2 );
 	inet_aton( inet_ntoa( clt.sin_addr ), &(clt.sin_addr) );
 	
-	sendto( sock, sendbuf, SEARCH_BUFLEN_TX, 0, (struct sockaddr *)&clt, sizeof(struct sockaddr) );
+	sendto( sock, sendbuf, SEARCH_BUFLEN_TX, 0, (sockaddr *)&clt, sizeof(sockaddr) );
 	DWARN(2, "---> Replied message \"%s\" to %s\n", sendbuf, inet_ntoa(clt.sin_addr)); 
 	memset( recvbuf, 0, SEARCH_BUFLEN_RX );
     }
-
+#if 0 // avoid Unreachable warning.
     close(sock);
     return NULL;
+#endif
 }
-/*
- *
- */
 static void
 initEnv(void) {
-    static int firstcall = 1;
     char *env;
-
-    if (!firstcall) return;
-
-    firstcall = 0;
-
-    // DSCUDA_WARNLEVEL
+    int   tmp;
+    //<-- DSCUDA_WARNLEVEL
     env = getenv("DSCUDA_WARNLEVEL");
-    if (env) {
-        int tmp;
-        tmp = atoi(strtok(env, " "));
-        if (0 <= tmp) {
-            WarnLevel = tmp;
-        }
-        DWARN(1, "WarnLevel: %d\n", WarnLevel);
+    if (env != NULL) {
+	tmp = atoi(env);
+	if (tmp >= 0) {
+	    WarnLevel = tmp;
+	}
     }
+    //--> DSCUDA_WARNLEVEL
+    
+    //<-- DSCUDA_FAULT_PERIOD
+    env = getenv("DSCUDA_FAULT_PERIOD");
+    if (env != NULL) {
+	tmp = atoi(env);
+	if (tmp == 0) {
+	    DWARN(1, "Fault Period : Never faults. (DSCUDA_FAULT_PERIOD=%d)\n", tmp);
+	}
+	else if (tmp > 0) {
+	    DWARN(1, "Fault Period : Constant %d sec. (DSCUDA_FAULT_PERIOD=%d)\n", tmp, tmp);
+	}
+	else {
+	    DWARN(1, "Fault Period : Distributed %d sec. (DSCUDA_FAULT_PERIOD=%d)\n", -tmp, tmp);
+	}
+    }
+    //--> DSCUDA_FAULT_PERIOD
 }
-
-/*
- *
- */
 void
 showUsage(char *command) {
     fprintf(stderr,
-            "usage: %s [-d]\n"
-            "  -d: daemonize.\n",
+            "usage: %s [-dfh -l (filename) ]\n"
+            "  -d: daemonize.\n"
+            "  -f: invoke fault server.\n"
+            "  -h: help.\n"
+	    "  -s: silent message.\n",
             command);
 }
 
@@ -397,20 +411,25 @@ extern char *optarg;
 extern int optind;
 static void
 parseArgv( int argc, char **argv ) {
-    int c;
-    char *param = "dfl:h";
-
-    while ((c = getopt(argc, argv, param)) != EOF) {
+    int   c;
+    while ((c = getopt(argc, argv, "dfl:sh")) != EOF) {
         switch (c) {
 	case 'd':
             Daemonize = 1;
             break;
 	case 'f':
+	    DWARN(1, "*********************************\n");
+	    DWARN(1, "***  Fault DS-CUDA server(s)  ***\n");
+	    DWARN(1, "*********************************\n");
 	    CallFaultServer = true;
 	    break;
 	case 'l':
             strncpy( LogFileName, optarg, sizeof(LogFileName) );
             break;
+	case 's':
+	    DWARN(1, "-> enable \"Silent mode\"\n");
+	    WarnLevel = 0; // Override previous value with lowest.
+	    break;
 	case 'h':
 	default:
 	    showUsage(argv[0]);
@@ -420,12 +439,14 @@ parseArgv( int argc, char **argv ) {
 }
 int
 main(int argc, char **argv) {
-    int sock, nserver0;
-    int errfd;
+    int       sock;
+    int       errfd;
     pthread_t th;
     
+    initEnv();    
     pthread_create( &th, NULL, response_to_search, NULL );
     parseArgv( argc, argv );
+    DWARN(1, "WarnLevel: %d\n", WarnLevel);
     if (Daemonize) {
         if ( fork() ) {
             exit(0);
@@ -440,15 +461,14 @@ main(int argc, char **argv) {
             close(1);
         }
     }
-    
-    initEnv();
+
     
     sock = create_daemon_socket( RC_DAEMON_IP_PORT, NBACKLOG );
-    if ( sock == -1 ) {
+    if (sock == -1) {
 	DWARN(0, "create_daemon_socket() failed\n");
 	exit(1);
     }
-    nserver0 = Nserver;
+    int nserver0 = Nserver;
     while(true) {
         if (Nserver < RC_NSERVERMAX) {
             spawn_server( sock );
@@ -464,9 +484,11 @@ main(int argc, char **argv) {
         sleep(1);
         nserver0 = Nserver;
     }
+#if 0 // avoid unreachable warning
     DWARN( 0, "%s: cannot be reached.\n", __FILE__ );
-
     pthread_join( th, NULL );
     exit(1);
+#endif
 }
+#undef DWARN
 //EOF

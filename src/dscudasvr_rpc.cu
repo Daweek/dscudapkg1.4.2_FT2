@@ -33,6 +33,8 @@
 #include "dscudasvr.h"
 #include "dscudasvr_rpc.h"
 
+extern ServerState  DscudaSvr;
+
 /*
  * A thread to watch over the socket inherited from the daemon,
  * in order to detect disconnection by the client.
@@ -71,8 +73,9 @@ rpcWatchDisconnection(void *arg) {
         }
         SWARN(2, "got %d-byte side-band message from the client.\n", nrecvd);
     }
-
+#if 0 //avoid warning message; unreachable
     return NULL;
+#endif
 }
 
 int
@@ -98,10 +101,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             pval = (void*)&(argp->val.RCargVal_u.address);
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
-                SWARN(0, "(P)cuParamSetv(%p, %d, %p, %d) success.\n",
+                SWARN(1, "(P)cuParamSetv(%p, %d, %p, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                SWARN(0, "(P)cuParamSetv(%p, %d, %p, %d) failed. %s\n",
+                SWARN(1, "(P)cuParamSetv(%p, %d, %p, %d) failed. %s\n",
                      kfunc, argp->offset, pval, argp->size,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -112,10 +115,10 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
             ival = argp->val.RCargVal_u.valuei;
             cuerr = cuParamSeti(kfunc, argp->offset, ival);
 	    if (cuerr == CUDA_SUCCESS) {
-                SWARN(0, "(I)cuParamSeti(%p, %d, %d) success.\n",
+                SWARN(1, "(I)cuParamSeti(%p, %d, %d) success.\n",
                      kfunc, argp->offset, ival);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                SWARN(0, "(I)cuParamSeti(%p, %d, %d) failed. %s\n",
+                SWARN(1, "(I)cuParamSeti(%p, %d, %d) failed. %s\n",
                      kfunc, argp->offset, ival,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -129,7 +132,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
                 SWARN(5, "(F)cuParamSetf(%p, %d, %f) success.\n",
                      kfunc, argp->offset, fval);
 	    } else if (cuerr != CUDA_SUCCESS) {
-                SWARN(0, "(F)cuParamSetf(%p, %d, %f) failed. %s\n",
+                SWARN(1, "(F)cuParamSetf(%p, %d, %f) failed. %s\n",
                      kfunc, argp->offset, fval,
                      cudaGetErrorString((cudaError_t)cuerr));
                 fatal_error(1);
@@ -153,7 +156,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 	    
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
-                SWARN(0, "(V)cuParamSetv(%p, %d, %p, %d) success.\n",
+                SWARN(1, "(V)cuParamSetv(%p, %d, %p, %d) success.\n",
                      kfunc, argp->offset, pval, argp->size);
 	    } else if (cuerr != CUDA_SUCCESS) {
                 SWARN(0, "(V)cuParamSetv(%p, %d, %p, %d) failed. %s\n",
@@ -888,63 +891,69 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, int flag /*fault*/,
     check_cuda_error(err);
     res.err = err;
 
-//#if defined(FAULT_AT_D2H)
     //<--
     // !!! [debugging purpose only] destroy some part of the returning data
     // !!! in order to emulate a malfunctional GPU.
-    const  int period_err_d2h = 10; //sec
-    double period_err = (double)period_err_d2h;
+    static bool   firstcall  = true;
     static double t_prev_err;
-    double t_buf;
-    double dt_ok;
+           double period_err = (double)DscudaSvr.fault_period; 
+           double t_tmp;
+           double dt_ok;
     if (flag != 0) {
-	static bool firstcall = true;
-#if 1
-	if (firstcall) {
-	    firstcall = false;
-	    dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
-	    SWARN(2, "################ Good data (1st call).\n" );
-	}
-	else {
-	    t_buf = t_prev_err;
-	    dt_ok = dscuda::stopwatch( &t_buf );
-	    if ( dt_ok > period_err ) {
-		SWARN(2, "################\n" );
-		SWARN(2, "################\n" );
-		SWARN(2, "################ Bad data generatad.\n" );
-		SWARN(2, "################ (every %d sec)\n", period_err_d2h);
-		SWARN(2, "################\n" );
-		res.buf.RCbuf_val[0] = 123; // Overwrite with no mean bits.
-		t_prev_err = t_buf;
+	if (DscudaSvr.fault_period > 0) {
+	    if (firstcall) {
+		firstcall = false;
+		dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
+		SWARN(2, "################ Good data (1st call).\n" );
 	    }
 	    else {
-		SWARN(2, "################ Good data. (%5.1f/%d)\n", dt_ok, period_err_d2h );
+		t_tmp = t_prev_err;
+		dt_ok = dscuda::stopwatch( &t_tmp );
+		if ( dt_ok > period_err ) { // specified time passed or not.
+		    SWARN(2, "################\n" );
+		    SWARN(2, "################\n" );
+		    SWARN(2, "################ Bad data generatad.\n" );
+		    SWARN(2, "################ (every %d sec)\n", DscudaSvr.fault_period);
+		    SWARN(2, "################\n" );
+		    res.buf.RCbuf_val[0] = 123; // Overwrite no mean bits.
+		    t_prev_err = t_tmp;
+		}
+		else {
+		    SWARN(2, "################ Good data. (%5.1f/%d)\n",
+			  dt_ok, DscudaSvr.fault_period );
+		}
 	    }
 	}
-#else
-        static bool err_prev_call = false; // avoid bad data generation in adjacent calls.
+	if (DscudaSvr.fault_period < 0) {
+	    if (firstcall) {
+		firstcall = false;
+		dscuda::stopwatch( &t_prev_err ); // get time at firstcall.
+		SWARN(2, "################ Good data (1st call).\n" );
+	    }
+	}
+#if 0 // DS-CUDA original.
+	static bool err_prev_call = false; // avoid bad data generation in adjacent calls.
 	const  double err_rate = 1.0 / 10.0; // 1.0 / 1000.0;
 	
-        if (firstcall) {
-            firstcall = false;
-            srand48( time(NULL));
-        } 
-        else if (!err_prev_call && (drand48() < err_rate)) {
-            SWARN(2, "################\n" );
-            SWARN(2, "################\n" );
-            SWARN(2, "################ Bad data generatad.\n" );
-            SWARN(2, "################\n" );
-            SWARN(2, "################\n" );
-            res.buf.RCbuf_val[0] = 123; // Overwrite with no mean bits.
-            err_prev_call = true;
-        }
+	if (firstcall) {
+	    firstcall = false;
+	    srand48( time(NULL));
+	} 
+	else if (!err_prev_call && (drand48() < err_rate)) {
+	    SWARN(2, "################\n" );
+	    SWARN(2, "################\n" );
+	    SWARN(2, "################ Bad data generatad.\n" );
+	    SWARN(2, "################\n" );
+	    SWARN(2, "################\n" );
+	    res.buf.RCbuf_val[0] = 123; // Overwrite with no mean bits.
+	    err_prev_call = true;
+	}
 	else {
-            err_prev_call = false;
-        }
+	    err_prev_call = false;
+	}
 #endif
-    }
+    }//if (flag!=0) {...
     //--> !!! [debugging purpose only] 
-//#endif
     return &res;
 }
 
