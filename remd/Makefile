@@ -24,8 +24,8 @@ DSCUDACPP ?= /bin/dscudacpp
 
 CPPFLAGS = 
 NVCCFLAGS = -O2 -g -I${CUDASDKPATH}/CUDALibraries/common/inc -I${HOME} \
-	    -arch=compute_20 -code=compute_20 \
-   -I/usr/apps/free/NVIDIA_GPU_Computing_SDK/4.1/C/common/inc  --use_fast_math --ptxas-options=-v
+ -arch=compute_20 -code=compute_20 \
+ -I/usr/apps/free/NVIDIA_GPU_Computing_SDK/4.1/C/common/inc  --use_fast_math --ptxas-options=-v
 
 OUTPUT_FILE = histogram/histogram*.dat index_replica.dat energy_replica.dat input.txt acceptance_ratio.dat
 

@@ -84,9 +84,9 @@ extern struct ClientState St;
 #define WARN_CP(lv, fmt, args...) {\
 	if (lv <= dscuda::getWarnLevel()) {	\
 	    TSTAMP_FORMAT\
-	    fprintf( St.dscuda_chkpnt, "[%s.%d](%d) ", tfmt, tv.tv_usec/1000, lv); \
+	    fprintf( St.dscuda_chkpnt, "[%s.%03d](%d) ", tfmt, tv.tv_usec/1000, lv); \
 	    fprintf( St.dscuda_chkpnt, fmt, ## args);\
-	    fprintf( St.dscuda_stdout, "[%s.%d](%d)CP: ", tfmt, tv.tv_usec/1000, lv); \
+	    fprintf( St.dscuda_stdout, "[%s.%03d](%d)CP: ", tfmt, tv.tv_usec/1000, lv); \
 	    fprintf( St.dscuda_stdout, fmt, ## args);\
             fflush ( St.dscuda_chkpnt );\
 	    fflush ( St.dscuda_stdout );\

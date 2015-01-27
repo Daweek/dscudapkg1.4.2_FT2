@@ -36,8 +36,7 @@ void testFuncCopyExch(Remd_t &remd, Simu_t &simu);
 
 //===============================================================================
 int
-main(int argc, char **argv)
-{
+main(int argc, char **argv) {
     Stopwatch timer[3];
     int ndev;
 

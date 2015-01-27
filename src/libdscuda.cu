@@ -191,7 +191,7 @@ ClientState::ClientState(void) {
     INFO0("[Environment var] DSCUDA_FT16 = %d (rec_en)\n", ft.rec_en );
     INFO0("[Environment var] DSCUDA_FT24 = %d (migrate)\n", ft.gpu_migrate );
 
-    initVirtualDevice();  /* Update the list of virtual devices */
+    this->initVirtualDevice();  /* Update the list of virtual devices */
     WARN0(0, "\n");
 
     // Search around cluster.
@@ -364,9 +364,11 @@ ClientState::configFT(void) {
 
     //<--- copy same value to virtual and physical device.
     for (int i=0; i<RC_NVDEVMAX; i++) {
-	Vdev[i].ft_mode = this->ft_mode;
+	this->Vdev[i].ft_mode = this->ft_mode;
+	this->Vdev[i].ft      = this->ft;
 	for (int k=0; k<Vdev[i].nredundancy; k++) {
 	    Vdev[i].server[k].ft_mode = this->ft_mode;
+	    Vdev[i].server[k].ft      = this->ft;
 	}
     }
     //---> copy same value to virtual and physical device.
@@ -455,7 +457,7 @@ ClientState::initVirtualDevice(void) {
 	    sp->setUNIQ(uniq);
 	    uniq++;
 	}
-    } // for ( int i=0; ...
+    } //for ( int i=0; ...
     /* convert hostname to ip address. */
     char *hostname;
     int  det_abc;
@@ -741,6 +743,15 @@ ServerArray::print(void) {
 	WARN(1, "      + svrarr[%d].ip= %s\n", i, svr[i].ip);
 	WARN(1, "      + svrarr[%d].hostname= %s\n", i, svr[i].hostname);
     }
+}
+
+void
+FToption::infoD2H(void) {
+    WARN(1, "d2h_simple  =%d\n", (d2h_simple)?   1:0 );
+    WARN(1, "d2h_reduncpy=%d\n", (d2h_reduncpy)? 1:0 );
+    WARN(1, "d2h_compare =%d\n", (d2h_compare)?  1:0 );
+    WARN(1, "d2h_statics =%d\n", (d2h_statics)?  1:0 );
+    WARN(1, "d2h_rollback=%d\n", (d2h_rollback)? 1:0 );
 }
 
 int
@@ -1654,7 +1665,7 @@ periodicCheckpoint(void *arg) {
 	    WARN_CP(0, "(._.)Completed restoring the device memory previous backup ");
 	    WARN_CP0(0, "age=%d\n", St.Vdev[0].memlist.getAge());
 		    
-	    WARN_CP(0, "(+_+)Rollback the CUDA APIs.\n");
+	    WARN_CP(0, "(+_+)Rollback the CUDA APIs by CP.\n");
 	    dscuda::stopwatch(&Tx_sta);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();

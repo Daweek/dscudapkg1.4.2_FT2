@@ -111,8 +111,7 @@ saveFormatForce(const char *filename, const Real_t *potential_ar, long simstep) 
     xfclose(fp);
 }
 static void
-saveFormatEne(const char *filename, int rep_i, int seq_num, long simstep)
-{
+saveFormatEne(const char *filename, int rep_i, int seq_num, long simstep) {
     double simclock;
     int offset = simu.step_exch * rep_i;
     FILE *fp;
@@ -168,8 +167,7 @@ saveFormatTemp(const char *filename, int seq_num, long simstep)
 }
 //===============================================================================
 static void
-saveFormatSorted(const char *filename, int seq_num, long simstep)
-{
+saveFormatSorted(const char *filename, int seq_num, long simstep) {
     double simclock = simu.dt * (double)(simstep*simu.step_exch);
     FILE *fp;
     if (seq_num == 0) {
@@ -189,8 +187,7 @@ saveFormatSorted(const char *filename, int seq_num, long simstep)
 // data copy for position of atoms.
 //-------------------------------------------------------------------------------
 void
-savePosAll(int t)
-{
+savePosAll(int t) {
     for (int rep_i=0; rep_i<remd.Nrep; rep_i++) {
 	copyPos(rep_i, D2H);
 	savePos(rep_i, -999.9, t);
@@ -514,8 +511,7 @@ saveTempTarg(Remd_t &remd, long simstep) {
     seq_num++;
 } // saveTempTarg()
 void
-saveSorted(Remd_t &remd, long simstep)
-{
+saveSorted(Remd_t &remd, long simstep) {
     static int seq_num = 0;
     char savepath[1024];
     char filename[1024];
@@ -523,8 +519,7 @@ saveSorted(Remd_t &remd, long simstep)
     sprintf(filename, "%s/%s", savepath, SORT_FILE);
     saveFormatSorted(filename, seq_num, simstep);
     seq_num++;
-} // saveSorted()
-
+}
 void
 copyExch(CopyKind_t dir, Remd_t &remd, Simu_t &simu) {
     int *h_exch_ar;

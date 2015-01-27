@@ -329,6 +329,7 @@ struct FToption {   //-*- Static configuration -*-
     //
     bool gpu_migrate;  //[24]
     //[17...]
+    void infoD2H(void);
 };
 
 //********************************************************************

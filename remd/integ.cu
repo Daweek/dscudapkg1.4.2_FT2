@@ -109,8 +109,9 @@ integTime_dev(int t0,
 	      int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
 	      Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	      Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
-	      Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar,
-	      FaultConf FAULT_CONF) {
+	      Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar
+	      //,	      FaultConf FAULT_CONF
+	      ) {
     __shared__ Real3_t  shared_mem[SMEM_COUNT];
     __shared__ Real_t   potential_ar[SMEM_COUNT];
     __shared__ Real_t   zeta;
@@ -250,6 +251,12 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
 #if !defined(HOST_RUN) && !defined(DEVICE_RUN)
     die("undefined HOST_RUN or DEVICE_RUN.\n");
 #endif
+    Stopwatch stopwatch_0;
+    Stopwatch stopwatch_1;
+    Stopwatch stopwatch_2;
+    stopwatch_0.reset("simloop");
+    stopwatch_1.reset("kernel");
+    stopwatch_2.reset("etc");
 
     const int    Nrep      = remd.Nrep;
     const int    Nmol      = remd.Nmol;
@@ -313,8 +320,11 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
     next_progress = 0.0;
     step_progress = 0.05;
 
-    FaultConf FAULT_CONF(5); // fault 1 times.
+    //FaultConf FAULT_CONF(5); // fault 1 times.
     for (int t0 = 0; t0 < simu.step_max; t0++) {
+#ifdef MEAS_LOOP
+	stopwatch_0.start();
+#endif //MEAS_LOOP
 #if 0
 	printf("### t0 = %d / %d\n", t0, simu.step_max-1);
 #endif
@@ -356,26 +366,34 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
 	if ( simu.report_ene  >= 1 ) {
 	    saveSorted(remd, t0);   // cudaMemcpyD2H * ?
 	} 
-
+#if 0
 	if ( t0 < 2 ) {
 	    FAULT_CONF.fault_en     = 0;
 	    FAULT_CONF.overwrite_en = 0;
 	} else {
-#if defined( FAULT_ON )
+#    if defined( FAULT_ON )
 	    FAULT_CONF.fault_en     = 1;
-#endif
+#    endif
 	    FAULT_CONF.overwrite_en = 1;
 	}
-
+#endif
+#ifdef MEAS_KERNEL
+	stopwatch_1.start();
+#endif //MEAS_KERNEL
 	for (gpu_i = 0; gpu_i < Ngpu; gpu_i++) {                          // Sweep GPU.
 	    xcudaSetDevice( gpu_i);
 	    integTime_dev <<< blocks, threads >>>                       // rpcLaunchKernel
 		( t0, Nmol, step_exch, dt, cellsize, rcut, lj_sigma, lj_epsilon, mass, 
 		  remd.d_pos_ar[gpu_i], remd.d_vel_ar[gpu_i], remd.d_foc_ar[gpu_i],
 		  remd.d_energy[gpu_i], remd.d_temp_ar[gpu_i],remd.d_temp_meas[gpu_i],
-		  remd.d_exch_ar[gpu_i], FAULT_CONF );
+		  remd.d_exch_ar[gpu_i]);
+#ifdef MEAS_KERNEL
+	    cudaThreadSynchronize();
+#endif //MEAS_KERNEL
 	}
-	
+#ifdef MEAS_KERNEL
+	stopwatch_1.stop();
+#endif //MEAS_KERNEL
 //     #pragma omp parallel for
 //      for (gpu_i = 0; gpu_i < Ngpu; gpu_i++) {                          // Sweep GPU.
 //        if (cudaSetDevice(gpu_i) != cudaSuccess) { die("cudaSetDevice() failed.\n"); }
@@ -397,9 +415,18 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
 	calcHistogram( histo_ar, remd, simu); // struct histogram 
 	exchTemp( t0, remd, simu);            //
 
+	//<-- Stopwatch
+
+#ifdef MEAS_KERNEL
+	stopwatch_1.report();
+#endif //MEAS_KERNEL
+#ifdef MEAS_LOOP
+	stopwatch_0.stop();
+	stopwatch_0.report();
+#endif //MEAS_LOOP
+	//--> Stopwatch
 	//usleep(500000); // for longer sim time.
     } //for (t = 0; ...
-    
     saveHistogram( histo_ar, remd, simu );
     saveAccRatio( remd, simu.step_max );
     // free

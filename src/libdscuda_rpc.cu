@@ -1086,7 +1086,6 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
     //                   "ft.d2h_compare" ,
     //                   "ft.d2h_statics" ,
     //                   "ft.d2h_rollback"
-
     if (this->ft.d2h_simple) {
 	//**
 	//** This part include "Simple" DeviceToHost transfer operation.
@@ -1103,9 +1102,9 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 
 	//<-- Kick RPC!
 	dscudaMemcpyD2HResult *rp;
-	flag=0;
+	flag=1; //generate bits-flip faults.
 	//rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, server[0].Clnt );
-	rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, flag, server[0].Clnt ); //0:flag
+	rp = dscudamemcpyd2hid_1( (RCadr)d_src0, count, flag, server[0].Clnt );
 	//--> Kick RPC!
 	
 	//<--- RPC fault check.
@@ -1134,7 +1133,7 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	//** need additional one more memcpy();
 	//**
 	//<-- Copy from physical device
-	flag=0; // Suppose that dominant server is always correct.
+	flag=1; // Not suppose that dominant server is always correct.
 	cuerr = server[0].cudaMemcpyD2H( h_dst, d_src, count, flag, &rpc_result );
 	//--> Copy from physical device
 	//
@@ -1153,10 +1152,10 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 
     //MEMO: below routine may need maintainance.
     
-    // MEMO: if (!d2h_simple && d2h_reduncpy) {
-    //<--- Copy from physical device
+    // MEMO: if (d2h_simple==false && d2h_reduncpy==true) {
+    //<--- Copy from physical device(s)
     for (int i=0; i < this->nredundancy; i++) {
-	flag = (i==1)? 1 : 0; // 2nd server is always not correct.
+	flag = 1; // always none-zero probability of fail.
 	cuerr = server[i].cudaMemcpyD2H( h_dst, d_src, count, flag, &rpc_result );
 	server[i].rpcErrorHook( &rpc_result );
 	if (rpc_result.re_status != RPC_SUCCESS) {
@@ -1164,14 +1163,13 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	    this->reclist.recall();
 	}
     }
-    //---> Copy from physical device
-    
+    //---> Copy from physical device(s)
+    bool matched_all   = true;
+    bool unmatched_all = true;
     if (this->ft.d2h_compare) {
-	//<--- Compare gathered data
+	//<--- Compare collected data
 	int  matched_count   = 0;
 	int  unmatched_count = 0;
-	bool matched_all   = true;
-	bool unmatched_all = true;
 	int  recall_result;
 	for (int i=0; i < nredundancy-1; i++) {
 	    for (int k=i+1; k < nredundancy; k++) {
@@ -1188,20 +1186,18 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 		    WARN( 2, "   Statistics: \n");
 		    matched_all = false;
 		}
-		WARN( 2, "   UNMATCHED redundant device %d/%d with device 0. %s()\n",
-		      i, nredundancy - 1, __func__);
 	    } //for (k=...
 	} //for (i=...	
-	//---> Compare gathered data
+	//---> Compare collected data
 	if (matched_all) {
-	    WARN(5, "   #\\(^_^)/ All %d Redundant device(s) matched. statics OK/NG = %d/%d.\n",
+	    WARN(5, "   #(^_^) All %d redun. device(s) matched. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
 	    //<-- Update user application host region using server[0].
 	    memcpy( h_dst, server[0].memlist.queryHostPtr(d_src), count );
 	    //--> Update user application host region using server[0].
 	}
 	else if (unmatched_all) {
-	    WARN(1, "   #(;_;)   All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
+	    WARN(1, "   #(;_;) All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
 		 nredundancy-1, matched_count, unmatched_count);
 	}
 	else {
@@ -1211,23 +1207,34 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	    WARN(1, "  # #\n");
 	    WARN(1, " #   #\n");
 	}
-
-	if (!matched_all) {
-	    if (St.isRollbackCalling()==0) {
-		//St.unsetAutoVerb();    // <=== Must be disabled autoVerb during Historical Call.
-		
-		//TODO: rewrite BKUPMEM.restructDeviceRegion();
-		//TODO: recall_result = HISTREC.recall();
-		
-		if (recall_result != 0) {
-		    printModuleList();
-		    printVirtualDeviceList();
-		}
-		//HISTREC.on();  // ---> restore recordHist enable.
-		//St.setAutoVerb();    // ===> restore autoVerb enabled.
-	    }
-	}
     } // if (ft.d2h_compare) {
+
+    if (ft.d2h_rollback) {
+	if (!matched_all) {
+	    //<-- Restore clean data onto GPU device(s) ...[a]
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].restoreMemlist();
+	    }
+	    //--> Restore clean data onto GPU device(s) ...[a]
+
+	    //<-- Rerun recoreded CUDA APIs from CP ...[b]
+	    WARN(0, "(+_+)Rollback the CUDA APIs by cpyD2H\n");
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].reclist.print();
+		St.Vdev[i].recordOFF();
+		WARN_CP(1, "        VirDev[%d]\n", St.Vdev[i].id);
+		St.Vdev[i].reclist.recall();
+		St.Vdev[i].recordON();
+	    }
+	    //--> Rerun recoreded CUDA APIs from CP ...[b]
+	    
+	    //<-- flush all cuda stream
+	    for (int i=0; i<St.Nvdev; i++) {
+		St.Vdev[i].cudaThreadSynchronize();
+	    }
+	    //--> flush all cuda stream
+	} //if (!matched_all)
+    } //if (ft.d2h_rollback)...
     WARN(4, "   }\n");
     return cuerr;
 }//-->VirDev::cudaMemcpyD2H(...)

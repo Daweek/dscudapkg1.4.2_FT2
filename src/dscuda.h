@@ -43,7 +43,7 @@ enum {
     RC_REMOTECALL_TYPE_RPC = 1,
     RC_REMOTECALL_TYPE_IBV = 2,
 };
-
+#if 0
 struct FaultConf {
     char tag[32];      /* <= "DSCUDA_FAULT_INJECTION" */
     int  overwrite_en; /* Overwrite by DS-CUDA server */
@@ -72,7 +72,6 @@ struct FaultConf {
 	    exit(1);
 	}
     }
-#if 0
   /*
    * Destructor
    */
@@ -85,7 +84,7 @@ struct FaultConf {
 	    exit(1);
 	}
     }
-#endif
 };
-   
+#endif
+
 #endif // DSCUDA_H

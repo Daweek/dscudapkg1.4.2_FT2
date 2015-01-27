@@ -87,7 +87,9 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     void *pval;
     RCarg noarg;
     RCarg *argp = &noarg;
+#if 0
     FaultConf *fault_conf; // moikawa add
+#endif
 
     noarg.offset = 0;
     noarg.size = 0;
@@ -142,6 +144,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
           case dscudaArgTypeV: /*Structure, etc.*/
             pval = argp->val.RCargVal_u.valuev;
 	    /*if environ var found, then update its value with localhost's one.*/
+#if 0
 	    fault_conf = (FaultConf *)pval;
 	    if (strncmp(fault_conf->tag, IDTAG_0, 32)==0) {
                 SWARN(10, "DSCUDA_FAULT_INJECTION found, ");
@@ -153,7 +156,7 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
 		    SWARN(10, "but leave as is %d.\n", fault_conf->fault_en);
 		}
 	    }
-	    
+#endif
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
                 SWARN(1, "(V)cuParamSetv(%p, %d, %p, %d) success.\n",
@@ -903,7 +906,13 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, int flag /*fault*/,
 		SWARN(2, "################ Bad data generatad.\n" );
 		SWARN(2, "################ (every %d sec)\n", DscudaSvr.fault_period);
 		SWARN(2, "################\n" );
-		res.buf.RCbuf_val[0] = 123; // Overwrite no mean bits.
+		// <-- Overwrite no mean bits.
+		res.buf.RCbuf_val[0] = 123;
+		//res.buf.RCbuf_val[0] = ~res.buf.RCbuf_val[0];
+		//*((int *)res.buf.RCbuf_val) += 1;
+		err = cudaMemcpy((void*)src, res.buf.RCbuf_val, sizeof(int), cudaMemcpyHostToDevice);
+		check_cuda_error(err);
+		// --> Overwrite no mean bits.
 		DscudaSvr.last_fault_time = passed_time;
 		DscudaSvr.faultCountUp();
 		DscudaSvr.next_fault_time = DscudaSvr.first_fault_time +
@@ -913,8 +922,8 @@ dscudamemcpyd2hid_1_svc( RCadr src, RCsize count, int flag /*fault*/,
 		SWARN(2, "################ Good data. (%5.1f/%d)\n",
 		      passed_time, DscudaSvr.fault_period );
 	    }
-	}
-	if (DscudaSvr.fault_period < 0) {
+	} //if (DscudaSvr.fault_period > 0) 
+	else if (DscudaSvr.fault_period < 0) {
 	    SWARN(2, "################ Good data (1st call).\n" );
 	}
 #if 0 // DS-CUDA original.
