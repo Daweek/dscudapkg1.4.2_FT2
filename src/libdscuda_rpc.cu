@@ -1211,14 +1211,16 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 
     if (ft.d2h_rollback) {
 	if (!matched_all) {
+	    WARN_CP(0, "================================================== cpyD2H begin\n");
 	    //<-- Restore clean data onto GPU device(s) ...[a]
+	    WARN_CP(0, "(+_+)Restore clean data by cpyD2H\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
 	    //--> Restore clean data onto GPU device(s) ...[a]
 
 	    //<-- Rerun recoreded CUDA APIs from CP ...[b]
-	    WARN(0, "(+_+)Rollback the CUDA APIs by cpyD2H\n");
+	    WARN_CP(0, "(+_+)Rerun the CUDA APIs by cpyD2H\n");
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
 		St.Vdev[i].recordOFF();
@@ -1233,6 +1235,7 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 		St.Vdev[i].cudaThreadSynchronize();
 	    }
 	    //--> flush all cuda stream
+	    WARN_CP(0, "================================================== cpyD2H end\n");
 	} //if (!matched_all)
     } //if (ft.d2h_rollback)...
     WARN(4, "   }\n");

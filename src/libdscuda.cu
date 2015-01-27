@@ -1605,8 +1605,7 @@ periodicCheckpoint(void *arg) {
 	
 	dscuda::stopwatch(&Ts_sta);	
 	//<-- Output beginning message.
-	WARN_CP(0,
-		"==================================================== #%d\n", cp_count);
+	WARN_CP(0,"==================================================== #%d begin\n", cp_count);
 	WARN_CP(0,"periodicCheckpoint( period = %d sec )\n", cp_period );
 	//--> Output beginning message.
 
@@ -1678,17 +1677,12 @@ periodicCheckpoint(void *arg) {
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].cudaThreadSynchronize();
 	    }
+	    WARN_CP(0, "Synchronize() Rollbacked CUDA APIs.\n");
 	    //--> flush all cuda stream
 	    Tx = dscuda::stopwatch(&Tx_sta, &Tx_min, &Tx_max);
 	    Tx_sum += Tx;
 	    Tx_avr =  Tx_sum / (double)faulted_count;
 	}
-	//<-- mutex unlocks for following R/W.
-	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
-	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
-	pthread_mutex_unlock( &cudaKernelRun_mutex );
-	pthread_mutex_unlock( &cudaElse_mutex );
-	//--> mutex unlocks for following R/W.
 
 
 	Ta = dscuda::stopwatch(&Ta_sta, &Ta_min, &Ta_max);
@@ -1716,10 +1710,19 @@ periodicCheckpoint(void *arg) {
 	    WARN_CP(0," *Tr= - { - , - , - } %8.3f (%d)\n", Tr_sum, faulted_count);
 	    WARN_CP(0," *Tx= - { - , - , - } %8.3f (%d)\n", Tx_sum, faulted_count);
 	}
+	
+	pthread_testcancel();/* thread cancelation point */
+	WARN_CP(0,"==================================================== #%d end\n", cp_count);
 	//--> Output ending message.
 	cp_count++;
-	pthread_testcancel();/* thread cancelation point */
+	//<-- mutex unlocks for following R/W.
+	pthread_mutex_unlock( &cudaMemcpyD2H_mutex );
+	pthread_mutex_unlock( &cudaMemcpyH2D_mutex );
+	pthread_mutex_unlock( &cudaKernelRun_mutex );
+	pthread_mutex_unlock( &cudaElse_mutex );
+	//--> mutex unlocks for following R/W.
     }//while(true)
+    
     WARN_CP0(0,"periodicCheckpoint() thread completed.\n");
     WARN_CP0(0,"====================================================\n");
     WARN_CP0(0,"= Summary\n");
@@ -1743,6 +1746,7 @@ periodicCheckpoint(void *arg) {
     sleep(1);
     return NULL;
 } // periodicCheckpoint()
+
 void
 VirDev::invalidateAllModuleCache(void) {
     for (int i=0; i<RC_NKMODULEMAX; i++) {
