@@ -237,8 +237,8 @@ int
 main(int argc, char **argv)
 {
     int ndev;
-    size_t minsize = 256 * 1024;
-    size_t maxsize = 256 * 1024 * 1024;
+    size_t minsize = 4 * 1024;
+    size_t maxsize = 4 * 1024 * 1024;
     size_t nloop   = 1024 * 1024 * 1024;
     cudaGetDeviceCount(&ndev);
 

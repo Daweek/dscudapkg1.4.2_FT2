@@ -294,9 +294,13 @@ ClientState::~ClientState(void) {
 
     if (ft.d2h_statics) {
 	if (ft.cp_statics) {
-	    WARN(1, "[ERRORSTATICS] count both @D2H and @CP.\n" );
-	} else {
-	    WARN(1, "[ERRORSTATICS] count @D2H but @CP.\n" );
+	    WARN_CP(1, "[ERRORSTATICS] count both @D2H and @CP.\n" );
+	    for (int i=0; i<Nvdev; i++) {
+		WARN_CP(1, "    Virtual[%d]'s total error = %d [times]\n", i, Vdev[i].ft_unmatch_total);
+	    }
+	}
+	else {
+	    WARN0(1, "[ERRORSTATICS] count @D2H not @CP.\n" );
 	    for (int i=0; i<Nvdev; i++) {
 		WARN0(1, "    [ERRORSTAT]  Virtual[%2d]\n", i);
 		for (int j=0; j<Vdev[i].nredundancy; j++) {
@@ -319,6 +323,7 @@ ClientState::~ClientState(void) {
 ###***                                                                          *\n\
 ###******************************************************************************\n");
 } //--> ClientState::~ClientState(void)
+
 void
 ClientState::configFT(void) {
     extractENV( this->daemon,    "DSCUDA_USEDAEMON",  0 );
@@ -1710,7 +1715,11 @@ periodicCheckpoint(void *arg) {
 	    WARN_CP(0," *Tr= - { - , - , - } %8.3f (%d)\n", Tr_sum, faulted_count);
 	    WARN_CP(0," *Tx= - { - , - , - } %8.3f (%d)\n", Tx_sum, faulted_count);
 	}
-	
+	//<-- flush all cuda stream
+	for (int i=0; i<St.Nvdev; i++) {
+	    WARN_CP(0," Vdev[%d].ft_unmatch_count= %d\n", i, St.Vdev[i].ft_unmatch_total);
+	}
+	//--> flush all cuda stream
 	pthread_testcancel();/* thread cancelation point */
 	WARN_CP(0,"==================================================== #%d end\n", cp_count);
 	//--> Output ending message.

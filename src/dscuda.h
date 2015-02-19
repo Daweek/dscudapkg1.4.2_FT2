@@ -38,53 +38,8 @@ const int  SEARCH_BUFLEN_TX = 64 ;    // length of buffer using for dscudad sear
 const int  SEARCH_BUFLEN_RX = 1024 ;    // length of buffer using for dscudad searching.
 const int  SEARCH_NUM_TOKEN = 2 ;
 
-
 enum {
     RC_REMOTECALL_TYPE_RPC = 1,
     RC_REMOTECALL_TYPE_IBV = 2,
 };
-#if 0
-struct FaultConf {
-    char tag[32];      /* <= "DSCUDA_FAULT_INJECTION" */
-    int  overwrite_en; /* Overwrite by DS-CUDA server */
-    int  fault_en;     /* ==0: no-fault, >0: fault-count. OVERWRITTEN by SERVER */
-    int  fault_count;  /* Number of fault occur */
-    int  *d_Nfault;
-
-    FaultConf(int fault_set=0, const char *s=IDTAG_0) {
-	cudaError_t err;
-	overwrite_en=1;
-	fault_en = 0; /* Default */
-	fault_count = fault_set;
-	strcpy(tag, s);
-	/* malloc on device */
-	cudaSetDevice(0); /* temporary */
-	err = cudaMalloc( &d_Nfault, sizeof(int) );
-	if (err != cudaSuccess) {
-	    fprintf(stderr, "#Error. cudaMalloc() failed in constructor %s().\n", __func__);
-	    exit(1);
-	}
-	/* set initial value on device */
-	err = cudaMemcpy(d_Nfault, &fault_count, sizeof(fault_count), cudaMemcpyHostToDevice);
-	if (err != cudaSuccess) {
-	    fprintf(stderr, "#Error. cudaMemcpy() failed in constructor %s().\n", __func__);
-	    printf("CUDA error: %s\n", cudaGetErrorString(err)); 
-	    exit(1);
-	}
-    }
-  /*
-   * Destructor
-   */
-    ~FaultConf() {
-	cudaError_t err;
-	cudaSetDevice(0); /* temporary */
-	err = cudaFree(p_Nfault);
-	if (err != cudaSuccess) {
-	    fprintf(stderr, "#Error. cudaFree() failed in destructor %s().\n", __func__);
-	    exit(1);
-	}
-    }
-};
-#endif
-
 #endif // DSCUDA_H

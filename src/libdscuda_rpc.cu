@@ -282,12 +282,24 @@ PhyDev::migrateRebuildModulelist(void) {
 }
 
 VirDev::VirDev(void) {
-    id          = -1;
-    nredundancy = 1;
-    ft_mode     = FT_UNDEF;
-    conf        = VDEV_INVALID;
+    this->id               = -1;
+    this->nredundancy      =  1;
+    this->ft_mode          = FT_UNDEF;
+    this->conf             = VDEV_INVALID;
+    this->ft_unmatch_total = 0;
+    this->ft_unmatch_cp    = 0;
+    this->ft_unmatch_d2h   = 0;
     strcpy(info, "INVALID");
     recordOFF();
+    this->Tr_sum  = 0.0;
+    this->Tr_avr  = 0.0;
+    this->Tr_min  = 1.0e6;
+    this->Tr_max  = 0.0;
+    
+    this->Tx_sum  = 0.0;
+    this->Tx_avr  = 0.0;
+    this->Tx_min  = 1.0e6;
+    this->Tx_max  = 0.0;
 }
 
 void
@@ -1165,7 +1177,6 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
     }
     //---> Copy from physical device(s)
     bool matched_all   = true;
-    bool unmatched_all = true;
     if (this->ft.d2h_compare) {
 	//<--- Compare collected data
 	int  matched_count   = 0;
@@ -1179,7 +1190,6 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 					    count );
 		if (memcmp_result == 0) { // match
 		    server[k].stat_correct++;
-		    unmatched_all = false;
 		}
 		else { // unmatch
 		    server[k].stat_error++;
@@ -1196,31 +1206,39 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	    memcpy( h_dst, server[0].memlist.queryHostPtr(d_src), count );
 	    //--> Update user application host region using server[0].
 	}
-	else if (unmatched_all) {
-	    WARN(1, "   #(;_;) All %d Redundant device(s) unmathed. statics OK/NG = %d/%d.\n",
-		 nredundancy-1, matched_count, unmatched_count);
-	}
 	else {
-	    WARN(1, " #   #\n");
-	    WARN(1, "  # #\n");
-	    WARN(1, "   #  Detected Unmatched result. OK/NG= %d/%d.\n", matched_count, unmatched_count);
-	    WARN(1, "  # #\n");
-	    WARN(1, " #   #\n");
+	    this->ft_unmatch_total++; //count fault.
+	    this->ft_unmatch_d2h++;
+	    WARN_CP(1, " #   #\n");
+	    WARN_CP(1, "  # #\n");
+	    WARN_CP(1, "   #  Detected Unmatched result. OK/NG= %d/%d.\n", matched_count, unmatched_count);
+	    WARN_CP(1, "  # # D2H   umatched count = %d\n", this->ft_unmatch_d2h);
+	    WARN_CP(1, "  # # Total umatched count = %d\n", this->ft_unmatch_total);
+	    WARN_CP(1, " #   #\n");
 	}
     } // if (ft.d2h_compare) {
 
+    double Tr, Tr_sta; //restre mem
+    double Tx, Tx_sta; //redo api
     if (ft.d2h_rollback) {
 	if (!matched_all) {
 	    WARN_CP(0, "================================================== cpyD2H begin\n");
 	    //<-- Restore clean data onto GPU device(s) ...[a]
 	    WARN_CP(0, "(+_+)Restore clean data by cpyD2H\n");
+	    
+	    dscuda::stopwatch(&Tr_sta);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].restoreMemlist();
 	    }
+	    Tr = dscuda::stopwatch(&Tr_sta, &Tr_min, &Tr_max);
+	    Tr_sum += Tr;
+	    Tr_avr = Tr_sum / (double)ft_unmatch_d2h;
+	    WARN_CP(0, "(._.)Completed restoring the device memory previous backup ");
 	    //--> Restore clean data onto GPU device(s) ...[a]
 
 	    //<-- Rerun recoreded CUDA APIs from CP ...[b]
 	    WARN_CP(0, "(+_+)Rerun the CUDA APIs by cpyD2H\n");
+	    dscuda::stopwatch(&Tx_sta);
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].reclist.print();
 		St.Vdev[i].recordOFF();
@@ -1234,7 +1252,30 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	    for (int i=0; i<St.Nvdev; i++) {
 		St.Vdev[i].cudaThreadSynchronize();
 	    }
+	    WARN_CP(0, "Synchronize() Rollbacked CUDA APIs.\n");
 	    //--> flush all cuda stream
+	    Tx = dscuda::stopwatch(&Tx_sta, &Tx_min, &Tx_max);
+	    Tx_sum += Tx;
+	    Tx_avr =  Tx_sum / (double)ft_unmatch_d2h;
+
+
+	    //<-- Output ending message.	
+	    WARN_CP(0," 'Name' = 'now' { 'min' , 'avr' , 'max' } 'sum'\n");
+	    if (ft_unmatch_d2h > 0) {
+		WARN_CP(0," *Tr= %8.3f { %8.3f , %8.3f , %8.3f } %8.3f (%d)\n",
+			Tr, Tr_min, Tr_avr, Tr_max, Tr_sum, ft_unmatch_d2h);
+		WARN_CP(0," *Tx= %8.3f { %8.3f , %8.3f , %8.3f } %8.3f (%d)\n",
+			Tx, Tx_min, Tx_avr, Tx_max, Tx_sum, ft_unmatch_d2h);
+	    }
+	    else {
+		WARN_CP(0," *Tr= - { - , - , - } %8.3f (%d)\n", Tr_sum, ft_unmatch_d2h);
+		WARN_CP(0," *Tx= - { - , - , - } %8.3f (%d)\n", Tx_sum, ft_unmatch_d2h);
+	    }
+	    //<-- flush all cuda stream
+	    for (int i=0; i<St.Nvdev; i++) {
+		WARN_CP(0," Vdev[%d].ft_unmatch_count= %d\n", i, St.Vdev[i].ft_unmatch_total);
+	    }
+	    
 	    WARN_CP(0, "================================================== cpyD2H end\n");
 	} //if (!matched_all)
     } //if (ft.d2h_rollback)...
@@ -1285,6 +1326,7 @@ PhyDev::collectEntireRegions(int flag/*FT*/) {
 	i++;
     } // while (...);
 } // ---> void PhyDev::collectEntireRegions(void)
+
 bool
 ClientState::verifyEntireRegions(void) {
     WARN_CP(1, "    %s()\n", __func__);
@@ -1301,6 +1343,7 @@ ClientState::verifyEntireRegions(void) {
     //--> Sweep all virtual devices.
     return all_virdev_matched;
 }
+
 bool
 VirDev::verifyEntireRegions(void) {
     WARN_CP(1, "        VirDev[%d]\n", id);
@@ -1340,7 +1383,7 @@ VirDev::verifyEntireRegions(void) {
 		    WARN_CP0(1, "OK\n");
 		}
 		//--> Do verify
-	    }
+	    } //for(int j=...
 	}
 	//--> Memory compare between all combinations of redunts.
 	//<-- Point next region.
@@ -1353,9 +1396,10 @@ VirDev::verifyEntireRegions(void) {
     }
     else {
 	WARN_CP(1, "   + NOT MATCHED *************************\n");
+	this->ft_unmatch_total++; // counts fault.
     }
     return all_matched;
-}
+} //VirDev::verifyEntireRegions(...
 //
 // 
 // Update the host memory region of reliable data.

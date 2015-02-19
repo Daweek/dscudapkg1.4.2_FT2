@@ -87,9 +87,6 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
     void *pval;
     RCarg noarg;
     RCarg *argp = &noarg;
-#if 0
-    FaultConf *fault_conf; // moikawa add
-#endif
 
     noarg.offset = 0;
     noarg.size = 0;
@@ -144,19 +141,6 @@ rpcUnpackKernelParam(CUfunction *kfuncp, RCargs *argsp) {
           case dscudaArgTypeV: /*Structure, etc.*/
             pval = argp->val.RCargVal_u.valuev;
 	    /*if environ var found, then update its value with localhost's one.*/
-#if 0
-	    fault_conf = (FaultConf *)pval;
-	    if (strncmp(fault_conf->tag, IDTAG_0, 32)==0) {
-                SWARN(10, "DSCUDA_FAULT_INJECTION found, ");
-		if (fault_conf->overwrite_en) {
-		    SWARN(10, "then overwrite %d over %d.\n",
-			 DscudaSvr.getFaultInjection(), fault_conf->fault_en);
-		    fault_conf->fault_en = DscudaSvr.getFaultInjection();
-		} else {
-		    SWARN(10, "but leave as is %d.\n", fault_conf->fault_en);
-		}
-	    }
-#endif
             cuerr = cuParamSetv(kfunc, argp->offset, pval, argp->size);
 	    if (cuerr == CUDA_SUCCESS) {
                 SWARN(1, "(V)cuParamSetv(%p, %d, %p, %d) success.\n",

@@ -19,6 +19,7 @@
 Remd_t remd;  /* Only one instance of Remd_t in this program. */
 Simu_t simu;  /* Only one instance of Simu_t in this program. */
 
+
 static void mallocHost(Remd_t &remd, Simu_t &simu);
 static void mallocDev(Remd_t &remd, Simu_t &simu);
 //
@@ -62,7 +63,14 @@ main(int argc, char **argv) {
 
     //--- Allocate memory on device GPU side.
     mallocDev(remd, simu);
-
+#if 1 //Dummy allocated region for longer CP time.
+    int  *d_extra_region[7];
+    int   extra_pages = 8;
+    const size_t sz_extra = 64*1024*1024;
+    for (int i=0; i<extra_pages; i++) {
+	xcudaMalloc((void **)&d_extra_region[i], sz_extra);
+    }
+#endif
     //--- Do data-transfer test between CPU and GPU(s).
     testFuncCopyEne(remd, simu);
     testFuncCopyExch(remd, simu);
@@ -101,6 +109,11 @@ main(int argc, char **argv) {
   
     //-- Free memory on device GPU side.
     freeDev(simu);
+#if 1 //Dummy allocated region for longer CP time.
+    for (int i=0; i<extra_pages; i++) {
+	xcudaFree(d_extra_region[i]);
+    }
+#endif
   
     //-- Free memory on host CPU side.
     freeHost(remd);
@@ -192,8 +205,7 @@ mallocHost(Remd_t &remd, Simu_t &simu)
 } //mallocHost()
 //===============================================================================
 static void
-mallocDev(Remd_t &remd, Simu_t &simu)
-{
+mallocDev(Remd_t &remd, Simu_t &simu) {
     debug_print(2, "Entering %s().\n", __func__);
     
     const int ar_size = sizeof(Real3_t) * remd.Nmol * simu.Nrep_1dev;
@@ -234,7 +246,11 @@ mallocDev(Remd_t &remd, Simu_t &simu)
 	xcudaMalloc((void **)&remd.d_exch_ar[gpu_i],   ch_size);
 	xcudaMalloc((void **)&remd.d_energy[gpu_i],    en_size);
 	xcudaMalloc((void **)&remd.d_temp_meas[gpu_i], en_size);
-
+#ifdef EXTRA_CUDAMALLOC
+	//<-- overheaded dummy region
+	xcudaMalloc((void **)&remd.d_temp_ar[gpu_i],   te_size);
+	//--> overheaded dummy region
+#endif
 	printf("succeeded.\n"); fflush(stdout);
     }
     puts("succeeded.\n"); fflush(stdout);

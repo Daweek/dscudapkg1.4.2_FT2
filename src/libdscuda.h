@@ -444,6 +444,11 @@ public:
     //<-- Fault tolerant function control 
     FTmode      ft_mode;
     FToption    ft;
+    int         ft_unmatch_total;
+    int         ft_unmatch_d2h;
+    int         ft_unmatch_cp;
+    double      Tr_sum, Tr_avr, Tr_min, Tr_max;
+    double      Tx_sum, Tx_avr, Tx_min, Tx_max;
     //--> Fault tolerant function control
     
     VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
