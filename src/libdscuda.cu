@@ -42,6 +42,9 @@ int cp_thread_exit=0;
        pthread_mutex_t cudaKernelRun_mutex = PTHREAD_MUTEX_INITIALIZER;
        pthread_mutex_t cudaElse_mutex      = PTHREAD_MUTEX_INITIALIZER;
 
+       pthread_mutex_t Tc_reset_mutex      = PTHREAD_MUTEX_INITIALIZER;
+       int             Tc_reset_req;
+
        RCmappedMem    *RCmappedMemListTop     = NULL;
        RCmappedMem    *RCmappedMemListTail    = NULL;
 
@@ -1548,6 +1551,7 @@ periodicCheckpoint(void *arg) {
     int correct_count = 0;
     int faulted_count = 0;
     int cp_count = 1;
+    int Tc_reset_req0;
     //<-- timer
     double Tc_exp,Tc_exp_l=(double)cp_period*0.7, Tc_exp_h=(double)cp_period*1.3;
     int    Tc_exp_sec;
@@ -1568,6 +1572,7 @@ periodicCheckpoint(void *arg) {
       |         |Tm|
      */
     while (cp_thread_exit==0) {
+    Tc_start:
 	dscuda::stopwatch(&Ta_sta);
 	dscuda::stopwatch(&Tc_sta);
 
@@ -1578,9 +1583,28 @@ periodicCheckpoint(void *arg) {
 	Tc_exp_sec  = (int)floor(Tc_exp);
 	Tc_exp_usec = (Tc_exp - Tc_exp_sec)*1e6;
 	for (int i=0; i<Tc_exp_sec; i++) {
-	    usleep( 1000000 );
+	    for (int j=0; j<10; j++) { // 1.000s
+		usleep( 100000 ); // 100ms
+		//<-- mutex lock
+		pthread_mutex_lock( &Tc_reset_mutex );
+		Tc_reset_req0 = Tc_reset_req;
+		pthread_mutex_unlock( &Tc_reset_mutex );
+		if (Tc_reset_req0 != 0) {
+		    goto Tc_start;
+		}
+		//--> mutex lock
+	    }
 	}
 	usleep( (int)Tc_exp_usec );
+	//<-- mutex lock
+	pthread_mutex_lock( &Tc_reset_mutex );
+	Tc_reset_req0 = Tc_reset_req;
+	pthread_mutex_unlock( &Tc_reset_mutex );
+	if (Tc_reset_req0 != 0) {
+	    goto Tc_start;
+	}
+	//--> mutex lock
+	
 	//--> Wait for specified period (sec) passed.
 
 	dscuda::stopwatch(&Tm_sta);

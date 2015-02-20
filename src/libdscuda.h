@@ -739,5 +739,7 @@ extern pthread_mutex_t cudaMemcpyD2H_mutex;
 extern pthread_mutex_t cudaMemcpyH2D_mutex;
 extern pthread_mutex_t cudaKernelRun_mutex;
 extern pthread_mutex_t cudaElse_mutex;
+extern pthread_mutex_t Tc_reset_mutex;
+extern int             Tc_reset_req;
 
 #endif //__LIBDSCUDA_H__

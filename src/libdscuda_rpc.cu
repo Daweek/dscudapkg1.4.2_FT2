@@ -1223,6 +1223,13 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
     if (ft.d2h_rollback) {
 	if (!matched_all) {
 	    WARN_CP(0, "================================================== cpyD2H begin\n");
+	    //<-- Request Tc timer to reset
+	    WARN_CP(0,"cudaMemcpyD2H wait Tc_reset_mutex unlock... Tc_reset_req=1\n");
+	    pthread_mutex_lock( &Tc_reset_mutex );
+	    Tc_reset_req = 1;
+	    pthread_mutex_unlock( &Tc_reset_mutex );
+	    //--> Request Tc timer to reset
+
 	    //<-- Restore clean data onto GPU device(s) ...[a]
 	    WARN_CP(0, "(+_+)Restore clean data by cpyD2H\n");
 	    
@@ -1275,7 +1282,13 @@ VirDev::cudaMemcpyD2H(void *h_dst, const void *d_src, size_t count) {
 	    for (int i=0; i<St.Nvdev; i++) {
 		WARN_CP(0," Vdev[%d].ft_unmatch_count= %d\n", i, St.Vdev[i].ft_unmatch_total);
 	    }
-	    
+
+	    //<-- Clear Request Tc timer to reset
+	    WARN_CP(0,"cudaMemcpyD2H wait Tc_reset_mutex unlock... Tc_reset_req=0\n");
+	    pthread_mutex_lock( &Tc_reset_mutex );
+	    Tc_reset_req = 0;
+	    pthread_mutex_unlock( &Tc_reset_mutex );
+	    //--> Clear Request Tc timer to reset
 	    WARN_CP(0, "================================================== cpyD2H end\n");
 	} //if (!matched_all)
     } //if (ft.d2h_rollback)...

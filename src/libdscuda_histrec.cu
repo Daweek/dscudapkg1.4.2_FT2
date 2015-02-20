@@ -594,16 +594,13 @@ recallRpcLaunchKernel(void *argp) {
     WARN_CP(1,  "                 ");
     WARN_CP0(1, "Recall RpcLaunchKernel((int)moduleid=%d, (int)kid=%d, (char*)kname=%s, ...)...\n",
 	 argsrc->moduleid, argsrc->kid, argsrc->kname);
-#if 0
-    rpcDscudaLaunchKernelWrapper(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args);
-#else
+
     VirDev *vdev = St.Vdev + Vdevid[vdevidIndex()];
     bool rec_en_stack = vdev->isRecording();
     int  flag = 0;
     vdev->recordOFF();
     vdev->launchKernel(argsrc->moduleid, argsrc->kid, argsrc->kname, argsrc->gdim, argsrc->bdim, argsrc->smemsize, argsrc->stream, argsrc->args, flag);
     if (rec_en_stack) vdev->recordON();
-#endif
 }
 //EOF
 
