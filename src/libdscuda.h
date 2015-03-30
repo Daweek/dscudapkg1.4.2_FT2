@@ -23,10 +23,13 @@ struct CudaSetDeviceArgs {
     int      device;
 };
 struct CudaMallocArgs {
-    void*    devPtr;
+    //void*    devPtr;
+    void**   hstPtr;
     size_t   size;
-    CudaMallocArgs(void) { devPtr = NULL, size = 0; }
-    CudaMallocArgs( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
+    //CudaMallocArgs(void) { devPtr = NULL, size = 0; }
+    //CudaMallocArgs( void *ptr, size_t sz ) { devPtr = ptr; size = sz; }
+    CudaMallocArgs(void) { hstPtr = NULL, size = 0; }
+    CudaMallocArgs( void **ptr, size_t sz ) { hstPtr = ptr; size = sz; }
 };
 struct CudaMemcpyArgs {
     void*    dst;
@@ -454,8 +457,9 @@ public:
     VdevConf    conf;                      //{VDEV_MONO, VDEV_POLY}
     char        info[16];                  //{MONO, POLY(nredundancy)}
                                            /*** CHECKPOINTING ***/
-    BkupMemList memlist;              //part of Checkpoint data.
-    HistList    reclist;
+    BkupMemList memlist;              // part of Checkpoint data.
+    HistList    reclist;              // CUDA API history in last Tc.
+    //HistList    xreclist;             // cancel API hisotyr. ex.)cudaMalloc() <-> cudaFree();
     //<--- CUDA API recording ON/OFF dynamically.
 public:
     void        recordON(void); 

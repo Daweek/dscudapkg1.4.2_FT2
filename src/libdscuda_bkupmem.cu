@@ -264,7 +264,7 @@ BkupMemList::queryDevicePtr(const void *v_ptr) {
     return NULL;
 }
 /*
- * Add the BkupMem cell at the tail of List.
+ * Add the BkupMem cell to the list at the its tail.
  */
 void
 BkupMemList::append(void *uva_ptr, void *d_ptr, int size) {

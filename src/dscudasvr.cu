@@ -386,7 +386,7 @@ initEnv(void) {
 	}
     }
     SWARN(1, "Fault period Config: %d\n", DscudaSvr.fault_period);
-    DscudaSvr.first_fault_time = (double)DscudaSvr.fault_period / 2.0;
+    DscudaSvr.first_fault_time = (double)DscudaSvr.fault_period; // /2.0
     DscudaSvr.next_fault_time = DscudaSvr.first_fault_time;
     
     /* Timed out */
@@ -403,7 +403,7 @@ initEnv(void) {
     SWARN(1, "Force Timeout Config: 0x%x\n", DscudaSvr.force_timeout);
 
     // --> add by Oikawa
-}
+}//initEnv()
 
 /*
  * Unload Modules never been used for a long time.

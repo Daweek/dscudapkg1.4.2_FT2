@@ -335,8 +335,9 @@ storeSetDevice(void *argp) {
 }
 static void*
 storeMalloc(void *argp) {
-    //nothing to do
-    return NULL;
+    //nothing to do?
+    DSCUDAVERB_STORE_ARGS(Malloc); 
+    return argdst;
 }
 static void*
 storeMemcpyH2D(void *argp) {
@@ -438,7 +439,10 @@ releaseSetDevice(void *argp) {
 }
 static void
 releaseMalloc(void *argp) {
-    //nothing to do
+    //nothing to do?
+    CudaMallocArgs *argsrc;
+    argsrc = (CudaMallocArgs *)argp;
+    free(argsrc);
 }
 static void
 releaseMemcpyH2D(void *argp) {
@@ -517,7 +521,25 @@ recallSetDevice(void *argp) {
 }
 static void
 recallMalloc(void *argp) {
+    CudaMallocArgs *argsrc;
+    int         vdevid = Vdevid[ vdevidIndex() ];
+    VirDev     *vdev   = St.Vdev + vdevid;
+    bool rec_en_stack = vdev->isRecording();
+
+    argsrc = (CudaMallocArgs *)argp;
     //nothing to do
+    WARN_CP(1,  "                 ");
+    WARN_CP0(1, "Recall cudaMalloc()...\n");
+
+    vdev->recordOFF();
+    //<--- Need to memorize also copy data. Great.
+    //vdev->cudaFree(*argsrc->devPtr);
+    //vdev->cudaMalloc(&argsrc->devPtr, argsrc->size);
+    vdev->cudaFree(*(argsrc->hstPtr));
+    vdev->cudaMalloc(argsrc->hstPtr, argsrc->size);
+    //---> Need to memorize also copy data. Great.
+
+    if (rec_en_stack) vdev->recordON();
 }
 static void
 recallMemcpyH2D(void *argp) {

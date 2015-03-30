@@ -19,7 +19,6 @@
 Remd_t remd;  /* Only one instance of Remd_t in this program. */
 Simu_t simu;  /* Only one instance of Simu_t in this program. */
 
-
 static void mallocHost(Remd_t &remd, Simu_t &simu);
 static void mallocDev(Remd_t &remd, Simu_t &simu);
 //
@@ -64,12 +63,14 @@ main(int argc, char **argv) {
     //--- Allocate memory on device GPU side.
     mallocDev(remd, simu);
 #if 1 //Dummy allocated region for longer CP time.
-    int  *d_extra_region[7];
-    int   extra_pages = 8;
+//#define EXTRA_PAGES (8)
+    int  *d_extra_region[8];
+    int   extra_pages = EXTRA_PAGES; // = 1;
     const size_t sz_extra = 64*1024*1024;
     for (int i=0; i<extra_pages; i++) {
 	xcudaMalloc((void **)&d_extra_region[i], sz_extra);
     }
+#undef EXTRA_PAGES
 #endif
     //--- Do data-transfer test between CPU and GPU(s).
     testFuncCopyEne(remd, simu);

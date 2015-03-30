@@ -3,14 +3,12 @@
 #include <string.h>
 #include <math.h>
 #include <unistd.h>
-//#include <cutil.h>
-//#include <cutil_inline.h>
 #include <sys/time.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif // _OPENMP
 
-#define MAXDEV 32
+#define MAXDEV 4
 static const double MEGA  = 1e6;
 static const double MICRO = 1e-6;
 
@@ -21,7 +19,6 @@ get_cputime(double *nowp, double *deltap)
 {
     struct timeval t;
     double now0;
-
     gettimeofday(&t, NULL);
     now0 = t.tv_sec + t.tv_usec/1000000.0;
     *deltap = now0 - *nowp;
@@ -43,7 +40,6 @@ bcastperf(int argc, char **argv)
     int ndev;
     static int nthread = 0;
 
-    cudaGetDeviceCount(&ndev);
     printf("# %d device%s found.\n", ndev, ndev > 1 ? "s" : "");
 
     for (i = 0; i < ndev; i++) {
@@ -87,8 +83,8 @@ bcastperf(int argc, char **argv)
  *
  */
 static
-void sendperf( int argc, char **argv,
-	       size_t minsize, size_t maxsize, size_t nloop) {
+void sendperf( int argc, char **argv, size_t minsize, size_t maxsize, size_t nloop)
+{
     int i, j;
     size_t size;
     double now = 0.0, dt = 0.0;
@@ -96,7 +92,6 @@ void sendperf( int argc, char **argv,
     char *src[MAXDEV];
     char *dst[MAXDEV];
     int ndev;
-    cudaGetDeviceCount(&ndev);
 
     ndev = 1; // !!!
 
@@ -115,15 +110,16 @@ void sendperf( int argc, char **argv,
     printf("\n#\n# cudaMemcpy (HostToDevice)\n#\n");
 
 #if 1
-    for (size = minsize; size <= maxsize; size *= ratio) {
+    for (size = minsize; size < maxsize; size *= ratio) {
+	size_t packet_count = nloop/size;
 	get_cputime(&now, &dt);
-	for (j = 0; j < nloop/size; j++) {
+	for (j = 0; j < packet_count; j++) {
 	    for (i = 0; i < ndev; i++) {
-  	        cudaSetDevice(i);
+		cudaSetDevice(i);
                 cudaMemcpy(dst[i], src[i], size, cudaMemcpyHostToDevice);
 	    }
 	}
-        //cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
 	get_cputime(&now, &dt);
 
 #if 0 // with estimated RPC overhead.
@@ -133,24 +129,80 @@ void sendperf( int argc, char **argv,
 	printf("%d byte    %f sec    %f MB/s    %f ib_sec  %f MB/s\n",
 	       size, lt, nloop/MEGA/lt, ibsec, nloop/MEGA/(lt + ibsec));
 #else
-	  printf("%12d Byte    %f sec    %f MB/s\n",
-	  size, dt, nloop/MEGA/dt);
+	  printf("%12d Byte  %12d times %12.6f sec  %12.6f MB/s\n",
+		 size, packet_count, dt, (size * packet_count)/MEGA/dt);
 #endif
 	fflush(stdout);
     }
 
 #else
-          size = 40;
-          for (i = 0; i < ndev; i++) {
-              for (j = 0; j < size; j++) {
-                  src[i][j] = j;
-              }
-          }
-          for (i = 0; i < ndev; i++) {
-              cudaSetDevice(i);
-              cudaMemcpy(dst[i], src[i], size, cudaMemcpyHostToDevice);
-          }
+    size = 40;
+    for (i = 0; i < ndev; i++) {
+	for (j = 0; j < size; j++) {
+	    src[i][j] = j;
+	}
+    }
+    for (i = 0; i < ndev; i++) {
+	cudaSetDevice(i);
+	cudaMemcpy(dst[i], src[i], size, cudaMemcpyHostToDevice);
+    }
 #endif
+    
+#if 0
+    for (i = 0; i < ndev; i++) {
+	cudaSetDevice(i);
+	cudaFree(dst[i]);
+	free(src[i]);
+    }
+#endif
+}
+static
+void sendperf_analyze( int argc, char **argv, size_t minsize, size_t maxsize, size_t nloop)
+{
+    int i, j;
+    size_t size;
+    double now = 0.0, dt = 0.0;
+    double sta = 0.0, sta_dt = 0.0;
+    int  ratio = 2;
+    char *src[MAXDEV];
+    char *dst[MAXDEV];
+    int ndev;
+
+    ndev = 1; // !!!
+
+    printf("# %d device%s found.\n", ndev, ndev > 1 ? "s" : "");
+    for (i = 0; i < ndev; i++) {
+        cudaSetDevice(i);
+        cudaMalloc((void**) &dst[i], sizeof(char) * maxsize);
+	src[i] = (char *)malloc(sizeof(char) * maxsize);
+    }
+    
+    printf("#\n");
+    printf("# cudaMemcpy(HostToDevice)\n");
+    printf("#   - Total size of transfered is %6.1f MByte.\n", nloop/1e6);
+    printf("#\n");
+
+    printf("\n#\n# cudaMemcpy (HostToDevice)\n#\n");
+
+    for (size = minsize; size < maxsize; size *= ratio) {
+	get_cputime(&now, &dt);
+	for (j = 0; j < nloop/size; j++) {
+	    for (i = 0; i < ndev; i++) {
+		get_cputime(&sta, &sta_dt);
+  	        cudaSetDevice(i);
+                cudaMemcpy(dst[i], src[i], size, cudaMemcpyHostToDevice);
+		cudaDeviceSynchronize();
+		get_cputime(&sta, &sta_dt);
+		printf("%12d Byte %f sec %f MB/s\n", size, sta_dt, size / MEGA / sta_dt);
+	    }
+	}
+        cudaDeviceSynchronize();
+	get_cputime(&now, &dt);
+	
+	printf("%12d Byte    %f sec    %f MB/s\n",
+	       size, dt, nloop/MEGA/dt);
+	fflush(stdout);
+    }
 }
 
 static
@@ -163,7 +215,6 @@ void recvperf( int argc, char **argv,
     char *src[MAXDEV];
     char *dst[MAXDEV];
     int ndev;
-    cudaGetDeviceCount(&ndev);
 
     ndev = 1; // !!!
 
@@ -177,20 +228,29 @@ void recvperf( int argc, char **argv,
     printf("# cudaMemcpy(DeviceToHost)\n");
     printf("#   - Total size of transfered is %6.1f MByte.\n", (double)nloop/1e6);
     printf("#\n");
-    for (size = minsize; size <= maxsize; size *= ratio) {
+
+    for (size = minsize; size < maxsize; size *= ratio) {
+	size_t packet_count = nloop / size;
 	get_cputime(&now, &dt);
-	for (j = 0; j < nloop/size; j++) {
+	for (j = 0; j < packet_count; j++) {
 	    for (i = 0; i < ndev; i++) {
-  	        cudaSetDevice(i);
+		cudaSetDevice(i);
                 cudaMemcpy(dst[i], src[i], size, cudaMemcpyDeviceToHost);
 	    }
 	}
-        //cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
 	get_cputime(&now, &dt);
-	printf("%12d Byte    %f sec    %f MB/s\n",
-               size, dt, (double)nloop/MEGA/dt);
+	printf("%12d Byte  %12d times %12.6f sec  %12.6f MB/s\n",
+	       size, packet_count, dt, (size * packet_count)/MEGA/dt);
 	fflush(stdout);
     }
+#if 0
+    for (i = 0; i < ndev; i++) {
+	cudaSetDevice(i);
+	cudaFree(src[i]);
+	free(dst[i]);
+    }
+#endif
 }
 
 static
@@ -203,7 +263,6 @@ void selfperf( int argc, char **argv,
     char *src[MAXDEV];
     char *dst[MAXDEV];
     int ndev;
-    cudaGetDeviceCount(&ndev);
 
     ndev = 1; // !!!
 
@@ -237,17 +296,18 @@ int
 main(int argc, char **argv)
 {
     int ndev;
-    size_t minsize = 4 * 1024;
-    size_t maxsize = 4 * 1024 * 1024;
+    //size_t minsize = 4 * 1024;
+    size_t minsize = 4 * 1000;
+    size_t midsize = 512 * 1000;
+    size_t maxsize = 65 * 1024 * 1024;
     size_t nloop   = 1024 * 1024 * 1024;
     cudaGetDeviceCount(&ndev);
 
-    if (1 < ndev) {
-        bcastperf(argc, argv);
-    }
-    sendperf( argc, argv, minsize, maxsize, nloop);
-    recvperf( argc, argv, minsize, maxsize, nloop);
-    selfperf( argc, argv, minsize, maxsize, nloop * 16);
+    sendperf( argc, argv, minsize, midsize, nloop/4);
+    sendperf( argc, argv, midsize, maxsize, nloop);
+    
+    recvperf( argc, argv, minsize, midsize, nloop/4);
+    recvperf( argc, argv, midsize, maxsize, nloop);
     
     sleep(1);
     fprintf(stderr, "going to quit...\n");

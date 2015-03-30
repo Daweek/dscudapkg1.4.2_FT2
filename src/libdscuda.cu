@@ -1551,7 +1551,7 @@ periodicCheckpoint(void *arg) {
     int correct_count = 0;
     int faulted_count = 0;
     int cp_count = 1;
-    int Tc_reset_req0;
+    int Tc_reset_req0 = 0;
     //<-- timer
     double Tc_exp,Tc_exp_l=(double)cp_period*0.7, Tc_exp_h=(double)cp_period*1.3;
     int    Tc_exp_sec;
@@ -1562,6 +1562,9 @@ periodicCheckpoint(void *arg) {
     double Tc, Tc_sum=0.0, Tc_sta, Tc_avr=-1.0, Tc_min=1.0e6, Tc_max=0.0; //cp sleep
     double Tr, Tr_sum=0.0, Tr_sta, Tr_avr=-1.0, Tr_min=1.0e6, Tr_max=0.0; //restre mem
     double Tx, Tx_sum=0.0, Tx_sta, Tx_avr=-1.0, Tx_min=1.0e6, Tx_max=0.0; //redo api
+    //
+    double Td2h, Td2h_partial, Td2h_sum=0.0, Td2h_sta, Td2h_avr=-1.0, Td2h_min=1.0e6,
+	Td2h_max=0.0; //Tr+Tx in D2h
     //--> timer 
     /*
       Memo: "Tc" is defined by "int cp_period" above.
@@ -1572,10 +1575,9 @@ periodicCheckpoint(void *arg) {
       |         |Tm|
      */
     while (cp_thread_exit==0) {
-    Tc_start:
 	dscuda::stopwatch(&Ta_sta);
 	dscuda::stopwatch(&Tc_sta);
-
+	Td2h = 0.0;
 	//<-- Wait for specified period (sec) passed.
 	Tc_exp = ((double)cp_period * (double)cp_count) - Tc_sum - Tm_avr; //in sec
 	if      (Tc_exp < Tc_exp_l) Tc_exp = Tc_exp_l; // saturate to lower bound time.
@@ -1583,27 +1585,31 @@ periodicCheckpoint(void *arg) {
 	Tc_exp_sec  = (int)floor(Tc_exp);
 	Tc_exp_usec = (Tc_exp - Tc_exp_sec)*1e6;
 	for (int i=0; i<Tc_exp_sec; i++) {
-	    for (int j=0; j<10; j++) { // 1.000s
-		usleep( 100000 ); // 100ms
+	    for (int j=0; j<10; j++) { // 1.000s = 100ms * 10;
 		//<-- mutex lock
-		pthread_mutex_lock( &Tc_reset_mutex );
-		Tc_reset_req0 = Tc_reset_req;
-		pthread_mutex_unlock( &Tc_reset_mutex );
-		if (Tc_reset_req0 != 0) {
-		    goto Tc_start;
-		}
+		dscuda::stopwatch(&Td2h_sta);
+		do {
+		    pthread_mutex_lock( &Tc_reset_mutex );
+		    Tc_reset_req0 = Tc_reset_req;
+		    pthread_mutex_unlock( &Tc_reset_mutex );
+		} while (Tc_reset_req0 == 1);
+		Td2h_partial = dscuda::stopwatch(&Td2h_sta);
+		Td2h += Td2h_partial;
 		//--> mutex lock
+		usleep( 100000 ); // =100ms
 	    }
 	}
-	usleep( (int)Tc_exp_usec );
 	//<-- mutex lock
-	pthread_mutex_lock( &Tc_reset_mutex );
-	Tc_reset_req0 = Tc_reset_req;
-	pthread_mutex_unlock( &Tc_reset_mutex );
-	if (Tc_reset_req0 != 0) {
-	    goto Tc_start;
-	}
+	dscuda::stopwatch(&Td2h_sta);
+	do {
+	    pthread_mutex_lock( &Tc_reset_mutex );
+	    Tc_reset_req0 = Tc_reset_req;
+	    pthread_mutex_unlock( &Tc_reset_mutex );
+	} while (Tc_reset_req0 == 1);
+	Td2h_partial = dscuda::stopwatch(&Td2h_sta);
+	Td2h += Td2h_partial; // Fix the value of Td2h.
 	//--> mutex lock
+	usleep( (int)Tc_exp_usec );
 	
 	//--> Wait for specified period (sec) passed.
 
@@ -1628,9 +1634,18 @@ periodicCheckpoint(void *arg) {
 	Tm_sum += Tm;
 	Tm_avr =  Tm_sum / (double)cp_count;
 
-	Tc = dscuda::stopwatch(&Tc_sta, &Tc_min, &Tc_max);
+	//Tc = dscuda::stopwatch(&Tc_sta, &Tc_min, &Tc_max);
+	Tc = dscuda::stopwatch(&Tc_sta) - Td2h;
+	if (Tc < Tc_min) Tc_min = Tc;
+	if (Tc > Tc_max) Tc_max = Tc;
 	Tc_sum += Tc;
 	Tc_avr =  Tc_sum / (double)cp_count;
+
+	//Td2h
+	if (Td2h < Td2h_min) Td2h_min = Td2h;
+	if (Td2h > Td2h_max) Td2h_max = Td2h;
+	Td2h_sum += Td2h;
+	Td2h_avr = Td2h_sum / (double)cp_count;
 	
 	dscuda::stopwatch(&Ts_sta);	
 	//<-- Output beginning message.
@@ -1729,6 +1744,9 @@ periodicCheckpoint(void *arg) {
 		Ts, Ts_min, Ts_avr, Ts_max, Ts_sum);
 	WARN_CP(0," Ta = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
 		Ta, Ta_min, Ta_avr, Ta_max, Ta_sum);
+	WARN_CP(0," Td2h = %8.3f { %8.3f , %8.3f , %8.3f } %8.3f\n",
+		Td2h, Td2h_min, Td2h_avr, Td2h_max, Td2h_sum);
+		
 	if (faulted_count>0) {
 	    WARN_CP(0," *Tr= %8.3f { %8.3f , %8.3f , %8.3f } %8.3f (%d)\n",
 		    Tr, Tr_min, Tr_avr, Tr_max, Tr_sum, faulted_count);

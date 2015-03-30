@@ -66,7 +66,8 @@ dscudaGetIpaddrString(unsigned int addr) {
  * returns the number of seconds passed since *t0.
  */
 double
-dscuda::stopwatch(double *t0) {
+dscuda::stopwatch(double *t0)
+{
     struct timeval t;
     gettimeofday(&t, NULL);
     double tnow = t.tv_sec + t.tv_usec/1000000.0;
@@ -75,7 +76,8 @@ dscuda::stopwatch(double *t0) {
     return dt;
 }
 double
-dscuda::stopwatch(double *t0, double *min, double *max) {
+dscuda::stopwatch(double *t0, double *min, double *max)
+{
     struct timeval t;
     gettimeofday(&t, NULL);
     double tnow = t.tv_sec + t.tv_usec/1000000.0;

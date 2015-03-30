@@ -798,6 +798,7 @@ cudaFuncSetCacheConfig(const char * func, enum cudaFuncCache cacheConfig) {
  */
 cudaError_t
 cudaMalloc(void **d_ptr, size_t size) {
+    pthread_mutex_lock( &cudaElse_mutex );
     cudaError_t cuerr;
     int         vid  = vdevidIndex();
     VirDev     *vdev = St.Vdev + Vdevid[vid];
@@ -806,6 +807,7 @@ cudaMalloc(void **d_ptr, size_t size) {
     WARN(3, "cudaMalloc(%p, %zu) {\n", d_ptr, size, Vdevid[vid]);
     cuerr = vdev->cudaMalloc(d_ptr, size);
     WARN(3, "}\n", d_ptr, size);
+    pthread_mutex_unlock( &cudaElse_mutex );
     return cuerr;
 }
 cudaError_t
@@ -818,15 +820,18 @@ VirDev::cudaMalloc(void **d_ptr, size_t size) {
     WARN(3, "   Vdev[%d] (@=%p, size=%zu) redun=%d\n",
 	 id, d_ptr, size, nredundancy);
     /*
-     * Record called history of CUDA APIs.
+     * Record called history of CUDA APIs. must register in advance.
      */
     if (isRecording()) {
 	WARN(3, "      ===> Recorded to the rollback history.\n");
 	CudaMallocArgs args;
-	args.devPtr = uva_ptr;
+	//args.devPtr = uva_ptr;
+	//args.devPtr = d_ptr;
+	args.hstPtr = d_ptr;
 	args.size   = size;
 	appendRecord(dscudaMallocId, &args);
     }
+
     struct rpc_err rpc_result;
     for (int i=0; i<nredundancy; i++) {
 	/*
@@ -863,14 +868,6 @@ cudaError_t
 PhyDev::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
     dscudaMallocResult *rp;
     cudaError_t cuerr = cudaSuccess;
-#if 0
-    if (isRecording()) {
-	CudaMallocArgs args;
-	args.devPtr = uva_ptr;
-	args.size   = size;
-	this->appendRecord(dscudaMallocId, &args);
-    }
-#endif
     
     rp = dscudamallocid_1( size, Clnt); //Kick RPC
     clnt_geterr( Clnt, rpc_result);
@@ -892,9 +889,14 @@ PhyDev::cudaMalloc(void **d_ptr, size_t size, struct rpc_err *rpc_result) {
  * cudaFree() series.
  */
 cudaError_t
-cudaFree(void *d_ptr) {
+cudaFree(void *d_ptr)
+{
+    pthread_mutex_lock( &cudaElse_mutex );
+    
     int          vid = vdevidIndex();
     cudaError_t  err = cudaSuccess;
+    
+
 
     WARN(3, "cudaFree(%p) {\n", d_ptr);
     VirDev     *vdev = St.Vdev + Vdevid[vid];
@@ -903,6 +905,7 @@ cudaFree(void *d_ptr) {
 
     WARN(3, "}\n");
     WARN(3, "\n");
+    pthread_mutex_unlock( &cudaElse_mutex );
     return err;
 }
 cudaError_t
@@ -920,6 +923,8 @@ VirDev::cudaFree(void *v_ptr) {
 	}
 	
 	server[i].memlist.remove(v_ptr);
+	WARN(3, "         + memlist.remove(v_ptr=%p, d_ptr=%p)\n",
+	     v_ptr, server[i].memlist.queryDevicePtr(v_ptr));
     }
     this->memlist.remove(v_ptr);
 
@@ -940,7 +945,7 @@ PhyDev::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
     dscudaResult *rp;
     void *d_ptr = memlist.queryDevicePtr(v_ptr);
     
-    WARN(3, "      + Phy[%d].cudaFree(%p) { }\n", id, d_ptr);
+    WARN(3, "      + Phy[%d].cudaFree(%p)\n", id, d_ptr);
 
     rp = dscudafreeid_1((RCadr)d_ptr, Clnt);
     clnt_geterr( Clnt, rpc_result );
@@ -957,7 +962,6 @@ PhyDev::cudaFree(void *v_ptr, struct rpc_err *rpc_result) {
 
     return err;
 }
-
 
 /*
  * cudaMemcpy( HostToDevice ) entry point and switch by its direction.

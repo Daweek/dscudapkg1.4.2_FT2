@@ -33,8 +33,7 @@ static Real_t hamiltonian( Real_t, Real_t, Real_t, Real_t, Real_t, Real_t, int);
 
 // Debug
 __device__
-int chksum(int *start, int count)
-{
+int chksum(int *start, int count) {
     int sum, *p, i;
     if (threadIdx.x==0 && threadIdx.y==0 && threadIdx.z==0) { /* Do by only 1 thread */
 	p=start;
@@ -51,8 +50,7 @@ extern "C" __global__ void
 fitVel_dev( int Nmol, int step_exch, Real_t dt, Real_t cellsize, Real_t rcut,
 	    Real_t lj_sigma, Real_t lj_epsilon, Real_t mass, 
 	    Real3_t *d_pos_ar, Real3_t *d_vel_ar, Real3_t *d_foc_ar,
-	    Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar)
-{
+	    Real_t  *d_ene_ar, Real_t  *d_temp_ar,Real_t  *d_temp_meas, int *d_exch_ar) {
     __shared__ Real3_t  shared_mem[SMEM_COUNT];
     __shared__ Real_t   potential_ar[SMEM_COUNT];
     
@@ -254,7 +252,7 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
     Stopwatch stopwatch_2;
     stopwatch_0.reset("simloop");
     stopwatch_1.reset("kernel");
-    stopwatch_2.reset("etc");
+    stopwatch_2.reset("fileio");
 
     const int    Nrep      = remd.Nrep;
     const int    Nmol      = remd.Nmol;
@@ -335,7 +333,12 @@ simRemd( Remd_t &remd, Simu_t &simu ) {
 
 	//-- save location of atoms ?
 	if (simu.report_posi >= 1) {
-	    savePosAll( t0 * step_exch ); // cudaMemcpyD2H * Nrep, refer to "comm_save.cu"
+	    if (t0 % 10 == 0) { //save every (t_exch * 10)
+		stopwatch_2.start();
+		savePosAll( t0 * step_exch ); // cudaMemcpyD2H * Nrep, refer to "comm_save.cu"
+		stopwatch_2.stop();
+		stopwatch_2.report();
+	    }
 	}
 	//-- save verocity of atoms ?
 	if (simu.report_velo >= 1) {

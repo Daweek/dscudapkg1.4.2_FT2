@@ -38,13 +38,13 @@ EXES = remd_top
 
 OBJS_HST = remd_top_hst.o init_cond.o integ_hst.o comm_save_hst.o 
 
-OBJS_DEV = remd_top_dev.o init_cond.o integ_dev.o comm_save_dev.o mytools.o
+OBJS_DEV = init_cond.o integ_dev.o comm_save_dev.o mytools.o
 
 OBJS_DEV_FJ = remd_top_dev.o init_cond.o integ_dev.fault.o comm_save_dev.o mytools.o
 
-OBJS_DS  = remd_top_ds.o  init_cond.o integ_ds.o  comm_save_ds.o mytools.o
+OBJS_DS  = init_cond.o integ_ds.o  comm_save_ds.o mytools.o
 
-OBJS_DS_RCUT = remd_top_ds.o  init_cond.o integ_ds_rcut.o  comm_save_ds.o 
+OBJS_DS_RCUT = init_cond.o integ_ds_rcut.o  comm_save_ds.o 
 
 curr : remd_rpc
 
@@ -59,11 +59,20 @@ remd_hst : $(OBJS_HST)
 	$(CXX) $(NVCCFLAGS) $(CPPFLAGS) $(CUDALIB) $^ -o $@
 
 #### CUDA version
-remd_local : $(OBJS_DEV)
+remd_local_1page : remd_top.cu $(OBJS_DEV)
 	@echo "//"
 	@echo "// Generate remd_local"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 $^ $(CCLIB) -lrt -o $@
+	$(NVCC) -c -D"DEVICE_RUN" -D"EXTRA_PAGES=1" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o remd_top_native_1page.o
+	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 remd_top_native_1page.o $(OBJS_DEV) $(CCLIB) -lrt -o $@
+
+remd_local_8page : remd_top.cu $(OBJS_DEV)
+	@echo "//"
+	@echo "// Generate remd_local"
+	@echo "//"
+	$(NVCC) -c -D"DEVICE_RUN" -D"EXTRA_PAGES=8" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o remd_top_native_8page.o
+	$(NVCC) $(NVCCFLAGS) $(DSCUDAFLAGS) -L. -L$(CUDAPATH)/lib64 remd_top_native_8page.o $(OBJS_DEV) $(CCLIB) -lrt -o $@
+
 
 remd_local.fault : $(OBJS_DEV_FJ)
 	@echo "//"
@@ -74,20 +83,29 @@ remd_local.fault : $(OBJS_DEV_FJ)
 remd_local_meas_kernel : remd_top_dev.o init_cond.o integ_dev_meas_kernel.o comm_save_dev.o mytools.o
 	$(NVCC) $(NVCCFLAGS) -L. -L$(CUDAPATH)/lib64 -DMEAS_CUDA_EVENT $^ $(CCLIB) -o $@
 #### DS-CUDA version
-remd_ibv : $(OBJS_DS)
+remd_ibv : $(OBJS_DS) remd_top.cu
 	@echo "//"
 	@echo "// Generate remd_ds_ibv"
 	@echo "//"
 	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link $^ $(DSCUDALIB_IBV) $(CCLIB) -o $@
 
-remd_rpc : $(OBJS_DS)
+remd_rpc_1page : remd_top.cu $(OBJS_DS) 
+	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"EXTRA_PAGES=1" -I. $(NVCCFLAGS) -i $< -o remd_top_ds_1page.o
 	@echo "//"
 	@echo "// Generate remd_ds_rpc"
 	@echo "//"
-	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lpthread -lrt $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
+	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lpthread -lrt remd_top_ds_1page.o $(OBJS_DS) $(DSCUDALIB_RPC) $(CCLIB) -o $@
 #	$(CXX) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
 
-remd_rpc_rcut : $(OBJS_DS_RCUT)
+remd_rpc_8page : remd_top.cu $(OBJS_DS) 
+	$(DSCUDACPP) -c -D"DEVICE_RUN" -D"EXTRA_PAGES=8" -I. $(NVCCFLAGS) -i $< -o remd_top_ds_8page.o
+	@echo "//"
+	@echo "// Generate remd_ds_rpc"
+	@echo "//"
+	$(NVCC) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 -link -lpthread -lrt remd_top_ds_8page.o $(OBJS_DS) $(DSCUDALIB_RPC) $(CCLIB) -o $@
+#	$(CXX) $(NVCCFLAGS) -L. -L$(DSCUDA_PATH)/lib -L$(CUDAPATH)/lib64 $^ $(DSCUDALIB_RPC) $(CCLIB) -o $@
+
+remd_rpc_rcut : $(OBJS_DS_RCUT) remd_top.cu
 	@echo "//"
 	@echo "// Generate remd_ds_rpc"
 	@echo "//"
@@ -101,9 +119,6 @@ remd_top_hst.o : remd_top.cu
 
 remd_top_dev.o : remd_top.cu
 	$(NVCC) -c -D"DEVICE_RUN" $(NVCCFLAGS) $(DSCUDAFLAGS) $< -o $@
-
-remd_top_ds.o  : remd_top.cu
-	$(DSCUDACPP) -c -D"DEVICE_RUN" -I. $(NVCCFLAGS) -i $< -o $@
 
 remd_top.cu : init_cond.H remd_typedef.H mytools.H
 #
